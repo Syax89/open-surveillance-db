@@ -26,7 +26,7 @@ import assert from "node:assert/strict";
 import test, { afterEach, before } from "node:test";
 import {
   setupDom, loadDomModule, installFetchMock, jsonResponse,
-  renderWithLocale, setNavState, React,
+  renderWithLocale, setNavState, React, expandMapPoints,
 } from "./helpers/dom-harness.mjs";
 
 let rtl;
@@ -146,6 +146,7 @@ test("MappaTool: ?type= active — camera fetch count is FLAT after the filtered
 
   const { screen } = rtl;
   await renderWithLocale(React.createElement(MappaTool));
+  await expandMapPoints();
 
   // t_bb310428: /mappa fetches the VIEWPORT (bbox), not the paginated
   // walk; the facets query (?facets=1) is a separate one-shot. Flatness is
@@ -166,6 +167,7 @@ test("MappaTool: ?type= + ?freshness= active — camera fetch count is FLAT afte
 
   const { screen } = rtl;
   await renderWithLocale(React.createElement(MappaTool));
+  await expandMapPoints();
 
   await assertFetchCountIsFlat(screen, calls, (list) => bboxCalls(list));
 

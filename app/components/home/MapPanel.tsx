@@ -84,6 +84,10 @@ export function MapPanel({ filteredRecords, visibleRecords, selectedId, onSelect
   // only on demand. The deterministic initial state is hydration-safe and
   // gives the map the dominant visual area on desktop as well as mobile.
   const [pointsCollapsed, setPointsCollapsed] = useState<boolean>(true);
+  // Stable callbacks (perf): the memoized MapRecordList only re-renders when
+  // its data/labels change, not on every MapPanel render.
+  const togglePoints = useCallback(() => setPointsCollapsed((current) => !current), []);
+  const statusLabel = useCallback((status: string) => publicStatusLabel(statuses, status, t.unknown), [statuses, t.unknown]);
 
   // Popup content (t_702c10af): built by the shared lib/map-popup (escaped
   // + safe labels). Import provenance (FASE C, t_4dbce318): committed
@@ -104,7 +108,7 @@ export function MapPanel({ filteredRecords, visibleRecords, selectedId, onSelect
     <>
       <div className={`live-map-workspace map-split${pointsCollapsed ? " map-points-collapsed" : " map-points-expanded"}`}>
         <aside className={`map-sidebar${pointsCollapsed ? " is-collapsed" : ""}`} aria-labelledby="map-list-title">
-          <MapRecordList filteredRecords={filteredRecords} visibleRecords={visibleRecords} selectedId={selectedId} onSelect={onSelect} labels={t} statusLabel={(status) => publicStatusLabel(statuses, status, t.unknown)} collapsed={pointsCollapsed} onToggleCollapse={() => setPointsCollapsed((current) => !current)} />
+          <MapRecordList filteredRecords={filteredRecords} visibleRecords={visibleRecords} selectedId={selectedId} onSelect={onSelect} labels={t} statusLabel={statusLabel} collapsed={pointsCollapsed} onToggleCollapse={togglePoints} />
         </aside>
         <div className="map-panel">
           <SurveillanceMap cameras={filteredRecords} selectedId={selectedId} focusLocation={coordinates} focusBounds={focusBounds} focusIntent={focusIntent} onFocusApplied={onFocusApplied} initialView={initialView} onViewChange={onViewChange} onSelect={onSelect} onPick={onPick} directoryHref={directoryHref} onBoundsChange={onBoundsChange} popupHtmlFor={popupHtmlForCamera} />
