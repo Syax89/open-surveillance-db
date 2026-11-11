@@ -59,10 +59,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -178,7 +178,7 @@ jobs:
         run: |
           # F9 (t_ab0d4c75): snapshot del D1 di produzione nello stesso run del
           # deploy, PRIMA delle migrazioni — una migrazione distruttiva ha
-          # sempre il restore dello stesso run (il backup notturno 02:00
+          # sempre il restore dello stesso run (il backup notturno ~01:23 UTC
           # potrebbe essere vecchio di un giorno). Mai artifact in chiaro:
           # cifrato se BACKUP_PASSPHRASE è configurato, altrimenti il file
           # resta solo sul runner effimero (non caricato).
@@ -231,7 +231,7 @@ jobs:
 
       - name: Upload snapshot D1 + version-id (artifact run, F9 qa#5)
         if: ${{ github.event.inputs.mode == 'deploy' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: pre-deploy-${{ github.sha }}
           path: |

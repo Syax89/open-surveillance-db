@@ -18,8 +18,8 @@ name: Ops Backup D1
 
 on:
   schedule:
-    - cron: "0 2 * * *" # ogni giorno 02:00 UTC — backup D1 (gated su vars.ENABLE_CF_BACKUP, F10)
-    - cron: "0 3 1 */3 *" # trimestrale 03:00 UTC — restore drill (gated su vars.ENABLE_RESTORE_DRILL + ENABLE_CF_BACKUP, F10)
+    - cron: "23 1 * * *" # ogni giorno ~01:23 UTC (minuto non tondo: i cron a :00 subiscono ritardi di ore) — backup D1 (gated su vars.ENABLE_CF_BACKUP, F10)
+    - cron: "37 2 1 */3 *" # trimestrale ~02:37 UTC — restore drill (gated su vars.ENABLE_RESTORE_DRILL + ENABLE_CF_BACKUP, F10)
   workflow_dispatch:
     inputs:
       mode:
@@ -48,10 +48,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -82,6 +82,9 @@ jobs:
           sed -i "s/00000000-0000-4000-8000-000000000000/${D1_DATABASE_ID}/" wrangler.jsonc
           echo "database_id: iniettato dal secret GitHub (mai committato)"
 
+      # Nota: durante `wrangler d1 export` il D1 NON risponde alle query
+      # (avviso di wrangler; ~16 s a 272k telecamere, cresce con i dati).
+      # Per questo il job deve restare notturno (cron a minuto non tondo).
       - name: Export D1 remoto (schema + dati)
         id: export
         env:
@@ -180,7 +183,7 @@ jobs:
           ls -la d1-backup-*.enc*
 
       - name: Upload artifact privato del run (solo cifrato)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: d1-backup-${{ steps.export.outputs.stamp }}
           path: |
@@ -229,7 +232,7 @@ jobs:
     # F10 (t_ab0d4c75): il restore non era MAI stato esercitato. Il drill
     # scarica l'ultimo backup cifrato, lo applica a un D1 temporaneo e fa
     # smoke sui conteggi. Manuale (workflow_dispatch, mode=drill) oppure solo
-    # al cron trimestrale (03:00 del 1° del mese ogni 3), e solo se il backup
+    # al cron trimestrale (~02:37 UTC del 1° del mese ogni 3), e solo se il backup
     # CF è attivo E il drill è abilitato (vars.ENABLE_RESTORE_DRILL == "true").
     # `needs: backup`: senza dipendenza il drill partiva in parallelo e non
     # trovava l'artifact del run ("Nessun artifact d1-backup-* disponibile").
@@ -240,14 +243,14 @@ jobs:
     permissions:
       actions: read
       contents: read
-    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.mode == 'drill') || (github.event.schedule == '0 3 1 */3 *' && vars.ENABLE_CF_BACKUP == 'true' && vars.ENABLE_RESTORE_DRILL == 'true') }}
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.mode == 'drill') || (github.event.schedule == '37 2 1 */3 *' && vars.ENABLE_CF_BACKUP == 'true' && vars.ENABLE_RESTORE_DRILL == 'true') }}
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
