@@ -17,8 +17,11 @@
  * JSON bbox contract (GET /api/cameras?bbox=west,south,east,north), with:
  *
  *  - module-level cache: every fetched bbox is kept for 5 minutes (aligned
- *    with the API Cache-Control window) keyed by the quantized rectangle +
- *    server-filter combo, so panning back over a loaded area is instant;
+ *    with the API Cache-Control window) keyed by the grid-snapped rectangle
+ *    + server-filter combo, so panning back over a loaded area is instant;
+ *  - grid snap: the requested bbox is the viewport grown outward to a
+ *    zoom-dependent grid (snapViewportRectangles), so nearby viewports share
+ *    one URL (edge-cache hits) and small pans stay inside the fetched box;
  *  - in-flight dedupe: concurrent consumers / StrictMode double-effects share
  *    one promise per bbox instead of duplicating requests;
  *  - merge store: records from every fetched bbox accumulate in one
@@ -42,7 +45,8 @@
  *    culls by viewport (recordsInBounds) exactly as before — the markers and
  *    the sidebar list behave identically, just on a smaller, faster source;
  *  - `total` is the bbox-scoped server count of the LATEST response (the
- *    records inside the box matching the server filters). The filter-bar
+ *    records inside the requested box — grid-snapped, so larger than the
+ *    viewport — matching the server filters; not rendered). The filter-bar
  *    count in the UI stays client-side over the store (same computation as
  *    before) — it converges to the dataset total as the user explores;
  *  - `onRecords` fires ONCE, when the store transitions empty → non-empty
@@ -82,8 +86,17 @@ export const VIEWPORT_ZOOMOUT_DEBOUNCE_MS = 800;
  * over this area answer a decimated sample and get the long debounce.
  */
 export const VIEWPORT_MAX_AREA_SQ_DEG = 50;
-/** Cache-cell quantization (~110 m at the equator — tiny pans hit the cache). */
-export const VIEWPORT_QUANTIZE_DECIMALS = 3;
+/**
+ * Grid-snap divisors (see `snapViewportRectangles`): the grid step on each
+ * axis is the viewport span divided by this, rounded UP to a power of two.
+ * Detail views (count=false, always complete) snap coarsely; counted overview
+ * and continental views snap finely so a decimated sample keeps ~the density
+ * it had for the bare viewport.
+ */
+export const VIEWPORT_SNAP_DIVISOR_DETAIL = 4;
+export const VIEWPORT_SNAP_DIVISOR_OVERVIEW = 16;
+/** Halvings tried before a box that cannot stay in its area class is sent unsnapped. */
+const VIEWPORT_SNAP_MAX_REFINEMENTS = 6;
 /** One server-directed retry is enough; never turn a 429 into a request loop. */
 export const VIEWPORT_RATE_LIMIT_AUTO_RETRIES = 1;
 /** A malformed intermediary header must not freeze the map for an unbounded time. */
@@ -96,6 +109,9 @@ type ViewportPage = {
   /** True when the server answered a decimated sample (continental viewport). */
   decimated?: boolean;
 };
+
+/** A resolved viewport rectangle: the page plus the fetched box it came from. */
+type ResolvedPage = ViewportPage & { mergeKey: string; fromCache: boolean };
 
 class ViewportRateLimitError extends Error {
   constructor(readonly retryAfterSeconds: number) {
@@ -169,11 +185,14 @@ export function __viewportCacheKeys(): string[] {
 const inFlight = new Map<string, Promise<ViewportPage>>();
 const focusWalks = new Map<number, Promise<Camera | null>>();
 
-/** Quantized cache key: server-filter combo + the ~110 m bbox cell. */
+/**
+ * Cache key: server-filter combo + the EXACT fetched (grid-snapped) box. The
+ * snapped edges are discrete grid values, so overlapping viewports already
+ * share one key — no extra float quantization is needed (nor safe: at street
+ * zoom the grid step is finer than a 3-decimal cell).
+ */
 function bboxCacheKey(bounds: ViewportBounds, filterKey: string): string {
-  const d = VIEWPORT_QUANTIZE_DECIMALS;
-  const q = (value: number) => value.toFixed(d);
-  return `${filterKey}|${q(bounds.south)}|${q(bounds.north)}|${q(bounds.west)}|${q(bounds.east)}`;
+  return bboxRequestKey(bounds, filterKey);
 }
 
 /**
@@ -277,6 +296,69 @@ function coveringEntry(bounds: ViewportBounds, filterKey: string): CacheEntry | 
 
 function boxArea(bounds: ViewportBounds): number {
   return Math.max(0, bounds.north - bounds.south) * Math.max(0, bounds.east - bounds.west);
+}
+
+/**
+ * Server response class of one bbox: 0 = detail (count=false probe, always
+ * complete), 1 = counted overview (server may decimate on density),
+ * 2 = continental (server ALWAYS decimates, > BBOX_MAX_AREA_SQ_DEG).
+ */
+function areaClass(area: number): 0 | 1 | 2 {
+  if (area <= VIEWPORT_OVERVIEW_AREA_SQ_DEG) return 0;
+  if (area <= VIEWPORT_MAX_AREA_SQ_DEG) return 1;
+  return 2;
+}
+
+/** Smallest power of two (2^n, n may be negative) that is >= value. */
+function powerOfTwoAtLeast(value: number): number {
+  return 2 ** Math.ceil(Math.log2(value));
+}
+
+/**
+ * GRID-SNAP RULE (edge + client cache reuse). The box actually requested is
+ * the viewport rectangle grown OUTWARD to a grid anchored at (0°, 0°):
+ *
+ *   step(axis) = 2^ceil(log2(viewportSpan(axis) / divisor))
+ *   divisor    = 4 for detail views, 16 for counted overview/continental views
+ *
+ * The span is the WHOLE raw viewport (both antimeridian halves together), so
+ * the step only depends on the zoom level (a zoom step halves the span →
+ * halves the step) and every viewport at the same zoom over the same area
+ * produces the SAME bbox string — shared edge-cache entries across users, and
+ * a fetched box larger than the viewport (≈1.6–2.3× its area for detail
+ * views, ≈1.1–1.3× for overviews), so small pans stay covered.
+ *
+ * Invariants: edges are clamped to the world (lat ±90, lng ±180 — the
+ * antimeridian split from `viewportRectangles` is kept: each half is snapped
+ * on its own and its ±180 edge stays put), and a snapped box never changes
+ * the server's response class for that rectangle (`areaClass`): if it would
+ * cross the count=false overview cap or the 50 sq deg decimation cap, the
+ * step is halved, and after VIEWPORT_SNAP_MAX_REFINEMENTS the exact rectangle
+ * is sent.
+ */
+export function snapViewportRectangles(bounds: ViewportBounds): ViewportBounds[] {
+  const rectangles = viewportRectangles(bounds);
+  const latSpan = Math.max(...rectangles.map((rect) => rect.north - rect.south));
+  const lngSpan = rectangles.reduce((sum, rect) => sum + (rect.east - rect.west), 0);
+  return rectangles.map((rect) => {
+    if (!(latSpan > 0) || !(lngSpan > 0)) return rect;
+    const targetClass = areaClass(boxArea(rect));
+    const divisor = targetClass === 0 ? VIEWPORT_SNAP_DIVISOR_DETAIL : VIEWPORT_SNAP_DIVISOR_OVERVIEW;
+    let latStep = powerOfTwoAtLeast(latSpan / divisor);
+    let lngStep = powerOfTwoAtLeast(lngSpan / divisor);
+    for (let attempt = 0; attempt <= VIEWPORT_SNAP_MAX_REFINEMENTS; attempt += 1) {
+      const snapped: ViewportBounds = {
+        south: Math.max(-90, Math.floor(rect.south / latStep) * latStep),
+        north: Math.min(90, Math.ceil(rect.north / latStep) * latStep),
+        west: Math.max(-180, Math.floor(rect.west / lngStep) * lngStep),
+        east: Math.min(180, Math.ceil(rect.east / lngStep) * lngStep),
+      };
+      if (areaClass(boxArea(snapped)) === targetClass) return snapped;
+      latStep /= 2;
+      lngStep /= 2;
+    }
+    return rect;
+  });
 }
 
 /**
@@ -423,7 +505,7 @@ export type UseViewportCamerasOptions = {
 export type UseViewportCamerasResult = {
   /** Merged store: the union of every fetched viewport (id-deduped). */
   records: Camera[];
-  /** Bbox-scoped server total of the latest response (null until the first answer). */
+  /** Server total of the latest response, scoped to the requested (grid-snapped) box (null until the first answer). */
   total: number | null;
   /** True when the latest response is a decimated sample (continental viewport). */
   decimated: boolean;
@@ -555,31 +637,29 @@ export function useViewportCameras({ bounds, filters, focusId, onRecords, onErro
       : VIEWPORT_FETCH_DEBOUNCE_MS;
     const timer = window.setTimeout(() => {
       const liveRectangles = viewportRectangles(boundsRef.current!);
-      const liveKeys = liveRectangles.map((rect) => bboxCacheKey(rect, filterKey));
-      // Merge-dedupe uses the EXACT geometry: two rects that share a quantized
-      // cache cell (bboxA 0..0.1 vs bboxB 0.0001..0.1001) are different areas,
-      // so B's payload must still merge even though the CACHE cell is shared
-      // (B04 — otherwise the cell key silently swallows the new strip).
-      const liveMergeKeys = liveRectangles.map((rect) => bboxRequestKey(rect, filterKey));
+      // The boxes actually REQUESTED: the same rectangles grown outward to
+      // the zoom grid (snapViewportRectangles), index-aligned with
+      // liveRectangles. Coverage is always checked for the VIEWPORT
+      // rectangle against the cached SNAPPED boxes.
+      const fetchRectangles = snapViewportRectangles(boundsRef.current!);
       // Geometry-only key for the SETTLEMENT (B10): the pending landing is
       // geometry-based; the filter is matched separately via `filterKey`.
       const liveGeometryKey = liveRectangles.map(bboxExactKey).join("+");
-      // Resolve ONE rectangle through the module cache / in-flight dedupe /
-      // network, recording the fetched rectangle (and completeness) in cache.
-      // B04: the quantized cache cell is only REUSED when its entry actually
-      // COVERS this rectangle — a same-cell entry fetched for different
-      // geometry is never handed out, and the in-flight dedupe is keyed on the
-      // exact rectangle so a concurrent consumer of other geometry never joins
-      // the wrong request.
-      const resolveRectangle = async (rect: ViewportBounds, key: string): Promise<ViewportPage> => {
-        const cached = bboxCache.get(key);
-        if (cached && cachedEntryCovers(cached, rect, filterKey, Date.now())) {
-          touchCacheEntry(key, cached);
-          return { records: cached.records, total: cached.total, nextOffset: null, decimated: cached.decimated };
+      // Resolve ONE viewport rectangle through the module cache / in-flight
+      // dedupe / network. B04: a cached box is only REUSED when it actually
+      // COVERS the viewport rectangle (fresh, complete, same filters); a miss
+      // requests the SNAPPED box and caches it with the bounds really
+      // fetched. The in-flight dedupe is keyed on the exact requested box +
+      // filters, so a consumer of other geometry never joins the wrong
+      // request. `mergeKey` names the box the records came from.
+      const resolveRectangle = async (rect: ViewportBounds, fetchRect: ViewportBounds): Promise<ResolvedPage> => {
+        const covering = coveringEntry(rect, filterKey);
+        if (covering) {
+          return { records: covering.records, total: covering.total, nextOffset: null, decimated: covering.decimated, mergeKey: bboxRequestKey(covering.bounds, filterKey), fromCache: true };
         }
-        const flightKey = bboxRequestKey(rect, filterKey);
-        if (inFlight.has(flightKey)) return inFlight.get(flightKey)!;
-        const promise = fetchViewportPage(rect, filtersRef.current, controller.signal);
+        const flightKey = bboxRequestKey(fetchRect, filterKey);
+        if (inFlight.has(flightKey)) return { ...(await inFlight.get(flightKey)!), mergeKey: flightKey, fromCache: false };
+        const promise = fetchViewportPage(fetchRect, filtersRef.current, controller.signal);
         inFlight.set(flightKey, promise);
         let page: ViewportPage;
         try {
@@ -588,9 +668,9 @@ export function useViewportCameras({ bounds, filters, focusId, onRecords, onErro
           inFlight.delete(flightKey);
         }
         if (!controller.signal.aborted) {
-          cacheInsert(key, { bounds: rect, filterKey, records: page.records, total: page.total, fetchedAt: Date.now(), decimated: page.decimated, complete: page.decimated !== true });
+          cacheInsert(bboxCacheKey(fetchRect, filterKey), { bounds: fetchRect, filterKey, records: page.records, total: page.total, fetchedAt: Date.now(), decimated: page.decimated, complete: page.decimated !== true });
         }
-        return page;
+        return { ...page, mergeKey: flightKey, fromCache: false };
       };
       (async () => {
         // 1) Containment: EVERY requested rectangle is already inside a fresh
@@ -608,9 +688,13 @@ export function useViewportCameras({ bounds, filters, focusId, onRecords, onErro
           for (let i = 0; i < liveRectangles.length; i += 1) {
             const entry = coveringEntry(liveRectangles[i], filterKey);
             if (entry && !covering) covering = entry;
-            if (mergedKeysRef.current.has(liveMergeKeys[i])) continue;
-            mergedKeysRef.current.add(liveMergeKeys[i]);
-            if (entry) commitRecords(entry.records);
+            if (!entry) continue;
+            // Merge-dedupe per FETCHED box: a pan inside a box this instance
+            // already merged re-renders nothing.
+            const mergeKey = bboxRequestKey(entry.bounds, filterKey);
+            if (mergedKeysRef.current.has(mergeKey)) continue;
+            mergedKeysRef.current.add(mergeKey);
+            commitRecords(entry.records);
           }
           setLoading(false);
           setError(false);
@@ -623,9 +707,9 @@ export function useViewportCameras({ bounds, filters, focusId, onRecords, onErro
           return;
         }
         // 2) Resolve every rectangle (cache / in-flight dedupe / fetch).
-        const pages: ViewportPage[] = [];
+        const pages: ResolvedPage[] = [];
         for (let i = 0; i < liveRectangles.length; i += 1) {
-          pages.push(await resolveRectangle(liveRectangles[i], liveKeys[i]));
+          pages.push(await resolveRectangle(liveRectangles[i], fetchRectangles[i]));
         }
         if (controller.signal.aborted) return;
         setLoading(false);
@@ -636,9 +720,12 @@ export function useViewportCameras({ bounds, filters, focusId, onRecords, onErro
         const combinedTotal = pages.reduce((sum, page) => sum + page.total, 0);
         if (combinedTotal === 0 && !pages.some((page) => page.records.length > 0)) setEmpty(true);
         setTotal(combinedTotal);
-        for (let i = 0; i < liveRectangles.length; i += 1) {
-          if (mergedKeysRef.current.has(liveMergeKeys[i])) continue;
-          mergedKeysRef.current.add(liveMergeKeys[i]);
+        for (let i = 0; i < pages.length; i += 1) {
+          // A NETWORK page always merges (a refetch after expiry carries fresh
+          // payloads; mergeRecords keeps identities when nothing changed).
+          // Only a cache hit on a box this instance already merged is skipped.
+          if (pages[i].fromCache && mergedKeysRef.current.has(pages[i].mergeKey)) continue;
+          mergedKeysRef.current.add(pages[i].mergeKey);
           const merged = commitRecords(pages[i].records);
           // The first non-empty payload fires onRecords ONCE (initial
           // selection); later pans/merges must not steal the selection.
