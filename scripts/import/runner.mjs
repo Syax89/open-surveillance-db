@@ -33,7 +33,7 @@ import { pass1IntraSource, pass2CrossSource } from "./dedup.mjs";
 import { isLicenceImportable } from "./licence-gate.mjs";
 import { haversineMeters } from "./geo.mjs";
 
-/** D1 batch statement budget — 100 statements/call → 50 rows (insert + event). */
+/** D1 batch statement budget — 100 statements/call → 50 rows (insert + event, one atomic batch per chunk). */
 export const D1_BATCH_CHUNK_ROWS = 50;
 export const DEFAULT_MAX_RECORDS = 100_000;
 
@@ -334,12 +334,11 @@ export async function runImport(db, { slug, adapter: adapterOverride, descriptor
 
 /**
  * Write phase: chunked D1 batch inserts (design §8.3 step 7). Each chunk is
- * ≤ 50 staged rows → two D1 batch calls of ≤ 50 statements each (first the
- * INSERTs with RETURNING, then the lifecycle `imported` events with the
- * real camera ids — the same ON CONFLICT DO NOTHING RETURNING pattern as
- * db/community-actions.ts). Every INSERT carries (source, external_id) and
- * the partial UNIQUE makes it safe to re-run; a crash mid-run resumes
- * without duplicates.
+ * ≤ 50 staged rows → ONE atomic D1 batch call of ≤ 100 statements (each
+ * camera INSERT paired with its `imported` lifecycle event, see the comment
+ * in the loop). Every INSERT carries (source, external_id) and the partial
+ * UNIQUE makes it safe to re-run; a crash mid-run resumes without
+ * duplicates and never leaves a committed camera without its event.
  *
  * The runner owns `source` ('import:<slug>') and `import_batch_id` — the
  * adapter contract forbids the adapter from setting them. Imported rows
@@ -350,57 +349,71 @@ export async function runImport(db, { slug, adapter: adapterOverride, descriptor
  * `rollback_payload` column stays NULL — nothing to restore yet.
  */
 async function writeChunks(db, batchId, slug, inserts, report, counts, nowIso, checksum) {
+  const source = `import:${slug}`;
   for (let offset = 0; offset < inserts.length; offset += D1_BATCH_CHUNK_ROWS) {
     const chunk = inserts.slice(offset, offset + D1_BATCH_CHUNK_ROWS);
 
-    // Batch 1: the row inserts. RETURNING id lets us write the events with
-    // the real camera id in the second batch.
-    const insertStatements = chunk.map((row) =>
-      db
-        .prepare(
-          `INSERT INTO cameras (title, kind, manufacturer, observed_on, publish_manufacturer, publish_observed_on, address, notes, latitude, longitude, direction, status, source, updated, description, last_verified_at, review_due_at, review_interval_months, external_id, import_batch_id, created_at)
-           VALUES (?, ?, ?, NULL, 0, 0, ?, ?, ?, ?, ?, 'active', ?, ?, ?, NULL, NULL, ?, ?, ?, ?)
-           ON CONFLICT (source, external_id) WHERE external_id IS NOT NULL DO NOTHING
-           RETURNING id`,
-        )
-        .bind(
-          row.title,
-          row.kind,
-          row.manufacturer ?? null,
-          row.address ?? null,
-          row.notes ?? "",
-          row.latitude,
-          row.longitude,
-          row.direction ?? null,
-          `import:${slug}`,
-          nowIso,
-          row.description ?? "",
-          row.reviewIntervalMonths ?? row.review_interval_months ?? 12,
-          row.external_id,
-          batchId,
-          nowIso,
-        ),
-    );
-    const insertResults = await db.batch(insertStatements);
-
-    // Batch 2: one `imported` lifecycle event per actually-inserted row
-    // (ON CONFLICT DO NOTHING rows return no id → no event; provenance is
-    // only for rows this run really created, design §5.1).
-    const eventStatements = [];
-    for (let i = 0; i < chunk.length; i += 1) {
-      const cameraId = insertResults[i]?.results?.[0]?.id;
-      if (cameraId === undefined) continue; // duplicate — no new row, no event
-      eventStatements.push(
+    // ONE atomic db.batch() per chunk: each camera INSERT is immediately
+    // followed by its `imported` lifecycle event, written as INSERT ...
+    // SELECT that resolves the camera id by (source, external_id).
+    //
+    // Why not two batches (inserts with RETURNING, then events with the
+    // returned ids)? D1 batches are transactional, but two batches are two
+    // transactions: if the event batch failed after the inserts committed,
+    // the documented recovery (re-run) hit ON CONFLICT DO NOTHING, got no
+    // ids back, and the cameras were left without provenance forever.
+    // In a single batch the inserts and their events commit or roll back
+    // together, so a re-run always starts from a consistent state.
+    //
+    // Duplicate guards on the event SELECT: `import_batch_id = ?` limits it
+    // to rows owned by THIS batch (a pre-existing row of another batch that
+    // hit DO NOTHING gets no event), and NOT EXISTS keeps it to one
+    // `imported` event per camera even if the same row is seen twice (e.g.
+    // a --force refresh reusing the batch id).
+    //
+    // D1 limits: ≤ 50 rows → ≤ 100 statements per batch; the INSERT binds
+    // 15 params, the event 5 — far below the 100 bound-params cap.
+    const statements = [];
+    for (const row of chunk) {
+      statements.push(
         db
           .prepare(
-            "INSERT INTO camera_lifecycle_events (camera_id, event_type, detail, created_at) VALUES (?, 'imported', ?, ?)",
+            `INSERT INTO cameras (title, kind, manufacturer, observed_on, publish_manufacturer, publish_observed_on, address, notes, latitude, longitude, direction, status, source, updated, description, last_verified_at, review_due_at, review_interval_months, external_id, import_batch_id, created_at)
+             VALUES (?, ?, ?, NULL, 0, 0, ?, ?, ?, ?, ?, 'active', ?, ?, ?, NULL, NULL, ?, ?, ?, ?)
+             ON CONFLICT (source, external_id) WHERE external_id IS NOT NULL DO NOTHING`,
           )
-          .bind(cameraId, JSON.stringify({ batch: slug, external_id: chunk[i].external_id }), nowIso),
+          .bind(
+            row.title,
+            row.kind,
+            row.manufacturer ?? null,
+            row.address ?? null,
+            row.notes ?? "",
+            row.latitude,
+            row.longitude,
+            row.direction ?? null,
+            source,
+            nowIso,
+            row.description ?? "",
+            row.reviewIntervalMonths ?? row.review_interval_months ?? 12,
+            row.external_id,
+            batchId,
+            nowIso,
+          ),
+        db
+          .prepare(
+            `INSERT INTO camera_lifecycle_events (camera_id, event_type, detail, created_at)
+             SELECT c.id, 'imported', ?, ?
+               FROM cameras c
+              WHERE c.source = ? AND c.external_id = ? AND c.import_batch_id = ?
+                AND NOT EXISTS (
+                  SELECT 1 FROM camera_lifecycle_events e
+                   WHERE e.camera_id = c.id AND e.event_type = 'imported'
+                )`,
+          )
+          .bind(JSON.stringify({ batch: slug, external_id: row.external_id }), nowIso, source, row.external_id, batchId),
       );
     }
-    if (eventStatements.length > 0) {
-      await db.batch(eventStatements);
-    }
+    await db.batch(statements);
   }
 
   // --- step 7b: commit the batch row (counters + report + status) ---
