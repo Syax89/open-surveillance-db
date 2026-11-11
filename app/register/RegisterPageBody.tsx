@@ -126,7 +126,7 @@ export function RegisterPageBody() {
             </div>
             <p className="oidc-disclosure">
               {t.oidcDisclosure}{" "}
-              <Link href="/privacy">{t.privacyNotice}</Link>.
+              <Link href="/privacy" prefetch={false}>{t.privacyNotice}</Link>.
             </p>
           </div>
         ) : null}
@@ -199,11 +199,11 @@ export function RegisterPageBody() {
             {submitting ? t.loading : t.register}
           </button>
           <p className="auth-legal-links">
-            <Link href="/privacy">{t.privacyNotice}</Link>
+            <Link href="/privacy" prefetch={false}>{t.privacyNotice}</Link>
             <span aria-hidden="true"> · </span>
-            <Link href="/termini">{t.termsOfUse}</Link>
+            <Link href="/termini" prefetch={false}>{t.termsOfUse}</Link>
           </p>
-          <Art13Notice id="register-art13-note" label={t.privacyDetails}>{t.registerArt13} <Link href="/privacy">{t.privacyNotice}</Link>. {t.registerArt13Rights} <a href="mailto:privacy@opensurveillancedb.org">{t.privacyContact}</a>.</Art13Notice>
+          <Art13Notice id="register-art13-note" label={t.privacyDetails}>{t.registerArt13} <Link href="/privacy" prefetch={false}>{t.privacyNotice}</Link>. {t.registerArt13Rights} <a href="mailto:privacy@opensurveillancedb.org">{t.privacyContact}</a>.</Art13Notice>
         </form>
 
         <p className="auth-switch">
