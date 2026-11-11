@@ -38,7 +38,7 @@ import test, { afterEach, before } from "node:test";
 import {
   setupDom, loadDomModule, installFetchMock, jsonResponse, fakeCamerasPayload, installCamerasApiMock,
   leafletMarkers, resetLeafletMarkers,
-  renderWithLocale, setNavState, getNavState, React,
+  renderWithLocale, setNavState, getNavState, React, expandMapPoints,
 } from "./helpers/dom-harness.mjs";
 
 let rtl;
@@ -196,6 +196,7 @@ test("MappaTool renders the map tool shell with the shared FiltersBar and the vi
   installRecordsMock();
   const { screen } = rtl;
   await renderWithLocale(React.createElement(MappaTool));
+  await expandMapPoints();
 
   assert.ok(screen.getByRole("heading", { name: "Interactive map" }), "map pageTitle heading (sr-only h1 kept for a11y)");
   // Integrated layout (t_966254a1) + heading cleanup (t_11e38eab): no
@@ -243,6 +244,7 @@ test("the /mappa sidebar rows carry the status dot + localized label (status rai
   // 1.4.1), so the coloured left rail is never the only signal.
   installRecordsMock();
   const { container } = await renderWithLocale(React.createElement(MappaTool));
+  await expandMapPoints();
 
   await rtl.waitFor(() => assert.ok(container.querySelectorAll(".map-record").length >= 2, "the sidebar must list the visible points"));
   const rows = container.querySelectorAll(".map-record");
@@ -260,6 +262,7 @@ test("MappaTool kind filter narrows the sidebar list and the markers", async () 
   const { screen } = rtl;
   const user = rtl.userEvent.setup();
   await renderWithLocale(React.createElement(MappaTool));
+  await expandMapPoints();
   await rtl.waitFor(() => assert.ok(screen.getByRole("button", { name: /Illustrative record A/ })));
 
   await user.selectOptions(screen.getByLabelText("Camera type"), "Fixed dome");
@@ -274,6 +277,7 @@ test("MappaTool freshness filter keeps the map rendered and uses the global rese
   const { screen } = rtl;
   const user = rtl.userEvent.setup();
   await renderWithLocale(React.createElement(MappaTool));
+  await expandMapPoints();
   await rtl.waitFor(() => assert.ok(screen.getByRole("button", { name: /Illustrative record A/ })));
 
   // The mocked records carry no finite freshness date ("Demo data"), so any
@@ -303,6 +307,7 @@ test("MappaTool deep link applies the seeded URL filters fully (type + freshness
   setNavState({ search: "type=Traffic monitoring&freshness=7d" });
   const { screen } = rtl;
   await renderWithLocale(React.createElement(MappaTool));
+  await expandMapPoints();
 
   // F4 (useCameraFilters): the URL is no longer just a shell — the deep link
   // seeds kind AND applies the derived freshness cutoff. The mocked records
@@ -324,6 +329,7 @@ test("MappaTool with a valid EMPTY /api/cameras answer keeps the map and shows t
   installEmptyMock();
   const { screen } = rtl;
   await renderWithLocale(React.createElement(MappaTool));
+  await expandMapPoints();
 
   // The map region is still on the page (never replaced by an empty state).
   assert.ok(screen.getByRole("region", { name: "Interactive OpenStreetMap map" }), "the map stays rendered with zero records from the API");
@@ -385,6 +391,7 @@ test("MappaTool marker popup carries record info and the correction/detail links
   await resetLeafletMarkers();
   const { waitFor } = rtl;
   await renderWithLocale(React.createElement(MappaTool));
+  await expandMapPoints();
 
   await waitFor(async () => assert.equal((await leafletMarkers()).length, 2));
   const popupByTitle = Object.fromEntries((await leafletMarkers()).map((marker) => [marker.opts.title, marker.popupHtml]));
@@ -414,6 +421,7 @@ test("MappaTool list row click selects the marker and opens its popup (marker �
   const { screen, waitFor } = rtl;
   const user = rtl.userEvent.setup();
   await renderWithLocale(React.createElement(MappaTool));
+  await expandMapPoints();
 
   await waitFor(async () => assert.equal((await leafletMarkers()).length, 2));
   const markers = await leafletMarkers();
@@ -484,6 +492,7 @@ test("MappaTool zoom/pan updates the list to the points in the new viewport (deb
   const { screen, waitFor } = rtl;
   const leaflet = await loadDomModule("node_modules/leaflet/index.mjs");
   await renderWithLocale(React.createElement(MappaTool));
+  await expandMapPoints();
 
   // The map (and its moveend handler) exists after the lazy leaflet import
   // resolves. The viewport-bounded data layer (t_bb310428) fetches the
@@ -536,6 +545,7 @@ test("B08: the top and sidebar counters reflect the CURRENT VIEW, not the accumu
   const { screen, waitFor } = rtl;
   const leaflet = await loadDomModule("node_modules/leaflet/index.mjs");
   await renderWithLocale(React.createElement(MappaTool));
+  await expandMapPoints();
 
   await waitFor(() => assert.ok(leaflet.__maps.length > 0));
   const map = leaflet.__maps.at(-1);
@@ -584,6 +594,7 @@ test("MappaTool geocode autocomplete suggests places in a combobox; keyboard sel
   const { screen, waitFor } = rtl;
   const user = rtl.userEvent.setup();
   await renderWithLocale(React.createElement(MappaTool));
+  await expandMapPoints();
 
   // t_3c4b188e: ?q= writes (typing AND the selection clear) commit via the
   // pure history.replaceState path — spy on it to assert the committed URL.
@@ -684,6 +695,7 @@ test("MappaTool marker click after a ?focus= deep link keeps the clicked record 
   setNavState({ pathname: "/mappa", search: "focus=1" });
   const { screen, waitFor } = rtl;
   await renderWithLocale(React.createElement(MappaTool));
+  await expandMapPoints();
 
   // The deep link resolves record A as the selected camera.
   await waitFor(() => assert.ok(screen.getByRole("button", { name: /Illustrative record A/ })), { timeout: 5000 });
@@ -711,6 +723,7 @@ test("MappaTool geocode dropdown closes on Escape and on click outside", async (
   const { screen, waitFor } = rtl;
   const user = rtl.userEvent.setup();
   await renderWithLocale(React.createElement(MappaTool));
+  await expandMapPoints();
 
   const input = screen.getByRole("combobox", { name: /Filter points or find a place/ });
   await user.type(input, "Ferrara");
@@ -762,6 +775,7 @@ test("MappaTool geocode autocomplete shows honest no-results and unavailable sta
   const { screen, waitFor } = rtl;
   const user = rtl.userEvent.setup();
   await renderWithLocale(React.createElement(MappaTool));
+  await expandMapPoints();
   const input = screen.getByRole("combobox", { name: /Filter points or find a place/ });
 
   await user.type(input, "Xyzzy");
@@ -788,6 +802,7 @@ test("MappaTool text search with no matching record keeps the map rendered (in-l
   // narrow viewport from a previous test would silently hide record A.
   await resetLeafletMarkers();
   await renderWithLocale(React.createElement(MappaTool));
+  await expandMapPoints();
   await rtl.waitFor(() => assert.ok(screen.getByRole("button", { name: /Illustrative record A/ })));
 
   // A query that matches no local point empties ONLY the list (the map and

@@ -751,6 +751,19 @@ export async function renderWithLocale(element) {
   return rtl.render(await wrapWithLocale(element));
 }
 
+// /mappa points list (perf cap): the list rows are NOT rendered while the
+// panel is collapsed (it starts collapsed, map-first). Integration tests that
+// interact with the rows expand it first, exactly as a user would.
+export async function expandMapPoints() {
+  const rtl = await setupDom();
+  const toggle = await rtl.waitFor(() => {
+    const element = document.querySelector(".map-list-toggle");
+    if (!element) throw new Error("map points toggle not rendered yet");
+    return element;
+  });
+  if (toggle.getAttribute("aria-expanded") === "false") rtl.fireEvent.click(toggle);
+}
+
 // Wrap an element in the real LocaleProvider without rendering yet — usable
 // for both the initial render and testing-library's rerender(), which
 // replaces the whole tree and therefore needs the provider again.

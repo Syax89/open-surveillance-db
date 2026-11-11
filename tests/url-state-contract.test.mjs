@@ -35,7 +35,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   setupDom, loadDomModule, installFetchMock, jsonResponse, camerasApiResponse, installCamerasApiMock,
-  renderWithLocale, wrapWithLocale, setNavState, getNavState, React,
+  renderWithLocale, wrapWithLocale, setNavState, getNavState, React, expandMapPoints,
 } from "./helpers/dom-harness.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -591,6 +591,7 @@ test("/mappa?focus=ID preselects the record (focus management, FRONTEND_DESIGN Â
   const { screen } = rtl;
   installApiMock();
   await renderWithLocale(React.createElement(MappaTool));
+  await expandMapPoints();
 
   // The sidebar list is the keyboard/text equivalent of the map: a ?focus=
   // deep link lands with the focused record selected (aria-current on its
@@ -685,6 +686,7 @@ test("t_b1e192e1: typing in GeocodeSearch fires /api/geocode even under a forced
   const leaflet = await loadDomModule("node_modules/leaflet/index.mjs");
   leaflet.__resetMarkers();
   const view = await renderWithLocale(React.createElement(MappaTool));
+  await expandMapPoints();
 
   const input = screen.getByRole("combobox", { name: /Filter points or find a place/ });
   // A single keystroke schedules the 250ms debounce...
@@ -719,6 +721,8 @@ test("t_3c4b188e: typing under a hostile router (failReplace) â€” the ?q= still 
     await setNavState({ failReplace: true, pathname: "/mappa" });
 
     await renderWithLocale(React.createElement(MappaTool));
+
+    await expandMapPoints();
     const input = screen.getByRole("combobox", { name: /Filter points or find a place/ });
     await user.type(input, "Ferrara");
 

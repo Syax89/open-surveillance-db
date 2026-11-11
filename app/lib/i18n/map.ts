@@ -124,6 +124,14 @@ export const en = {
         : visible === total
           ? `Showing all ${visible} points in the current view`
           : `Showing ${visible} of ${total} points in the current view`,
+  // Capped points list (perf): the list renders one page at a time; the
+  // button appends the next page and a polite live region reports the
+  // listed count. The heading count above always reports the full total.
+  listShowMore: (next: number, remaining: number) =>
+    next === remaining
+      ? (remaining === 1 ? "Show the last point" : `Show the last ${remaining} points`)
+      : `Show ${next} more points (${remaining} not listed yet)`,
+  listShownOf: (shown: number, total: number) => `Listing ${shown} of ${total} points in the current view`,
   listEmptyInView:
     "No documented points in the current view. Move the map or zoom out to explore more.",
   // Marker popup (t_702c10af): opens on marker click with the record info
@@ -276,6 +284,13 @@ export const it: Translation<typeof en> = {
         : visible === total
           ? `Mostrati tutti i ${visible} punti nella vista corrente`
           : `Mostrati ${visible} di ${total} punti nella vista corrente`,
+  // Elenco punti a pagine (prestazioni): il pulsante aggiunge la pagina
+  // successiva e una regione live cortese riporta quanti punti sono elencati.
+  listShowMore: (next: number, remaining: number) =>
+    next === remaining
+      ? (remaining === 1 ? "Mostra l'ultimo punto" : `Mostra gli ultimi ${remaining} punti`)
+      : `Mostra altri ${next} punti (${remaining} non ancora elencati)`,
+  listShownOf: (shown: number, total: number) => `Elencati ${shown} di ${total} punti nella vista corrente`,
   listEmptyInView:
     "Nessun punto documentato nella vista corrente. Sposta la mappa o rimpicciolisci per esplorare di più.",
   // Popup del segnaposto (t_702c10af): si apre al clic sul marker con le
