@@ -48,12 +48,17 @@ domain on every merge to `main`. The interface is bilingual (EN/IT).
 ### Public data
 
 The database holds community reports plus imports from official open-data
-sources: OpenStreetMap coverage (IT/AT/CH/DE), Milan, Zürich, Kanton Bern,
-Hamburg, Paris region (GPSO, PVPP, Agen), Spain (DGT, Madrid, Barcelona), the
-Netherlands (Utrecht, Amsterdam), UK (Plymouth, TfL), Ukraine, Luxembourg,
-Finland, Norway, Canada (BC, Québec) and the United States (PA, MD, Baltimore,
-NY Thruway, Denver, DC, CA, SF, MN, New Orleans, Boulder, Rochester). The full
-registry with licences is in
+sources: OpenStreetMap coverage (surveillance tags for IT/AT/CH/DE, France,
+Spain, the Netherlands, UK, Japan, India and Australia; ALPR selection for the
+US and Canada), Milan, Zürich, Kanton Bern, Hamburg, Paris region (GPSO, PVPP,
+Agen), Spain (DGT, Madrid, Barcelona), the Netherlands (Utrecht, Amsterdam),
+UK (Plymouth, TfL, Nottingham, TfGM Greater Manchester), Ireland (Dublin),
+Ukraine, Luxembourg, Finland, Norway, Slovakia (Prešov), Serbia (Subotica),
+Cyprus, Canada (BC, Québec), the United States (PA, MD, Baltimore, NY Thruway,
+Denver, DC, CA, SF, MN, KY, Ohio, New England 511, New Orleans, Boulder,
+Rochester), Brazil (Belo Horizonte), Peru (La Punta, Pasco), Japan (Tokyo,
+Ichikawa), Hong Kong, Singapore, Thailand (Nakhon Ratchasima), Australia (NSW,
+Queensland) and New Zealand (Wellington). The full registry with licences is in
 [docs/data-sources/README.md](data-sources/README.md); committed batches and
 record counts are shown live on `/fonti`.
 

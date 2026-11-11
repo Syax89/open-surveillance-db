@@ -1,11 +1,14 @@
 # SurveillanceMap.tsx — refactoring analysis
 
-## Current state (verified 2026-08-09)
+## Current state (recounted 2026-11-11)
 
-- **929 lines**, **10 `useEffect`** (was 951 / 16)
+- **1237 lines**, **9 `useEffect`** (2026-08-09: 929 / 10; before the first
+  pass: 951 / 16). The file grew with later map features, not with a
+  regression of the extractions below.
 - `useLatest()` applied and live — it replaced six hand-written
   `useRef(value)` + `useEffect(() => { ref.current = value }, [value])` pairs.
-  That is the only extraction currently in the codebase.
+- `useMapViewHeight()` (`app/lib/hooks/use-map-view-height.ts`, mobile map
+  height budget) is the only other hook extracted from this component so far.
 
 ## What was attempted and reverted
 
@@ -36,7 +39,8 @@ file, and it is only finished when it is *imported* and the suite is green.
 
 ## Where the complexity actually is
 
-Two effects hold most of it:
+Two effects hold most of it (line counts below are **historical, measured
+2026-08-09** — re-measure before planning work):
 
 | Lines | Effect | Responsibilities |
 |---|---|---|
@@ -53,7 +57,8 @@ any of that logic.
 The component is functional; this is optimisation, not a bug fix. Before
 touching the two big effects:
 
-1. `npm test` green as a baseline (2261 pass at the time of writing) and
+1. `npm test` green as a baseline (2261 pass on 2026-08-09 — historical figure;
+   the suite has grown since, so take the baseline from a fresh run) and
    `npx tsc --noEmit` exit 0.
 2. Coverage for the behaviours the comments describe: one popup per marker
    click, zero popups on pan/zoom, open popup survives a rebuild, grid badge
