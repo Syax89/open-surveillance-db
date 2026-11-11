@@ -305,3 +305,21 @@ test("compact footer density is unchanged", async () => {
     "the rich footer keeps its auto 1fr auto grid + 28/32px gaps",
   );
 });
+
+test("long lists skip off-screen rendering with content-visibility:auto (perf 2026-11)", async () => {
+  const css = await cssPromise;
+  for (const [selector, size] of [
+    [".directory-tool .record-list .record-list-card", "240px"],
+    [".moderation-list .record-list-card", "420px"],
+  ]) {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const rule = new RegExp(`(?:^|\\})\\s*${escaped}\\s*\\{([^}]*)\\}`, "g");
+    const bodies = [...css.matchAll(rule)].map((match) => match[1]);
+    const cv = bodies.find((body) => /content-visibility\s*:\s*auto/.test(body));
+    assert.ok(cv, `${selector} opts into content-visibility:auto`);
+    assert.match(cv, new RegExp(`contain-intrinsic-size\\s*:\\s*auto ${size}`), `${selector} reserves a remembered intrinsic size`);
+  }
+  // The footer is deliberately NOT contained: it has no horizontal padding,
+  // so paint containment would clip the focus rings of its edge links.
+  assert.doesNotMatch(css, /(?:^|\})\s*(?:\.site-footer|footer)\s*\{[^}]*content-visibility/, "footer focus rings must not be clipped");
+});

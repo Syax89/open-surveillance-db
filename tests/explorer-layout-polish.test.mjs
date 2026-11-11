@@ -13,6 +13,9 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const css = await readFile(path.join(root, "app", "globals.css"), "utf8");
+// Perf 2026-11: the cross-document opt-in is route-scoped — it lives in a
+// static stylesheet linked only by the two explorer pages.
+const vtCss = await readFile(path.join(root, "public", "explorer-view-transition.css"), "utf8");
 
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -205,22 +208,46 @@ test("≤700px /directory header and card actions compact onto one row without l
 });
 
 test("cross-document explorer transitions opt in and crossfade continuously with reduced-motion safety", () => {
-  const transition = ruleBlock(css, "@view-transition");
+  const transition = ruleBlock(vtCss, "@view-transition");
   assert.equal(declaration(transition, "navigation"), "auto", "cross-document navigation is explicitly opted in");
 
-  const oldRoot = ruleBlock(css, "::view-transition-old(root)");
-  const newRoot = ruleBlock(css, "::view-transition-new(root)");
+  const oldRoot = ruleBlock(vtCss, "::view-transition-old(root)");
+  const newRoot = ruleBlock(vtCss, "::view-transition-new(root)");
   assert.match(oldRoot, /animation\s*:\s*osdb-vt-out\b/, "outgoing document has a short root motion");
   assert.match(newRoot, /animation\s*:\s*osdb-vt-in\b/, "incoming document starts at the same time as the outgoing document");
   assert.doesNotMatch(newRoot, /animation-delay\s*:/, "the incoming document has no blank-frame delay");
 
-  const oldFrames = ruleBlock(css, "@keyframes osdb-vt-out");
-  const newFrames = ruleBlock(css, "@keyframes osdb-vt-in");
+  const oldFrames = ruleBlock(vtCss, "@keyframes osdb-vt-out");
+  const newFrames = ruleBlock(vtCss, "@keyframes osdb-vt-in");
   assert.match(oldFrames, /opacity\s*:\s*0/, "outgoing document fades away");
   assert.match(newFrames, /opacity\s*:\s*0/, "incoming document fades in");
   assert.match(`${oldFrames}${newFrames}`, /transform\s*:\s*translateY\(/, "the fade includes restrained vertical motion");
 
-  assert.match(css, /\.explore-view-switch\s*\{[^}]*view-transition-name\s*:\s*explore-view-switch/, "the explorer switch stays a named shared element");
-  const reducedMotion = mediaBlocks(css, "prefers-reduced-motion", "reduce");
+  assert.match(vtCss, /\.explore-view-switch\s*\{[^}]*view-transition-name\s*:\s*explore-view-switch/, "the explorer switch stays a named shared element");
+  const reducedMotion = mediaBlocks(vtCss, "prefers-reduced-motion", "reduce");
   assert.ok(reducedMotion.some((block) => /::view-transition-old\(\*\)[\s\S]*animation\s*:\s*none\s*!important/.test(block)), "reduced-motion users keep transitions disabled");
+});
+
+test("the @view-transition opt-in is scoped to the map/directory explorer, never global", async () => {
+  // A global rule made EVERY same-origin navigation pay full-page snapshots.
+  assert.doesNotMatch(css, /@view-transition\s*\{/, "app/globals.css must not opt every navigation in");
+  assert.doesNotMatch(css, /::view-transition-(old|new)\(root\)/, "root transition animations stay with the scoped opt-in");
+
+  const component = await readFile(path.join(root, "app", "components", "ExplorerViewTransitionStyles.tsx"), "utf8");
+  assert.match(component, /EXPLORER_VIEW_TRANSITION_CSS = "\/explorer-view-transition\.css"/);
+  assert.match(component, /<link rel="stylesheet" href=\{EXPLORER_VIEW_TRANSITION_CSS\} precedence="default" \/>/, "React 19 hoists the precedence stylesheet into <head>");
+
+  for (const page of ["mappa", "directory"]) {
+    const source = await readFile(path.join(root, "app", "(tools)", page, "page.tsx"), "utf8");
+    assert.match(source, /<ExplorerViewTransitionStyles \/>/, `/${page} links the explorer view-transition stylesheet`);
+  }
+  // No other route opts in.
+  const { execFileSync } = await import("node:child_process");
+  const users = execFileSync("grep", ["-rl", "--include=*.tsx", "--include=*.ts", "ExplorerViewTransitionStyles", path.join(root, "app")], { encoding: "utf8" })
+    .trim().split("\n").map((file) => path.relative(root, file)).sort();
+  assert.deepEqual(users, [
+    path.join("app", "(tools)", "directory", "page.tsx"),
+    path.join("app", "(tools)", "mappa", "page.tsx"),
+    path.join("app", "components", "ExplorerViewTransitionStyles.tsx"),
+  ]);
 });

@@ -5,6 +5,7 @@ import {
   removeCommunityAction,
   setCommunityAction,
 } from "../../../../../db/community-actions";
+import { cameraPurgeTags, purgeCacheTags } from "../../../../lib/cache-purge";
 import { resolveOptionalContributor } from "../../../../lib/auth-session";
 import { requireWriteAuth } from "../../../../lib/write-gate";
 import { CSRF_REJECTED_ERROR, csrfVerified, sameOrigin } from "../../../../lib/csrf";
@@ -135,6 +136,14 @@ export async function PUT(request: Request) {
   try {
     const now = new Date().toISOString();
     const result = await setCommunityAction({ cameraId: id, contributorId, actionType: action, now, env });
+    // Cache invalidation (perf 2026-11): an accepted action appends a public
+    // lifecycle event and may cross a community threshold (hidden/removed/
+    // restored), so purge the record tag — which also covers the cached
+    // /events timeline — and the shared collections, exactly like a
+    // moderation decision. Fail-open no-op without purge credentials.
+    if (result.kind === "ok" || result.kind === "switched") {
+      await purgeCacheTags(cameraPurgeTags(id), env);
+    }
     switch (result.kind) {
       case "ok":
         return Response.json({ action: result.actionType, counts: result.counts }, { headers: NO_STORE_HEADERS });

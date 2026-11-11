@@ -258,6 +258,62 @@ test("PUT ok returns {action, counts} with no-store header", async () => {
   assert.equal(input.actionType, "like");
 });
 
+// Edge/worker cache purge (perf 2026-11): an accepted action appends a public
+// lifecycle event (liked/confirmed/gone-flagged) and may cross a threshold
+// (hidden/removed/restored), so the cached timeline (/events, tag camera-<id>)
+// and the shared collections must be purged exactly like a moderation
+// decision — no stale timeline after an action. Rejected actions never purge.
+const originalFetch = globalThis.fetch;
+async function withPurgeCapture(fn) {
+  const captured = [];
+  env.CACHE_PURGE_TOKEN = "test-token";
+  env.CACHE_PURGE_ZONE_ID = "test-zone";
+  globalThis.fetch = async (input, init) => {
+    captured.push({ url: String(input), init });
+    return new Response(JSON.stringify({ success: true }), { status: 200 });
+  };
+  try {
+    await fn(captured);
+  } finally {
+    delete env.CACHE_PURGE_TOKEN;
+    delete env.CACHE_PURGE_ZONE_ID;
+    globalThis.fetch = originalFetch;
+  }
+}
+
+test("PUT ok/switched purges the record tag (timeline) and shared camera tags", async (t) => {
+  for (const result of [
+    { kind: "ok", actionType: "like", counts: { like: 1, confirm: 0, gone: 0, problem: 0, privacy: 0 } },
+    { kind: "switched", actionType: "gone", switchedFrom: "like", counts: { like: 0, confirm: 0, gone: 1, problem: 0, privacy: 0 } },
+  ]) {
+    await t.test(result.kind, async () => {
+      await withPurgeCapture(async (captured) => {
+        stub("findSessionByToken", async () => ({ ...sessionFixture, contributor }));
+        stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
+        stub("setCommunityAction", async () => result);
+        const { PUT } = await actionsRoute();
+        const response = await PUT(authed("PUT", "/api/cameras/5/actions", { body: { action: result.actionType } }));
+        assert.equal(response.status, 200);
+        assert.equal(captured.length, 1, "one purge call per accepted action");
+        assert.equal(captured[0].url, "https://api.cloudflare.com/client/v4/zones/test-zone/purge_cache");
+        assert.deepEqual(JSON.parse(captured[0].init.body).tags, ["cameras-list", "cameras-bbox", "cameras-export", "camera-5"]);
+      });
+    });
+  }
+});
+
+test("PUT does not purge when the action was rejected", async () => {
+  await withPurgeCapture(async (captured) => {
+    stub("findSessionByToken", async () => ({ ...sessionFixture, contributor }));
+    stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
+    stub("setCommunityAction", async () => ({ kind: "duplicate" }));
+    const { PUT } = await actionsRoute();
+    const response = await PUT(authed("PUT", "/api/cameras/5/actions", { body: { action: "like" } }));
+    assert.equal(response.status, 409);
+    assert.equal(captured.length, 0);
+  });
+});
+
 test("PUT switched returns {action, switchedFrom, counts}", async () => {
   stub("findSessionByToken", async () => ({ ...sessionFixture, contributor }));
   stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
