@@ -29,6 +29,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Least privilege: these jobs only read the repository.
+permissions:
+  contents: read
+
 concurrency:
   group: lighthouse-${{ github.ref }}
   cancel-in-progress: true
@@ -42,10 +46,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm

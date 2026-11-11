@@ -8,6 +8,10 @@ on:
   schedule:
     - cron: "0 6 * * 1" # ogni lunedì 06:00 UTC
 
+# Least privilege: these jobs only read the repository.
+permissions:
+  contents: read
+
 concurrency:
   group: security-${{ github.ref }}
   cancel-in-progress: true
@@ -20,7 +24,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -36,6 +40,9 @@ jobs:
           curl -sSfL \
             "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
             -o /tmp/gitleaks.tar.gz
+          # Integrity pin: sha256 of the release asset (matches the upstream
+          # gitleaks_8.24.3_checksums.txt). Bump together with GITLEAKS_VERSION.
+          echo "9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c  /tmp/gitleaks.tar.gz" | sha256sum -c -
           tar -xzf /tmp/gitleaks.tar.gz -C /usr/local/bin gitleaks
           if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
             # Su PR: scansiona SOLO i commit della PR (base..head), non l'intero
@@ -76,10 +83,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm

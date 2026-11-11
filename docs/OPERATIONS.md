@@ -54,7 +54,7 @@ curl -sS -o /dev/null -w 'moderation  %{http_code}\n' https://<PROD_URL>/api/mod
 ```
 
 Automated by the `.github/workflows/ops-monitoring.yml` workflow (scheduled,
-daily cron; opens a GitHub issue if a check fails — section 2.3).
+every 30 minutes at :17 and :47 UTC; opens a GitHub issue if a check fails — section 2.3).
 
 ### 2.2 Error rate and logs
 
@@ -105,7 +105,7 @@ Notes:
 
 Workflow `.github/workflows/ops-backup.yml`:
 
-- trigger: `schedule` cron `0 2 * * *` (02:00 UTC, daily) + `workflow_dispatch`;
+- trigger: `schedule` cron `23 1 * * *` (~01:23 UTC, daily; off the top of the hour because `:00` schedules start hours late on GitHub) + `workflow_dispatch`. Note: `wrangler d1 export` makes the database unavailable to queries while it runs (~16 s at 272k cameras), so it must stay at night;
 - runs `wrangler d1 export ... --remote` with credentials from
   `secrets.CLOUDFLARE_API_TOKEN` and `secrets.CLOUDFLARE_ACCOUNT_ID`;
 - verifies the dump contains the expected 3 tables (`cameras`,
