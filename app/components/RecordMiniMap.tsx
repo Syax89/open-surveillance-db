@@ -119,7 +119,10 @@ export function RecordMiniMap({
     <div
       ref={containerRef}
       className="record-minimap"
-      role="img"
+      // region, not img: the map contains focusable controls (zoom buttons,
+      // attribution links, the keyboard-pannable container), and an img role
+      // must not have interactive descendants (axe nested-interactive).
+      role="region"
       aria-label={t.positionOnMap}
     />
   );

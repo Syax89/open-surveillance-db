@@ -8,7 +8,7 @@
  *      (field-of-view.ts): domes → circle, directional kinds with a
  *      stored bearing → cone polygon, unknown direction → nothing;
  *   3. is decorative and hydration-safe: SSR emits the container div
- *      (role="img" + localized label), Leaflet mounts in an effect.
+ *      (role="region" + localized label), Leaflet mounts in an effect.
  *
  * Fixtures are fictitious (illustrative coordinates, example.test).
  */
@@ -79,7 +79,7 @@ test("the marker uses the custom divIcon (osm-camera-marker), never Leaflet's un
 test("mini map is interactive: pan/zoom enabled, tiles served by the CSP-safe /api/tiles proxy", async () => {
   const { screen } = rtl;
   await renderMiniMap({});
-  const img = screen.getByRole("img", { name: "Position on the map" });
+  const img = screen.getByRole("region", { name: "Position on the map" });
   assert.ok(img, "the container exposes the localized position label");
   const maps = await leafletMaps();
   const map = maps.at(-1);
