@@ -4,7 +4,10 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { LocaleToggle, useLocale } from "../../components/LocaleProvider";
-import { useMessages } from "../../lib/use-messages";
+import { useDomainMessages } from "../../lib/use-domain-messages";
+import { recordByLocale } from "../../lib/i18n/record";
+import { communityByLocale } from "../../lib/i18n/community";
+import { statusByLocale } from "../../lib/i18n/status";
 import { SiteHeader } from "../../components/SiteHeader";
 import { CommunityActions } from "../../components/CommunityActions";
 import { usePublicCamera } from "../../lib/use-public-cameras";
@@ -42,11 +45,10 @@ function isWithdrawn(status: string): boolean {
  */
 export default function RecordPageBody({ id, initial }: { id?: number; initial?: InitialRecordSeed } = {}) {
   const params = useParams<{ id: string }>();
-  const bundle = useMessages();
   const { locale } = useLocale();
-  const t = bundle.record;
-  const community = bundle.community;
-  const statuses: Record<string, string> = bundle.status;
+  const t = useDomainMessages(recordByLocale);
+  const community = useDomainMessages(communityByLocale);
+  const statuses: Record<string, string> = useDomainMessages(statusByLocale);
   // The server shell passes the validated id so the seeded SSR render never
   // depends on route params being available outside the client router.
   const recordId = typeof id === "number" ? id : Number(params.id);

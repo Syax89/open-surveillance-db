@@ -47,9 +47,6 @@ const HEAVY = new Set([
  * useDomainMessages — the "allow-list is exact" test enforces it.
  */
 const ALLOWLIST = new Set([
-  "app/components/SurveillanceMap.tsx",
-  "app/records/[id]/RecordPageBody.tsx",
-  "app/records/[id]/edit/page.tsx",
   // The deprecated hook itself (it IS the heavy import).
   "app/lib/use-messages.ts",
 ]);

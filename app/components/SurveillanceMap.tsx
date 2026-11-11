@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isPublicStatus } from "../lib/public-status";
 import { BOUNDS_DEBOUNCE_MS, escapeHtml, longitudeInCopy, viewportCenterLongitude, type MapView, type ViewportBounds } from "../lib/map-viewport";
 import { MAX_INDIVIDUAL_MARKERS, markersForViewport } from "../lib/map-grid";
-import { useMessages } from "../lib/use-messages";
+import { useDomainMessages } from "../lib/use-domain-messages";
+import { mapByLocale } from "../lib/i18n/map";
 import { useLatest } from "../lib/hooks/use-latest";
 import { useMapViewHeight } from "../lib/hooks/use-map-view-height";
 import { isDomeKind } from "../lib/camera-kinds";
@@ -328,7 +329,7 @@ export function SurveillanceMap({ cameras, selectedId, onSelect, onPick, focusLo
   // z17 one show no cones until the first pan. createMap also re-syncs it
   // from map.getZoom() right after creation.
   const [mapZoom, setMapZoom] = useState(() => initialView?.zoom ?? 13);
-  const t = useMessages().map;
+  const t = useDomainMessages(mapByLocale);
   // Geolocation button (t_18259daa, CEO): a floating custom control stacked
   // ABOVE the zoom buttons shows the user's own position on the map. All
   // client-side (privacy by design — the position never leaves the
