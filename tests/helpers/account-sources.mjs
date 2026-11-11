@@ -26,6 +26,9 @@ export const ACCOUNT_PAGE_SOURCES = [
   "app/account/PasskeysSection.tsx",
   "app/account/PasskeyDialogs.tsx",
   "app/account/DeleteAccountSection.tsx",
+  // Hooks that now hold logic formerly inline in AccountPageBody.tsx.
+  "app/lib/useContributions.ts",
+  "app/lib/usePasskeys.ts",
 ];
 
 /** Concatenated source of the account page body and its section components. */

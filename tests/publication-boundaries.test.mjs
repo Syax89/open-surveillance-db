@@ -667,6 +667,11 @@ test("every public route family applies its own rate limit with 429 and Retry-Af
   assert.match(nearby, /limitsFor\(\s*["']nearby["']/, "nearby must use its own bucket");
   assert.match(revisions, /limitsFor\(\s*["']revisions["']/, "revisions must use its own bucket");
   assert.match(moderation, /limitsFor\(\s*["']moderate["']/, "moderation must use its own bucket");
+  // The helper takes the bucket and the limits separately: pin both, so a
+  // mismatched `bucket:` cannot slip past a correct limitsFor(...) argument.
+  assert.match(nearby, /bucket:\s*["']nearby["']/, "nearby must rate-limit in its own bucket");
+  assert.match(revisions, /bucket:\s*["']revisions["']/, "revisions must rate-limit in its own bucket");
+  assert.match(moderation, /bucket:\s*["']moderate["']/, "moderation must rate-limit in its own bucket");
   assert.match(corrections, /submissionLimits\(env\)/, "corrections must share the submission bucket");
 });
 
