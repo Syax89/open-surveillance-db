@@ -1,8 +1,8 @@
 /**
- * Directional coherence between the Env interfaces in worker/index.ts and
+ * Directional coherence between the Env interfaces in worker/env.ts and
  * worker-configuration.d.ts.
  *
- * worker/index.ts declares `interface Env` with 24 keys; the manual
+ * worker/env.ts declares `interface Env` with 24 keys; the manual
  * `declare module "cloudflare:workers"` in worker-configuration.d.ts used to
  * lag behind. The contract is DIRECTIONAL: every key the worker actually
  * reads must be declared in the configuration typings, while the typings may
@@ -27,7 +27,7 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-const workerSource = readFileSync(path.join(root, "worker/index.ts"), "utf8");
+const workerSource = readFileSync(path.join(root, "worker/env.ts"), "utf8");
 const configSource = readFileSync(path.join(root, "worker-configuration.d.ts"), "utf8");
 
 /** The 13 keys that were missing from worker-configuration.d.ts and are now
@@ -69,13 +69,13 @@ function extractEnvKeys(source) {
 
 const configKeys = new Set(extractEnvKeys(configSource));
 
-test("every Env key in worker/index.ts exists in worker-configuration.d.ts", () => {
+test("every Env key in worker/env.ts exists in worker-configuration.d.ts", () => {
   const workerKeys = extractEnvKeys(workerSource);
   const missing = workerKeys.filter((key) => !configKeys.has(key));
   assert.equal(
     missing.length,
     0,
-    `worker/index.ts Env keys missing from worker-configuration.d.ts: ${missing.join(", ")}`,
+    `worker/env.ts Env keys missing from worker-configuration.d.ts: ${missing.join(", ")}`,
   );
 });
 

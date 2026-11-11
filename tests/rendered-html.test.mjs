@@ -805,12 +805,12 @@ test("security headers do not overwrite a stricter app-level CSP", async () => {
   // its own response; if the edge ever overwrote it, the stricter policy
   // would be silently weakened. The merge rule is asserted on the source
   // contract instead of a live binary response.
-  const workerSource = await readFile(path.join(root, "worker", "index.ts"), "utf8");
+  const workerSource = await readFile(path.join(root, "worker", "security-headers.ts"), "utf8");
   assert.match(workerSource, /if \(!headers\.has\(name\)\)/, "edge must only add missing headers");
 });
 
 test("worker edge source carries the global security headers (static guard)", async () => {
-  const workerSource = await readFile(path.join(root, "worker", "index.ts"), "utf8");
+  const workerSource = await readFile(path.join(root, "worker", "security-headers.ts"), "utf8");
   for (const [name, value] of [
     ["X-Content-Type-Options", "nosniff"],
     ["X-Frame-Options", "DENY"],
@@ -820,8 +820,8 @@ test("worker edge source carries the global security headers (static guard)", as
     ["Cross-Origin-Opener-Policy", "same-origin"],
     ["Content-Security-Policy", "default-src 'self'"],
   ]) {
-    assert.ok(workerSource.includes(name), `worker/index.ts must define ${name}`);
-    assert.ok(workerSource.includes(value), `worker/index.ts must define ${value}`);
+    assert.ok(workerSource.includes(name), `worker/security-headers.ts must define ${name}`);
+    assert.ok(workerSource.includes(value), `worker/security-headers.ts must define ${value}`);
   }
 });
 
