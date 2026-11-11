@@ -30,7 +30,7 @@
 
 import { getUserByEmail, type UserRecord, type UserRole, roleAtLeast } from "../../db/users";
 import { resolveOptionalContributor } from "./auth-session";
-import { CSRF_REJECTED_ERROR, csrfVerified, sameOrigin } from "./csrf";
+import { CSRF_REJECTED_ERROR, SESSION_COOKIE, csrfVerified, readCookie, sameOrigin } from "./csrf";
 
 const CHATGPT_EMAIL_HEADER = "oai-authenticated-user-email";
 const PROTOTYPE_EMAIL_HEADER = "x-osdb-user-email";
@@ -108,7 +108,14 @@ function writeOriginRejected(): Response {
  */
 export async function moderatorWriteGuard(request: Request): Promise<Response | null> {
   if (!sameOrigin(request)) return writeOriginRejected();
-  if (request.headers.get(MODERATION_AUTH_SOURCE_HEADER) !== "session") return null;
+  // Fail closed: only an explicit `edge` (Basic/bearer) source skips the
+  // token. A missing/unknown source still requires it whenever the request
+  // carries an osdb_session cookie (the ambient authority CSRF exploits), so a
+  // future gate branch that forgets to set the source cannot silently drop
+  // the check.
+  const source = request.headers.get(MODERATION_AUTH_SOURCE_HEADER);
+  if (source === "edge") return null;
+  if (source !== "session" && readCookie(request, SESSION_COOKIE) === null) return null;
   let resolved: Awaited<ReturnType<typeof resolveOptionalContributor>> = null;
   try {
     resolved = await resolveOptionalContributor(request);

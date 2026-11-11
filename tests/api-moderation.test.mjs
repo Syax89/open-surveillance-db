@@ -1296,3 +1296,19 @@ test("GET /api/moderation rejects malformed queue cursors with 400 and no queue 
     });
   }
 });
+
+test("PATCH with an osdb_session cookie but no auth-source marker fails closed (CSRF required)", async () => {
+  resetMockState();
+  stubModeratorAuth();
+  stubModeratorSession();
+  stub("moderateCamera", async () => okResult());
+  const { PATCH } = await route();
+  const withoutToken = await PATCH(sessionDecision({ "x-osdb-auth-source": "" }));
+  assert.equal(withoutToken.status, 403);
+  assert.equal(callArgs("moderateCamera").length, 0);
+  const withToken = await PATCH(
+    sessionDecision({ "x-osdb-auth-source": "", "x-csrf-token": "moderator-csrf-token" }),
+  );
+  assert.equal(withToken.status, 200);
+  assert.equal(callArgs("moderateCamera").length, 1);
+});
