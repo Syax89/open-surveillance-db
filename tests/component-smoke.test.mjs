@@ -108,6 +108,21 @@ const ACCOUNT_COMPONENTS = [
   { name: "ApiKeyRow", file: "app/account/ApiKeyRow.tsx" },
   { name: "ApiKeyCreateDialog", file: "app/components/ApiKeyCreateDialog.tsx" },
   { name: "ApiKeyRevealDialog", file: "app/components/ApiKeyRevealDialog.tsx" },
+  // Split di AccountPageBody (un componente per sezione): stesso contratto
+  // ~150 righe, nessuna deviazione registrata. Lo stato condiviso (profilo,
+  // livello, ruolo, logout/cancellazione) resta in AccountPageBody; gli hook
+  // useContributions/usePasskeys vivono in app/lib come useApiKeys.
+  { name: "VerifyEmailBanner", file: "app/account/VerifyEmailBanner.tsx" },
+  { name: "ProfileSection", file: "app/account/ProfileSection.tsx" },
+  { name: "DisplayNameField", file: "app/account/DisplayNameField.tsx" },
+  { name: "ContributionsSection", file: "app/account/ContributionsSection.tsx" },
+  { name: "ContributionStats", file: "app/account/ContributionStats.tsx" },
+  { name: "ContributionFilters", file: "app/account/ContributionFilters.tsx" },
+  { name: "ContributionList", file: "app/account/ContributionList.tsx" },
+  { name: "ContributionKindIcon", file: "app/account/ContributionKindIcon.tsx" },
+  { name: "PasskeysSection", file: "app/account/PasskeysSection.tsx" },
+  { name: "PasskeyDialogs", file: "app/account/PasskeyDialogs.tsx" },
+  { name: "DeleteAccountSection", file: "app/account/DeleteAccountSection.tsx" },
 ];
 
 /**

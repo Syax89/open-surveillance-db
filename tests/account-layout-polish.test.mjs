@@ -14,10 +14,11 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { readAccountPageSource } from "./helpers/account-sources.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const css = await readFile(path.join(root, "app", "globals.css"), "utf8");
-const body = await readFile(path.join(root, "app", "account", "AccountPageBody.tsx"), "utf8");
+const body = await readAccountPageSource();
 
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

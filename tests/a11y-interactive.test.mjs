@@ -46,6 +46,7 @@ import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { readAccountPageSource } from "./helpers/account-sources.mjs";
 import { Miniflare } from "miniflare";
 import {
   React,
@@ -432,7 +433,7 @@ test("auth errors are announced through a live region (role=alert)", async () =>
   const [login, register, account] = await Promise.all([
     readFile(path.join(root, "app", "login", "LoginPageBody.tsx"), "utf8"),
     readFile(path.join(root, "app", "register", "RegisterPageBody.tsx"), "utf8"),
-    readFile(path.join(root, "app", "account", "AccountPageBody.tsx"), "utf8"),
+    readAccountPageSource(),
   ]);
   // role="alert" is an implicit assertive live region: the message is read
   // out as soon as it renders after a failed submit.
@@ -443,7 +444,7 @@ test("auth errors are announced through a live region (role=alert)", async () =>
 
 test("account actions are native buttons; tabIndex only as programmatic focus targets, never on buttons", async () => {
   const [account, confirmDialog] = await Promise.all([
-    readFile(path.join(root, "app", "account", "AccountPageBody.tsx"), "utf8"),
+    readAccountPageSource(),
     readFile(path.join(root, "app", "components", "ConfirmDialog.tsx"), "utf8"),
   ]);
   assert.match(account, /type="button"/, "logout/delete must be native buttons");
@@ -503,7 +504,7 @@ test("the trust-level badge is never colour-only: label + dot, progress is a tex
 });
 
 test("profile contributions: local filters use labelled native controls, the counter is role=status, pagination carries aria-current (C5)", async () => {
-  const account = await readFile(path.join(root, "app", "account", "AccountPageBody.tsx"), "utf8");
+  const account = await readAccountPageSource();
   // Local filters stay out of the URL but have a native fieldset/legend and
   // individually associated labels (selects are easier to scan than chips).
   assert.match(account, /<fieldset className="contributions-filter-bar">/, "the filter toolbar must have native group semantics");
