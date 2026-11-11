@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { getD1 } from "../../../../../db/cameras";
-import { CACHE_TAGS } from "../../../../lib/cache-purge";
+import { CACHE_TAGS, cachePurgeConfigured } from "../../../../lib/cache-purge";
 import { urlTooLong } from "../../../../lib/input-limits";
 import { limitsFor } from "../../../../lib/rate-limit";
 import { rateLimitResponse } from "../../../../lib/rate-limit-response";
@@ -64,7 +64,11 @@ export async function GET(request: Request) {
     return Response.json({ error: "Camera not found." }, { status: 404 });
   }
 
-  return withPublicCache(request, 300, async () => {
+  // The timeline is refetched right after a community action, and a worker
+  // cache entry can only be invalidated by tag purge: without purge
+  // credentials (e.g. preprod) caching would serve the pre-action timeline,
+  // so the cache is used only when purge is configured.
+  const build = async () => {
   try {
     const d1 = await getD1();
     // Existence oracle gate (kanban t_c8c10689, P1): a non-public record
@@ -102,5 +106,6 @@ export async function GET(request: Request) {
     console.error("GET /api/cameras/[id]/events failed", error);
     return Response.json({ error: "Database unavailable" }, { status: 503 });
   }
-  });
+  };
+  return cachePurgeConfigured(env) ? withPublicCache(request, 300, build) : build();
 }

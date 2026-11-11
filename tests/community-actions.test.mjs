@@ -302,6 +302,19 @@ test("PUT ok/switched purges the record tag (timeline) and shared camera tags", 
   }
 });
 
+test("DELETE purges the record tag too (removing an action changes the cached counts)", async () => {
+  await withPurgeCapture(async (captured) => {
+    stub("findSessionByToken", async () => ({ ...sessionFixture, contributor }));
+    stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
+    stub("removeCommunityAction", async () => ({ kind: "ok" }));
+    const { DELETE: del } = await actionsRoute();
+    const response = await del(authed("DELETE", "/api/cameras/5/actions"));
+    assert.equal(response.status, 200);
+    assert.equal(captured.length, 1, "one purge call after a successful removal");
+    assert.ok(JSON.parse(captured[0].init.body).tags.includes("camera-5"));
+  });
+});
+
 test("PUT does not purge when the action was rejected", async () => {
   await withPurgeCapture(async (captured) => {
     stub("findSessionByToken", async () => ({ ...sessionFixture, contributor }));

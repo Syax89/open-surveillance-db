@@ -228,6 +228,18 @@ test("GET returns 503 when the database is unavailable", async () => {
 // purged and the record page refetches the timeline right after an action.
 // ---------------------------------------------------------------------------
 
+async function withPurgeConfigured(fn) {
+  const { env } = await loadTreeModule("cloudflare-workers.mjs");
+  env.CACHE_PURGE_TOKEN = "test-token";
+  env.CACHE_PURGE_ZONE_ID = "test-zone";
+  try {
+    await fn();
+  } finally {
+    delete env.CACHE_PURGE_TOKEN;
+    delete env.CACHE_PURGE_ZONE_ID;
+  }
+}
+
 function installFakeCache() {
   const store = new Map();
   globalThis.caches = {
@@ -245,7 +257,7 @@ function installFakeCache() {
 
 test("GET serves repeat views from the worker public cache with the per-record Cache-Tag", async () => {
   const store = installFakeCache();
-  try {
+  try { await withPurgeConfigured(async () => {
     const d1 = fakeD1({ camera: cameraRow("active") });
     stub("getD1", async () => d1);
     const { GET } = await route();
@@ -264,6 +276,21 @@ test("GET serves repeat views from the worker public cache with the per-record C
     assert.equal(d1.state.eventsQueried, 1, "a cache hit must not re-query D1");
     assert.equal(callArgs("getD1").length, 1);
     assert.equal((await responseBody(second)).events.length, 2);
+  }); } finally {
+    delete globalThis.caches;
+  }
+});
+
+test("GET does not use the worker cache when tag purge is not configured (no stale timeline after an action)", async () => {
+  const store = installFakeCache();
+  try {
+    const d1 = fakeD1({ camera: cameraRow("active") });
+    stub("getD1", async () => d1);
+    const { GET } = await route();
+    await GET(apiRequest("/api/cameras/3/events"));
+    await GET(apiRequest("/api/cameras/3/events"));
+    assert.equal(store.size, 0, "nothing is stored without purge credentials");
+    assert.equal(d1.state.eventsQueried, 2, "every view reads the fresh timeline");
   } finally {
     delete globalThis.caches;
   }
@@ -271,13 +298,13 @@ test("GET serves repeat views from the worker public cache with the per-record C
 
 test("GET never caches a 404 timeline (existence oracle stays fresh)", async () => {
   const store = installFakeCache();
-  try {
+  try { await withPurgeConfigured(async () => {
     stub("getD1", async () => fakeD1({ camera: cameraRow("pending") }));
     const { GET } = await route();
     const response = await GET(apiRequest("/api/cameras/3/events"));
     assert.equal(response.status, 404);
     assert.equal(store.size, 0);
-  } finally {
+  }); } finally {
     delete globalThis.caches;
   }
 });

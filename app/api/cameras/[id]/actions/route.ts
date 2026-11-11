@@ -180,6 +180,10 @@ export async function DELETE(request: Request) {
     if (result.kind === "not_found") {
       return Response.json({ error: "No action found." }, { status: 404, headers: NO_STORE_HEADERS });
     }
+    // Removing an action changes the cached record's counts (e.g.
+    // confirmCount): purge like PUT so the server-rendered record page and
+    // GET /api/cameras/[id] do not show the old number until the TTL.
+    await purgeCacheTags(cameraPurgeTags(id), env);
     return Response.json({ action: null }, { headers: NO_STORE_HEADERS });
   } catch (error) {
     console.error("DELETE /api/cameras/[id]/actions failed", error);

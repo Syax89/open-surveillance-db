@@ -70,6 +70,17 @@ export function cameraPurgeTags(cameraId: number): readonly string[] {
  *   callers use this on the write path where the moderation response must
  *   not depend on cache invalidation succeeding.
  */
+/**
+ * Whether tag purging is configured. A worker-side cache whose entries can
+ * only be invalidated by purge must not be used without it, or writes
+ * (community actions, moderation) would leave stale reads behind.
+ */
+export function cachePurgeConfigured(env: unknown): boolean {
+  const record = (env ?? {}) as Record<string, unknown>;
+  return typeof record.CACHE_PURGE_TOKEN === "string" && record.CACHE_PURGE_TOKEN !== ""
+    && typeof record.CACHE_PURGE_ZONE_ID === "string" && record.CACHE_PURGE_ZONE_ID !== "";
+}
+
 export async function purgeCacheTags(
   tags: readonly string[],
   env: unknown,

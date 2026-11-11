@@ -21,7 +21,13 @@ import { DEFAULT_LOCALE, LOCALE_BCP47, type Locale } from "./i18n/types";
  * reused formatter). One formatter is cached per BCP 47 tag — the options
  * are fixed, so the tag alone is the cache key.
  */
-const PUBLIC_DATE_OPTIONS: Intl.DateTimeFormatOptions = { day: "numeric", month: "long", year: "numeric" };
+// timeZone UTC: the record page is now server-rendered (Worker = UTC) and
+// hydrated in the visitor's browser. Without a fixed zone the same value
+// formats to a different calendar day on either side (e.g. a date-only
+// "2026-03-05" is 4 March in New York; 23:30Z is 6 March in Rome) → a
+// hydration text mismatch and a full client re-render. The stored values are
+// calendar days / UTC timestamps, so UTC is also the correct reading.
+const PUBLIC_DATE_OPTIONS: Intl.DateTimeFormatOptions = { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" };
 const formatters = new Map<string, Intl.DateTimeFormat>();
 
 /** The cached long-date formatter for a locale (exported for the reuse test). */
