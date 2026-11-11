@@ -379,6 +379,71 @@ test("recovery: a 'failed' batch re-runs without --force and commits (idempotent
   assert.equal(batch.status, "committed");
 });
 
+test("provenance: an event-write failure after inserts never leaves cameras without their 'imported' event", async () => {
+  await freshDb();
+  // Simulate a real D1 failure in the db.batch() that carries the
+  // lifecycle-event INSERTs: the batch executes, then a poisoned statement
+  // makes it fail and roll back (D1 batches are transactional). With the
+  // old two-batch writer the camera INSERTs had already committed in an
+  // earlier batch, so the re-run hit ON CONFLICT DO NOTHING and never wrote
+  // the missing events.
+  let poisoned = false;
+  const flakyDb = Object.create(db, {
+    batch: {
+      value: async (statements) => {
+        if (!poisoned && statements.some((s) => /camera_lifecycle_events/.test(s.sql))) {
+          poisoned = true;
+          return db.batch([...statements, db.prepare("INSERT INTO no_such_table_simulated_failure VALUES (1)")]);
+        }
+        return db.batch(statements);
+      },
+    },
+  });
+  await assert.rejects(
+    () =>
+      runImport(flakyDb, {
+        slug: "fixture",
+        descriptor: FIXTURE_DESCRIPTOR,
+        payload: RAW_ROWS,
+        options: { apply: true },
+      }),
+    /import write failed/,
+  );
+  assert.equal(poisoned, true, "the simulated failure must have fired");
+
+  // Documented recovery: re-run without --force.
+  const summary = await applyFixture();
+  assert.equal(summary.committed, true);
+  const batch = await db.prepare("SELECT * FROM import_batches WHERE slug = 'fixture'").first();
+  assert.equal(batch.status, "committed");
+
+  const cameras = (await db.prepare("SELECT id, external_id FROM cameras WHERE source = 'import:fixture'").all()).results;
+  assert.equal(cameras.length, 3);
+  for (const camera of cameras) {
+    const events = (
+      await db
+        .prepare("SELECT detail FROM camera_lifecycle_events WHERE camera_id = ? AND event_type = 'imported'")
+        .bind(camera.id)
+        .all()
+    ).results;
+    assert.equal(events.length, 1, `camera ${camera.external_id} must have exactly one 'imported' event`);
+    assert.equal(JSON.parse(events[0].detail).external_id, camera.external_id);
+  }
+  // No stray events (e.g. duplicates on a camera of another batch).
+  const total = (await db.prepare("SELECT COUNT(*) AS n FROM camera_lifecycle_events WHERE event_type = 'imported'").all()).results[0].n;
+  assert.equal(total, 3);
+
+  // A further --force refresh must not duplicate provenance either.
+  await applyFixture({ force: true });
+  const afterForce = (await db.prepare("SELECT COUNT(*) AS n FROM camera_lifecycle_events WHERE event_type = 'imported'").all()).results[0].n;
+  assert.equal(afterForce, 3);
+
+  // Rollback still removes the cameras and their events.
+  const rolled = await rollbackImport(db, "fixture");
+  assert.equal(rolled.removedCameras, 3);
+  assert.equal(rolled.eventsRemoved, 3);
+});
+
 // -------------------------------------------------- GDPR-neutral guarantees
 
 test("GDPR: PII-like source fields never reach the database", async () => {
