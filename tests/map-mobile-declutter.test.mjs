@@ -29,6 +29,7 @@ import {
   setupDom, loadDomModule, installFetchMock, jsonResponse,
   renderWithLocale, resetLeafletMarkers, leafletMaps, React,
 } from "./helpers/dom-harness.mjs";
+import { MAP_CSS, readSiteCss } from "./helpers/site-css.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const readSource = (relative) => readFile(path.join(root, relative), "utf8");
@@ -128,8 +129,11 @@ const PREVIEW_HIDDEN = [
 // ---------------------------------------------------------------------------
 
 test("mobile hides the extra record blocks inside .osm-camera-popup only", async () => {
-  const css = await readSource("app/globals.css");
-  const mobile = mobileBlock(css);
+  // Perf 2026-11: the popup rules live in app/styles/map.css (loaded after
+  // app/globals.css). The mobile block is map.css's; every "never hidden /
+  // no base hide / no z-index" guard still scans BOTH files.
+  const css = await readSiteCss(root);
+  const mobile = mobileBlock(await readSource(MAP_CSS));
   const base = baseScope(css);
   const mobileRules = cssRules(mobile);
   const baseRules = cssRules(base);
@@ -172,7 +176,7 @@ test("mobile hides the extra record blocks inside .osm-camera-popup only", async
 });
 
 test("the mobile popup margins beat Leaflet's own paragraph rule", async () => {
-  const css = await readSource("app/globals.css");
+  const css = await readSource(MAP_CSS); // the popup rules' home since perf 2026-11
   const leaflet = await readSource("node_modules/leaflet/dist/leaflet.css");
   // The rule that silently won before this change: 2 classes + 1 element.
   assert.match(leaflet, /\.leaflet-popup-content p \{[^}]*margin:\s*1\.3em 0/, "Leaflet's paragraph margin is still in play");

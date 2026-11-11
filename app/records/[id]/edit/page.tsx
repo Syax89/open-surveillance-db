@@ -13,6 +13,7 @@ import { KIND_OPTIONS, isDomeKind } from "../../../lib/camera-kinds";
 import { formatDirection } from "../../../lib/compass";
 import { isCsrfRejection, readCsrfToken } from "../../../lib/csrf";
 import { EditPositionMap } from "../../../components/EditPositionMap";
+import { MapStyles } from "../../../components/MapStyles";
 
 /**
  * /records/[id]/edit — dedicated contribution edit page (COMMUNITY_PLAN §2.2,
@@ -323,6 +324,8 @@ export default function RecordEditPage() {
 
   return (
     <main id="main-content" className="record-page">
+      {/* EditPositionMap is a Leaflet map: route-scoped map stylesheet (hoisted into <head>). */}
+      <MapStyles />
       <SiteHeader navLabel={t.navigation} toggle="none">
         <div className="nav-record-actions">
           <Link className="text-button" href={`/records/${recordId}`}>{t.backToDirectory}</Link>

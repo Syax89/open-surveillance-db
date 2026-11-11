@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { SegnalaTool } from "../../components/tools/SegnalaTool";
+import { MapStyles } from "../../components/MapStyles";
 import { getServerMessages } from "../../lib/server-i18n";
 import { parseReportCoordinates } from "../../lib/report-coordinates";
 
@@ -31,5 +32,11 @@ type Props = {
 export default async function SegnalaPage({ searchParams = Promise.resolve({}) }: Props = {}) {
   const params = await searchParams;
   const initialCoordinates = parseReportCoordinates(new URLSearchParams(params as Record<string, string>));
-  return <SegnalaTool initialCoordinates={initialCoordinates} />;
+  return (
+    <>
+      {/* The report mini-map is a Leaflet map: route-scoped map stylesheet. */}
+      <MapStyles />
+      <SegnalaTool initialCoordinates={initialCoordinates} />
+    </>
+  );
 }
