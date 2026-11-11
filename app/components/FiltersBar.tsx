@@ -1,7 +1,8 @@
 "use client";
 
 import { useId, useState, type FormEvent, type ReactNode } from "react";
-import { useMessages } from "../lib/use-messages";
+import { useDomainMessages } from "../lib/use-domain-messages";
+import { directoryByLocale } from "../lib/i18n/directory";
 
 /**
  * Shared filter bar (F1 route group (tools), D4): search + kind + freshness +
@@ -116,7 +117,7 @@ export function FiltersBar({
    */
   activeFilterCount?: number;
 }) {
-  const t = useMessages().directory;
+  const t = useDomainMessages(directoryByLocale);
   // On constrained layouts (≤820px) the whole filter group becomes one short
   // disclosure; the search always stays visible. On wider layouts the toggle
   // is not rendered (display:none) and the controls are ALWAYS shown.

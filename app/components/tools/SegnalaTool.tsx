@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useMessages } from "../../lib/use-messages";
+import { useDomainMessages } from "../../lib/use-domain-messages";
+import { reportByLocale } from "../../lib/i18n/report";
 import { ReportForm } from "../home/ReportForm";
 import { WriteGateWall } from "../WriteGateWall";
 import { useReportFlow } from "../../lib/useReportFlow";
@@ -27,7 +28,7 @@ type Props = {
  * that would fail with a raw server error at submit.
  */
 export function SegnalaTool({ initialCoordinates = null }: Props) {
-  const t = useMessages().report;
+  const t = useDomainMessages(reportByLocale);
   const [notice, setNotice] = useState("");
   const report = useReportFlow({ setNotice, initialCoordinates });
   // A map-picked point is meaningful work. If the write gate asks an

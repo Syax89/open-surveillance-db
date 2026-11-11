@@ -6,7 +6,8 @@
 // (the monolith rendered empty/records directly), so it keeps its own
 // section shell instead of reusing QueueSection.
 
-import { useMessages } from "../../lib/use-messages";
+import { useDomainMessages } from "../../lib/use-domain-messages";
+import { moderationByLocale } from "../../lib/i18n/moderation";
 import type { ModerationEvent } from "./types";
 
 type Props = {
@@ -18,7 +19,7 @@ type Props = {
 };
 
 export function HistorySection({ events, readableDate, readableAction, readableReason, readableStatus }: Props) {
-  const t = useMessages().moderation;
+  const t = useDomainMessages(moderationByLocale);
   return (
     <section className="moderation-section" aria-labelledby="moderation-history-title">
       <div className="section-heading"><div><p className="eyebrow"><span /> {t.localAudit}</p><h2 id="moderation-history-title">{t.recentDecisions}</h2></div><p className="section-note">{t.readOnlyHistory}</p></div>

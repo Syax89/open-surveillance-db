@@ -16,11 +16,12 @@
 // links, no geospatial filtering, no new API route — and the hero never
 // fetches during SSR (the autocomplete only runs in effects).
 
-import { useMessages } from "../../lib/use-messages";
+import { useDomainMessages } from "../../lib/use-domain-messages";
+import { homeByLocale } from "../../lib/i18n/home";
 import { PlaceAutocomplete } from "./PlaceAutocomplete";
 
 export function HeroDirectorySearch() {
-  const t = useMessages().home;
+  const t = useDomainMessages(homeByLocale);
   return (
     <form className="hero-search" action="/directory" role="search">
       <PlaceAutocomplete

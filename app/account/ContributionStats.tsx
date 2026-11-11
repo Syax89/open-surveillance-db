@@ -5,12 +5,13 @@
 // without scrolling or filtering. role=status on the in-moderation card: it
 // is the one that changes after a moderation action.
 
-import { useMessages } from "../lib/use-messages";
+import { useDomainMessages } from "../lib/use-domain-messages";
+import { communityByLocale } from "../lib/i18n/community";
 import type { ContributionSummary } from "../lib/useContributions";
 import { ContributionKindIcon } from "./ContributionKindIcon";
 
 export function ContributionStats({ summary }: { summary: ContributionSummary }) {
-  const community = useMessages().community;
+  const community = useDomainMessages(communityByLocale);
   return (
     <div className="account-stats" role="group" aria-label={community.statsGroupLabel}>
       <div className="account-stat">

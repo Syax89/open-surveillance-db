@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-// F5 qa#5 (t_ab0d4c75): useMessages moved out of LocaleProvider to keep
-// the root layout graph light — import the typed bundle from lib.
-import { useMessages } from "../lib/use-messages";
+// Only the `home` domain (already loaded by the shared header), never the
+// aggregated dictionary — see app/lib/use-domain-messages.ts.
+import { useDomainMessages } from "../lib/use-domain-messages";
+import { homeByLocale } from "../lib/i18n/home";
 
 /**
  * LegalTableWrap — keyboard access for the scrollable legal tables
@@ -32,7 +33,7 @@ import { useMessages } from "../lib/use-messages";
 export function LegalTableWrap({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const [overflowing, setOverflowing] = useState(false);
-  const t = useMessages().home;
+  const t = useDomainMessages(homeByLocale);
 
   useEffect(() => {
     const el = ref.current;

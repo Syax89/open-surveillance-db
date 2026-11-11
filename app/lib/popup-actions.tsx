@@ -2,8 +2,7 @@
 
 import { createRoot, type Root } from "react-dom/client";
 import { flushSync } from "react-dom";
-import { CommunityActions, type ActionCounts } from "../components/CommunityActions";
-import { messages } from "./i18n";
+import { CommunityActions, communityActionsBundle, type ActionCounts } from "../components/CommunityActions";
 import { LOCALE_COOKIE, resolveLocale, type Locale } from "./i18n/types";
 
 /**
@@ -95,7 +94,7 @@ function applyDesired(): void {
         recordId={recordId}
         counts={seed}
         compact
-        bundle={messages[resolvePopupLocale()]}
+        bundle={communityActionsBundle(resolvePopupLocale())}
         onCountsChange={(next) => { confirmedCounts.set(recordId, next); }}
       />,
     );

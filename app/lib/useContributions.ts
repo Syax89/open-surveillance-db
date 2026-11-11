@@ -8,7 +8,8 @@
 // the page or the loaded contributor changes. Nothing here renders JSX.
 
 import { useCallback, useEffect, useState } from "react";
-import { useMessages } from "./use-messages";
+import { useDomainMessages } from "./use-domain-messages";
+import { authByLocale } from "./i18n/auth";
 import type { TrustLevelMeta } from "./trust-levels";
 
 export type Contribution = {
@@ -68,7 +69,7 @@ export function useContributions(
   onSessionLost: () => void,
   onLevel: (level: TrustLevelMeta | null) => void,
 ) {
-  const t = useMessages().auth;
+  const t = useDomainMessages(authByLocale);
   const [contributions, setContributions] = useState<Contribution[]>([]);
   const [pagination, setPagination] = useState<ContributionsPagination | null>(null);
   const [filter, setFilter] = useState<StatusFilter>("all");

@@ -2,7 +2,8 @@
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
-import { useMessages } from "../lib/use-messages";
+import { useDomainMessages } from "../lib/use-domain-messages";
+import { authByLocale } from "../lib/i18n/auth";
 import { PublicNav } from "../components/PublicNav";
 
 /**
@@ -16,7 +17,7 @@ import { PublicNav } from "../components/PublicNav";
  * never reveals whether the address is registered.
  */
 export function ForgotPasswordBody() {
-  const t = useMessages().auth;
+  const t = useDomainMessages(authByLocale);
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);

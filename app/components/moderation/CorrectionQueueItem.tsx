@@ -8,7 +8,8 @@
 // without deciding) and escalate — so a moderator can resolve a request
 // while associating it with the record outcome in one place.
 
-import { useMessages } from "../../lib/use-messages";
+import { useDomainMessages } from "../../lib/use-domain-messages";
+import { moderationByLocale } from "../../lib/i18n/moderation";
 import { DecisionForm } from "./DecisionForm";
 import type { CorrectionInQueue, DecisionFormApi } from "./types";
 
@@ -22,7 +23,7 @@ type Props = {
 };
 
 export function CorrectionQueueItem({ correction, queueBadge, api, readableDate, readableStatus, readableOutcome }: Props) {
-  const t = useMessages().moderation;
+  const t = useDomainMessages(moderationByLocale);
   return (
     <article className="record-list-card">
       <div><p className="card-topline"><span className="status-dot pending" /> {t.privateCorrection}</p><h3>{correction.issueType}</h3><p className="record-kind">{correction.cameraId ? `${t.relatedRecord} #${correction.cameraId}` : t.generalConcern}</p></div>

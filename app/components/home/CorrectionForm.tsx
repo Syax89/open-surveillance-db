@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useMessages } from "../../lib/use-messages";
+import { useDomainMessages } from "../../lib/use-domain-messages";
+import { commonByLocale } from "../../lib/i18n/common";
+import { correctionByLocale } from "../../lib/i18n/correction";
 import { isCsrfRejection, readCsrfToken } from "../../lib/csrf";
 import { Art13Notice } from "../Art13Notice";
 import { RecordIdField } from "./RecordIdField";
@@ -26,9 +28,8 @@ type Props = {
  * pre-selects the related record and announces it via an aria-live region.
  */
 export function CorrectionForm({ defaultRecordId = null, showHeading = true }: Props) {
-  const bundle = useMessages();
-  const t = bundle.correction;
-  const common = bundle.common;
+  const t = useDomainMessages(correctionByLocale);
+  const common = useDomainMessages(commonByLocale);
   const [correctionNotice, setCorrectionNotice] = useState("");
   const [preselected, setPreselected] = useState<{ id: number; title: string } | null>(null);
 

@@ -5,7 +5,7 @@
  * this domain, `it` is type-checked against it via `Translation<typeof en>`
  * (see `./types.ts`), so a missing or extra key fails `tsc --noEmit`.
  */
-import type { Translation } from "./types";
+import type { Locale, Translation } from "./types";
 
 export const en = {
   landmarkLabel: "Site footer",
@@ -74,3 +74,10 @@ export const it: Translation<typeof en> = {
   dataLicense: "Database ed esportazioni concessi in licenza ODbL 1.0",
   osmAttribution: "Dati cartografici © OpenStreetMap contributors",
 };
+
+/**
+ * This domain only, in every locale — what client components import (via
+ * `useDomainMessages`, app/lib/use-messages.ts) instead of the aggregated
+ * `messages` map, which would ship EVERY domain in BOTH locales.
+ */
+export const footerByLocale: Record<Locale, Translation<typeof en>> = { en, it };

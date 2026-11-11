@@ -7,7 +7,8 @@
 // payload). The card is a11y-consistent with the other queue cards: labelled
 // rows, dt/dd pairs, and the DecisionForm's aria-labelled action group.
 
-import { useMessages } from "../../lib/use-messages";
+import { useDomainMessages } from "../../lib/use-domain-messages";
+import { moderationByLocale } from "../../lib/i18n/moderation";
 import { DecisionForm } from "./DecisionForm";
 import type { DecisionFormApi, EditRequestInQueue } from "./types";
 
@@ -29,7 +30,7 @@ const diffRows = [
 ] as const;
 
 export function EditQueueItem({ editRequest, queueBadge, api, readableDate }: Props) {
-  const t = useMessages().moderation;
+  const t = useDomainMessages(moderationByLocale);
   const changedRows = diffRows.filter((row) => editRequest[row.proposed] !== null && editRequest[row.proposed] !== undefined);
   // Position move (t_775c8400): the coordinates travel together — a row
   // shows only when BOTH are proposed (a half-move is rejected at parse

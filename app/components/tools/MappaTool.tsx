@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { useMessages } from "../../lib/use-messages";
+import { useDomainMessages } from "../../lib/use-domain-messages";
+import { mapByLocale } from "../../lib/i18n/map";
 import { useViewportCameras, viewportGeometryKey } from "../../lib/use-viewport-cameras";
 import { geocodeBounds, parseMapView, recordsInBounds, stringifyMapView } from "../../lib/map-viewport";
 import type { MapView, ViewportBounds } from "../../lib/map-viewport";
@@ -56,7 +57,7 @@ import { ExploreViewSwitch } from "../ExploreViewSwitch";
  * to the first visible record without opening its popup.
  */
 export function MappaTool() {
-  const t = useMessages().map;
+  const t = useDomainMessages(mapByLocale);
   const { filters, qInput, setQ, setType, setFreshness, setSort, setState, setOrigin, reset } = useCameraFilters();
   // Shareable viewport (?lat&lng&zoom): the map reads the initial view ONCE at
   // creation. The lazy useState captures the FIRST URL — later pan/zoom is

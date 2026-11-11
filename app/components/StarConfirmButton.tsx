@@ -1,6 +1,7 @@
 "use client";
 
-import { useMessages } from "../lib/use-messages";
+import { useDomainMessages } from "../lib/use-domain-messages";
+import { communityByLocale } from "../lib/i18n/community";
 
 /**
  * Community verification toggle (COMMUNITY_PLAN §6.3 C2/C9 — design review,
@@ -36,8 +37,7 @@ export function StarConfirmButton({
   disabledReason?: string | null;
   onToggle: () => void;
 }) {
-  const bundle = useMessages();
-  const t = bundle.community;
+  const t = useDomainMessages(communityByLocale);
   const label = confirmed ? t.removeVerification : t.confirmExists;
 
   return (

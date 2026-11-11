@@ -1,7 +1,8 @@
 "use client";
 
 import { PublicNav } from "../PublicNav";
-import { useMessages } from "../../lib/use-messages";
+import { useDomainMessages } from "../../lib/use-domain-messages";
+import { homeByLocale } from "../../lib/i18n/home";
 
 /**
  * HomeNav — navigation shell of the home hub (F2, t_52dcb95e).
@@ -15,6 +16,6 @@ import { useMessages } from "../../lib/use-messages";
  * page marked aria-current. The home keeps its in-page "#top" brand anchor.
  */
 export function HomeNav() {
-  const t = useMessages().home;
+  const t = useDomainMessages(homeByLocale);
   return <PublicNav navLabel={t.mainNavigation} homeLabel={t.homeAria} brandHref="#top" brandAs="anchor" />;
 }

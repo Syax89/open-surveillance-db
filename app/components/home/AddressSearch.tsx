@@ -16,7 +16,8 @@
 // (useReportFlow.selectCoordinates → reverse-geocode prefill of the
 // address field). No behavior change to ReportForm.
 
-import { useMessages } from "../../lib/use-messages";
+import { useDomainMessages } from "../../lib/use-domain-messages";
+import { reportByLocale } from "../../lib/i18n/report";
 import { PlaceAutocomplete, type PlaceAutocompleteCopy } from "./PlaceAutocomplete";
 import type { GeocodeSuggestion } from "./GeocodeSearch";
 
@@ -28,7 +29,7 @@ type Props = {
 };
 
 export function AddressSearch({ inputId, onPlaceSelect }: Props) {
-  const t = useMessages().report;
+  const t = useDomainMessages(reportByLocale);
   const copy: PlaceAutocompleteCopy = {
     listboxLabel: t.addressSearchLabel,
     placeholder: t.addressSearchPlaceholder,

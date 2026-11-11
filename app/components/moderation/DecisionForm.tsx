@@ -15,7 +15,8 @@
 // Both fields stay correction-only; camera/edit rows render exactly
 // the previous form.
 
-import { useMessages } from "../../lib/use-messages";
+import { useDomainMessages } from "../../lib/use-domain-messages";
+import { moderationByLocale } from "../../lib/i18n/moderation";
 import { correctionOutcomeOptions, reasonOptions } from "./types";
 import type { DecisionFormApi, ModerationAction, QueueEntity } from "./types";
 
@@ -27,7 +28,7 @@ type Props = {
 };
 
 export function DecisionForm({ entity, id, allowedActions, api }: Props) {
-  const t = useMessages().moderation;
+  const t = useDomainMessages(moderationByLocale);
   const key = `${entity}-${id}`;
   const reasonId = `${key}-reason`;
   const noteId = `${key}-note`;

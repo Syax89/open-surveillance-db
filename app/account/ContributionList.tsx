@@ -6,7 +6,11 @@
 // appears on editable camera contributions, pointing at /records/[id]/edit).
 
 import Link from "next/link";
-import { useMessages } from "../lib/use-messages";
+import { useDomainMessages } from "../lib/use-domain-messages";
+import { authByLocale } from "../lib/i18n/auth";
+import { communityByLocale } from "../lib/i18n/community";
+import { correctionByLocale } from "../lib/i18n/correction";
+import { statusByLocale } from "../lib/i18n/status";
 import { useLocale } from "../components/LocaleProvider";
 import { formatPublicDate } from "../lib/format-date";
 import type { Contribution } from "../lib/useContributions";
@@ -42,11 +46,10 @@ function contributionStatusLabel(
 }
 
 export function ContributionList({ contributions }: { contributions: Contribution[] }) {
-  const bundle = useMessages();
-  const t = bundle.auth;
-  const community = bundle.community;
-  const correctionLabels = bundle.correction;
-  const statuses = bundle.status;
+  const t = useDomainMessages(authByLocale);
+  const community = useDomainMessages(communityByLocale);
+  const correctionLabels = useDomainMessages(correctionByLocale);
+  const statuses = useDomainMessages(statusByLocale);
   const { locale } = useLocale();
 
   return (

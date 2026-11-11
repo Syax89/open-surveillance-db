@@ -9,7 +9,8 @@
 // (useModerationQueue.loadQueue) resets every queue to its first page.
 
 import { useCallback, useRef, useState, type Dispatch, type RefObject, type SetStateAction } from "react";
-import { useMessages } from "../../lib/use-messages";
+import { useDomainMessages } from "../../lib/use-domain-messages";
+import { moderationByLocale } from "../../lib/i18n/moderation";
 import type { CameraInQueue, CorrectionInQueue, EditRequestInQueue, PagedQueue, PublishedCursor, QueueItem, QueuePayload } from "./types";
 
 /** Queues the dashboard renders with a "load more" control (stale has no section yet). */
@@ -46,7 +47,7 @@ type Options = {
 };
 
 export function useBoundedQueues({ generationRef, busyRef, setters }: Options) {
-  const t = useMessages().moderation;
+  const t = useDomainMessages(moderationByLocale);
   const [totals, setTotals] = useState<QueueTotals>({}); const [nextCursors, setNextCursors] = useState<QueueCursors>({});
   const [loadingMore, setLoadingMore] = useState<DashboardPagedQueue | null>(null); const [failed, setFailed] = useState<DashboardPagedQueue | null>(null);
   // Queues that grew past their first page keep their control (and focus) on the last page.

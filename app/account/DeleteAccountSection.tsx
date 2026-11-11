@@ -5,10 +5,11 @@
 // replaced window.confirm) and the DELETE itself stay page state: a
 // successful erasure flips the whole page, so this section only opens it.
 
-import { useMessages } from "../lib/use-messages";
+import { useDomainMessages } from "../lib/use-domain-messages";
+import { authByLocale } from "../lib/i18n/auth";
 
 export function DeleteAccountSection({ onRequestDelete }: { onRequestDelete: () => void }) {
-  const t = useMessages().auth;
+  const t = useDomainMessages(authByLocale);
   return (
     <section aria-labelledby="delete-account-title" className="auth-danger-zone">
       <h2 id="delete-account-title">{t.deleteAccountSection}</h2>

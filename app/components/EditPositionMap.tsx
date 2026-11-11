@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef } from "react";
 import { isDomeKind } from "../lib/camera-kinds";
 import { fovBearingFromPoint, fovBearingPoint, fovCircleRadiusMeters, fovPolygonPoints } from "../lib/field-of-view";
-import { useMessages } from "../lib/use-messages";
+import { useDomainMessages } from "../lib/use-domain-messages";
+import { recordByLocale } from "../lib/i18n/record";
 
 type Props = {
   /** The record's current camera position (always set once the form loads). */
@@ -41,7 +42,7 @@ type Props = {
  */
 export function EditPositionMap({ latitude, longitude, onPositionChange, kind, direction, directionKnown, setDirection }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const t = useMessages().record;
+  const t = useDomainMessages(recordByLocale);
 
   // Leaflet handlers are bound once and read the LATEST props through refs,
   // so the click/drag handlers never go stale across re-renders.

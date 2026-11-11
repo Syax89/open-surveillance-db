@@ -5,7 +5,7 @@
  * this domain, `it` is type-checked against it via `Translation<typeof en>`
  * (see `./types.ts`), so a missing or extra key fails `tsc --noEmit`.
  */
-import type { Translation } from "./types";
+import type { Locale, Translation } from "./types";
 
 export const en = {
   navigation: "Guide navigation",
@@ -294,3 +294,10 @@ export const it: Translation<typeof en> = {
     "OpenSurveillanceDB è ancora in sviluppo attivo. I record vengono pubblicati subito da account verificati e mantenuti accurati dalla community; il progetto non dichiara che i dati siano completi, aggiornati o autorevoli.",
   footer: "Creato per la trasparenza, non per il tracciamento.",
 };
+
+/**
+ * This domain only, in every locale — what client components import (via
+ * `useDomainMessages`, app/lib/use-messages.ts) instead of the aggregated
+ * `messages` map, which would ship EVERY domain in BOTH locales.
+ */
+export const guideByLocale: Record<Locale, Translation<typeof en>> = { en, it };

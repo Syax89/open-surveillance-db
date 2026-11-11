@@ -12,7 +12,7 @@
  * corrections, and the residual legal-emergency surface. Keys unchanged
  * (page.tsx renders them positionally); values rewritten.
  */
-import type { Translation } from "./types";
+import type { Locale, Translation } from "./types";
 
 export const en = {
   navigation: "Publication navigation",
@@ -137,3 +137,10 @@ export const it: Translation<typeof en> = {
   notDashboardBody:
     "La dashboard di moderazione è uno strumento privato, protetto da controllo d'accesso e mai collegato dal sito pubblico, riservato alle emergenze legali e al flusso privato delle correzioni. Questa pagina spiega solo il modello pubblico.",
 };
+
+/**
+ * This domain only, in every locale — what client components import (via
+ * `useDomainMessages`, app/lib/use-messages.ts) instead of the aggregated
+ * `messages` map, which would ship EVERY domain in BOTH locales.
+ */
+export const moderazioneByLocale: Record<Locale, Translation<typeof en>> = { en, it };

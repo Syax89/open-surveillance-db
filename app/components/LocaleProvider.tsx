@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { en as commonEn, it as commonIt } from "../lib/i18n/common";
+import { commonByLocale } from "../lib/i18n/common";
 // Light import path (F5 qa#5, t_ab0d4c75): registry/cookie constants live
 // in types.ts, NOT in the index barrel that assembles the full two-locale
 // dictionary. Importing them from here would pull ~150 KB of messages
@@ -18,7 +18,7 @@ type LocaleContextValue = {
  * Locale context — exported for standalone roots OUTSIDE the Next tree (the
  * map popup action widget, lib/popup-actions): those roots render without a
  * LocaleProvider, so the widget reads the context directly and falls back to
- * the pre-resolved bundle prop instead of crashing (useMessages/useLocale
+ * the pre-resolved bundle prop instead of crashing (useDomainMessages/useLocale
  * throw by design — see CommunityActions `bundle` prop).
  */
 export const LocaleContext = createContext<LocaleContextValue | null>(null);
@@ -83,15 +83,11 @@ function subscribeToLocale(callback: () => void) {
 /**
  * Root-layout strings, scoped to the `common` domain only (F5 qa#5,
  * t_ab0d4c75): the root shell renders the skip link and the toggle
- * labels, and must NOT import the full two-locale dictionary — that stays
- * in route chunks via useMessages() (app/lib/use-messages.ts). Adding a
- * language means adding its common domain here next to the registry line.
+ * labels, and must NOT import the full two-locale dictionary: it imports
+ * `commonByLocale` straight from the common domain file. Route chunks
+ * likewise import only their own domains via useDomainMessages()
+ * (app/lib/use-domain-messages.ts).
  */
-const commonByLocale = {
-  en: commonEn,
-  it: commonIt,
-} as const;
-
 export function LocaleProvider({
   children,
   serverLocale = DEFAULT_LOCALE,

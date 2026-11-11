@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { useMessages } from "./use-messages";
+import { useDomainMessages } from "./use-domain-messages";
+import { commonByLocale } from "./i18n/common";
+import { reportByLocale } from "./i18n/report";
 import { isCsrfRejection, readCsrfToken } from "./csrf";
 import type { ReportCoordinates } from "./report-coordinates";
 
@@ -24,9 +26,8 @@ export type NearbyCandidate = { id: number; title: string; kind: string; distanc
  * under the ~150-line refactor target.
  */
 export function useReportFlow({ setNotice, initialCoordinates = null }: { setNotice: (notice: string) => void; initialCoordinates?: ReportCoordinates | null }) {
-  const bundle = useMessages();
-  const t = bundle.report;
-  const common = bundle.common;
+  const t = useDomainMessages(reportByLocale);
+  const common = useDomainMessages(commonByLocale);
   const [coordinates, setCoordinates] = useState<{ latitude: number; longitude: number } | null>(initialCoordinates);
   const [manualLatitude, setManualLatitude] = useState(initialCoordinates ? initialCoordinates.latitude.toFixed(5) : "");
   const [manualLongitude, setManualLongitude] = useState(initialCoordinates ? initialCoordinates.longitude.toFixed(5) : "");
