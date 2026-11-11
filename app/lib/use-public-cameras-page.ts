@@ -4,19 +4,26 @@ import { useEffect, useRef, useState } from "react";
 import { publicRecords, type Camera } from "./records";
 
 /**
- * Cursor-based pagination hook for the directory (sort=alphabetical only).
- * 
+ * Page-at-a-time pagination hook for the directory (sort=alphabetical only).
+ *
  * With 160k+ records, the full-walk pattern (usePublicCameras) becomes
  * unsustainable (80+ requests, 4+ MB, 16+ seconds). This hook loads ONE page
- * at a time via the cursor API (?after_title=...&after_id=...), avoiding
- * the OFFSET scan on large datasets.
- * 
+ * at a time.
+ *
  * Contract:
  * - `page` prop controls which page to load (1-indexed)
  * - `limit` records per page (default 20, the DIRECTORY_PAGE_SIZE)
  * - Returns records for THAT page only, plus total and hasMore
- * - Each page change triggers a new fetch; no walk, no cache
- * 
+ * - Each page change triggers exactly ONE request (perf pass 2026-11): the
+ *   page is addressed directly with `offset=(page-1)*limit` on the same
+ *   `ORDER BY title COLLATE NOCASE ASC, id DESC` the keyset cursor
+ *   (?after_title/&after_id) walks, so the rows are identical — but
+ *   /directory?page=50 no longer issues 50 serial requests. The server walks
+ *   the (status, title COLLATE NOCASE, id DESC) index (migration 0046), so
+ *   the OFFSET skip is an in-order index walk, not a sort.
+ * - The full-set COUNT is requested once per filter set (`count=true` on the
+ *   first request, `count=false` afterwards, reusing the known total).
+ *
  * Use ONLY when sort=alphabetical is active. For other sorts and the map,
  * keep using usePublicCameras (the full-walk pattern).
  */
@@ -61,12 +68,13 @@ export type UsePublicCamerasPageResult = {
   reload: () => void;
 };
 
-async function fetchCursorPage(
+async function fetchPage(
   filters: ServerCameraFilters,
-  after: { title: string; id: number } | null,
+  offset: number,
   limit: number,
+  withCount: boolean,
   signal: AbortSignal,
-): Promise<{ records: Camera[]; nextCursor: { title: string; id: number } | null; total: number | null }> {
+): Promise<{ records: Camera[]; total: number | null }> {
   const query = new URLSearchParams();
   if (filters.kind) query.set("kind", filters.kind);
   if (filters.freshness) query.set("freshness", filters.freshness);
@@ -75,19 +83,19 @@ async function fetchCursorPage(
   if (filters.state) query.set("state", filters.state);
   if (filters.origin) query.set("origin", filters.origin);
   if (filters.sort) query.set("sort", filters.sort);
-  if (after) {
-    query.set("after_title", after.title);
-    query.set("after_id", String(after.id));
-  }
   query.set("limit", String(limit));
-  query.set("count", "true");
+  query.set("offset", String(offset));
+  query.set("count", withCount ? "true" : "false");
   const response = await fetch(`/api/cameras?${query.toString()}`, { signal });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const data = (await response.json()) as Partial<CamerasPage>;
   if (!Array.isArray(data.records)) throw new Error("Malformed /api/cameras payload");
-  const records = publicRecords(data.records);
-  const nextCursor = records.length > 0 ? { title: records[records.length - 1].title, id: records[records.length - 1].id } : null;
-  return { records, nextCursor, total: typeof data.total === "number" ? data.total : null };
+  return { records: publicRecords(data.records), total: typeof data.total === "number" ? data.total : null };
+}
+
+/** Identity of a result set: the total is reusable while this stays equal. */
+function totalKey(filters: ServerCameraFilters, limit: number): string {
+  return JSON.stringify([limit, filters.kind, filters.freshness, filters.q, filters.initial, filters.state, filters.origin, filters.sort]);
 }
 
 export function usePublicCamerasPage({ page, limit = 20, filters = {} }: UsePublicCamerasPageOptions): UsePublicCamerasPageResult {
@@ -97,6 +105,8 @@ export function usePublicCamerasPage({ page, limit = 20, filters = {} }: UsePubl
   const [error, setError] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const filtersRef = useRef(filters);
+  // The server total of the last counted filter set (see loadPage).
+  const knownTotalRef = useRef<{ key: string; total: number } | null>(null);
 
   useEffect(() => {
     filtersRef.current = filters;
@@ -106,26 +116,15 @@ export function usePublicCamerasPage({ page, limit = 20, filters = {} }: UsePubl
     let cancelled = false;
     const controller = new AbortController();
 
-    // Walk from page 1 to the target page via cursor.
-    const walkToPage = async () => {
-      let cursor: { title: string; id: number } | null = null;
-      let currentTotal: number | null = null;
-      
-      // Fetch pages 1..N to reach the target page.
-      for (let i = 1; i <= page; i += 1) {
-        const result = await fetchCursorPage(filtersRef.current, cursor, limit, controller.signal);
-        if (currentTotal === null) currentTotal = result.total;
-        if (i === page) {
-          // Target page reached.
-          return { records: result.records, total: currentTotal, nextCursor: result.nextCursor };
-        }
-        cursor = result.nextCursor;
-        if (!cursor) {
-          // Ran out of pages before reaching target.
-          return { records: [], total: currentTotal, nextCursor: null };
-        }
-      }
-      return { records: [], total: currentTotal, nextCursor: null };
+    // ONE request for the target page: jump straight to its offset, and ask
+    // for the COUNT only when the total for this filter set is not known yet.
+    const loadPage = async () => {
+      const key = totalKey(filtersRef.current, limit);
+      const known = knownTotalRef.current?.key === key ? knownTotalRef.current.total : null;
+      const result = await fetchPage(filtersRef.current, (page - 1) * limit, limit, known === null, controller.signal);
+      if (known !== null) return { records: result.records, total: known };
+      if (result.total !== null) knownTotalRef.current = { key, total: result.total };
+      return result;
     };
 
     // This effect owns the request lifecycle; reset its visible state before
@@ -138,7 +137,7 @@ export function usePublicCamerasPage({ page, limit = 20, filters = {} }: UsePubl
     setLoading(true);
     setError(false);
     setRecords((previous) => (previous.length === 0 ? previous : []));
-    walkToPage()
+    loadPage()
       .then(({ records: fetched, total: fetchedTotal }) => {
         if (cancelled) return;
         setLoading(false);
@@ -157,7 +156,11 @@ export function usePublicCamerasPage({ page, limit = 20, filters = {} }: UsePubl
     };
   }, [page, limit, filters.kind, filters.freshness, filters.q, filters.initial, filters.state, filters.origin, filters.sort, attempt]);
 
-  const reload = () => setAttempt((prev) => prev + 1);
+  const reload = () => {
+    // A retry re-counts: the failure may have hidden a changed dataset.
+    knownTotalRef.current = null;
+    setAttempt((prev) => prev + 1);
+  };
   const hasMore = total !== null && records.length > 0 && (page * limit < total);
 
   return { records, total, hasMore, loading, error, reload };

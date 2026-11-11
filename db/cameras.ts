@@ -140,11 +140,20 @@ export function publicCameraPredicate(nowIso: string): { sql: string; parameters
   // them from EVERY public read (JSON list, CSV/GeoJSON exports, bbox, by-id,
   // nearby, search, facets) — fail-closed, so a forgotten R12 purge degrades
   // to "demo invisible on all public surfaces", never to "demo served".
-  const placeholders = PUBLIC_CAMERA_STATUSES.map(() => "?").join(", ");
+  //
+  // Index usability (perf pass 2026-11): with the gate closed, `demo` is also
+  // dropped from the BOUND whitelist, so the IN list holds one status and
+  // SQLite rewrites `status IN (?)` to `status = ?`. An equality on the
+  // leading column lets the (status, <sort key>) composite indexes serve the
+  // ORDER BY directly (e.g. cameras_status_title_nocase_idx for the
+  // alphabetical directory); a two-value IN forced a temp B-tree sort. The
+  // `status != 'demo'` clause stays as the fail-closed belt-and-braces gate.
+  const statuses = PUBLIC_CAMERA_STATUSES.filter((status) => status !== "demo" || demoRecordsPublic());
+  const placeholders = statuses.map(() => "?").join(", ");
   const demoGate = demoRecordsPublic() ? "" : " AND status != 'demo'";
   return {
     sql: `status IN (${placeholders}) AND (status = 'demo' OR review_due_at IS NULL OR review_due_at >= ?)${demoGate}`,
-    parameters: [...PUBLIC_CAMERA_STATUSES, nowIso],
+    parameters: [...statuses, nowIso],
   };
 }
 
@@ -300,8 +309,12 @@ export async function listPublicCamerasPage(
   if (filters?.origin === "imported") query += " AND source LIKE 'import:%'";
   
   // Cursor-based pagination for alphabetical sort (keyset pagination).
+  // Written as `t >= ? AND (t > ? OR id < ?)` — the same row set as
+  // `t > ? OR (t = ? AND id < ?)` — so the leading range term lets SQLite
+  // SEEK cameras_status_title_nocase_idx to the cursor instead of walking the
+  // index from the first title (an OR at the top level is not seekable).
   if (filters?.after && filters.sort === "alphabetical") {
-    query += " AND (title COLLATE NOCASE > ? OR (title COLLATE NOCASE = ? AND id < ?))";
+    query += " AND title COLLATE NOCASE >= ? AND (title COLLATE NOCASE > ? OR id < ?)";
     parameters.push(filters.after.title, filters.after.title, String(filters.after.id));
   }
   

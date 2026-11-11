@@ -81,9 +81,8 @@ test.afterEach(async () => {
   // Unmount FIRST: the hook cleanup aborts the in-flight request, so releasing
   // the gates below cannot land a state update on a mounted tree.
   rtl.cleanup();
-  // A walked replacement issues its requests one after another, so a released
-  // gate can open the NEXT one: drain until nothing is left (each pass runs
-  // after the cleanup, so no state update lands anywhere).
+  // A released gate could open a follow-up request: drain until nothing is
+  // left (each pass runs after the cleanup, so no state update lands anywhere).
   for (let pass = 0; pass < 4 && openGates.length > 0; pass += 1) {
     const gates = openGates;
     openGates = [];
@@ -177,8 +176,7 @@ test("Next: the page-1 rows never stand in for the pending page-2 replacement (E
   assert.equal(text(counter(container)), "40 public records found", "the KNOWN server total survives the replacement request (never a false zero)");
   assert.match(container.querySelector(".directory-pagination:not(.directory-pagination-top)")?.textContent ?? "", /Page 2 of 2/, "the target page is announced while its rows load");
 
-  // Settled page 2: the walk fetches page 1 (cursor) then page 2.
-  await answerNextListRequest();
+  // Settled page 2: ONE request addressed by offset (no walk from page 1).
   await answerNextListRequest();
   await rtl.waitFor(
     () => assert.deepEqual(titles(container).slice(0, 2), ["Record 21", "Record 22"], "page 2 renders its OWN rows once settled"),
@@ -203,7 +201,6 @@ test("Next (IT): the pending replacement announces the Italian loading note", as
   assert.match(text(counter(container)), /40 record pubblici trovati/, "the known total survives in Italian too");
 
   await answerNextListRequest();
-  await answerNextListRequest();
   await rtl.waitFor(() => assert.deepEqual(titles(container).slice(0, 1), ["Record 21"]), { timeout: 5000 });
 });
 
@@ -227,7 +224,6 @@ test("an external URL change (?page=2) replaces the visible page instead of keep
   assert.equal(text(listNote(container)), EN_LOADING, "the loading note covers the replacement");
   assert.match(text(counter(container)), /40 public records found/, "the total is preserved across the URL change");
 
-  await answerNextListRequest();
   await answerNextListRequest();
   await rtl.waitFor(() => assert.deepEqual(titles(container).slice(0, 1), ["Record 21"]), { timeout: 5000 });
 });
