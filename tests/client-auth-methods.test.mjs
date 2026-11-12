@@ -391,3 +391,24 @@ test("login: ?returnTo= is ignored for off-site targets (same-site only)", async
   const nav = await getNavState();
   await waitFor(() => assert.deepEqual(window.__locationAssigns, ["/account"]), "off-site returnTo must fall back to /account");
 });
+
+// Security audit 2026-11: `/\evil.com` and `/<TAB>/evil.com` start with a
+// single slash but the browser normalises them to //evil.com.
+for (const [label, encoded] of [["backslash", "%2F%5Cevil.example"], ["tab", "%2F%09%2Fevil.example"]]) {
+  test(`login: ?returnTo= rejects the ${label} protocol-relative trick`, async () => {
+    const { screen, waitFor } = rtl;
+    const user = rtl.userEvent.setup();
+    installFetchMock((input) => {
+      if (String(input) === "/api/auth/login") return jsonResponse({ contributor: { id: 1 } });
+      return jsonResponse({ error: "unexpected route" }, { status: 404 });
+    });
+    await setNavState({ url: `/login?returnTo=${encoded}`, pushed: [] });
+
+    await loginForm();
+    await user.type(screen.getByLabelText("Email"), "contributor@example.test");
+    await user.type(screen.getByLabelText(/^Password/), "correct-horse-battery");
+    await user.click(screen.getByRole("button", { name: "Log in" }));
+
+    await waitFor(() => assert.deepEqual(window.__locationAssigns, ["/account"]), `${label} returnTo must fall back to /account`);
+  });
+}

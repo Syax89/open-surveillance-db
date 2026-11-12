@@ -167,17 +167,12 @@ export function oidcProviderConfig(
 /**
  * Validate a client-supplied post-login redirect target. Only relative
  * same-origin paths are accepted (`/account`, `/report/...`); anything with
- * a scheme, `//` prefix or backslash is rejected so a state row can never
- * steer the callback to a phishing URL. Returns the sanitised path or null.
+ * a scheme, `//` prefix, backslash, whitespace or control character is
+ * rejected so a state row can never steer the callback to a phishing URL.
+ * The implementation lives in ./safe-redirect (shared with the login page
+ * and /api/locale); re-exported here for the OIDC routes.
  */
-export function safeRedirectTarget(value: unknown): string | null {
-  if (typeof value !== "string" || value.length === 0) return null;
-  if (!value.startsWith("/") || value.startsWith("//")) return null;
-  if (/[\\\s]/.test(value)) return null;
-  // Keep the browser inside the app: no scheme-relative or protocol values.
-  if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(value)) return null;
-  return value.slice(0, 300);
-}
+export { safeRedirectTarget } from "./safe-redirect";
 
 // ---------------------------------------------------------------------------
 // PKCE (RFC 7636)
