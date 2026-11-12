@@ -92,16 +92,28 @@ after(async () => {
   await cleanupDbRuntime();
 });
 
+// Real per-session CSRF token, keyed by the raw session token, so session
+// mutations can echo it through X-CSRF-Token like the browser client does.
+const csrfBySessionToken = new Map();
+
 function sessionCookie(response) {
   const cookie = response.headers.getSetCookie().find((entry) => entry.startsWith("osdb_session="));
   assert.ok(cookie, "register must issue a session cookie");
-  return /osdb_session=([^;]+)/.exec(cookie)[1];
+  const rawToken = /osdb_session=([^;]+)/.exec(cookie)[1];
+  const csrfCookie = response.headers.getSetCookie().find((entry) => entry.startsWith("osdb_csrf="));
+  if (csrfCookie) csrfBySessionToken.set(rawToken, decodeURIComponent(/osdb_csrf=([^;]+)/.exec(csrfCookie)[1]));
+  return rawToken;
 }
 
 function withSession(pathAndQuery, rawToken, init = {}) {
+  const csrfToken = csrfBySessionToken.get(rawToken) ?? "csrf-token-123";
   return apiRequest(pathAndQuery, {
     ...init,
-    headers: { ...(init.headers ?? {}), cookie: `osdb_session=${rawToken}; osdb_csrf=csrf-token-123` },
+    headers: {
+      ...(init.headers ?? {}),
+      cookie: `osdb_session=${rawToken}; osdb_csrf=${csrfToken}`,
+      "x-csrf-token": csrfToken,
+    },
   });
 }
 

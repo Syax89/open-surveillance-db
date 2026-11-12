@@ -11,7 +11,10 @@ import { BodyReadError, readJsonBody, urlTooLong } from "../../../../lib/input-l
  *
  *   - 200  token live           -> password rotated (PBKDF2 re-hash), EVERY
  *                                  live session revoked (a session opened
- *                                  with the old password must die), and the
+ *                                  with the old password must die), EVERY
+ *                                  passkey + recovery code deleted and EVERY
+ *                                  API key revoked (a reset means "I lost
+ *                                  control of this account"), and the
  *                                  email marked verified (proving mailbox
  *                                  control is what a reset does) — all in ONE
  *                                  atomic batch, so a crash cannot leave the

@@ -88,6 +88,17 @@ test("returns the nearest address with the cache status header", async () => {
   assert.equal(response.headers.get("Cache-Control"), "public, max-age=86400", "stable addresses are edge-cacheable");
 });
 
+test("forwards only the Referer origin to the reverse geocoder (same posture as the forward route)", async () => {
+  const seen = [];
+  stub("reverseGeocode", async (db, lat, lng, options) => {
+    seen.push(options?.referer ?? null);
+    return { address: "Via Roma 12", cached: false };
+  });
+  await getReverse("lat=45.4642&lng=9.19", { headers: { Referer: "https://osdb.test/segnala?lat=45.46&lng=9.19" } });
+  await getReverse("lat=45.4642&lng=9.19");
+  assert.deepEqual(seen, ["https://osdb.test/", null], "origin only — never the page path or the picked coordinates");
+});
+
 test("returns address null with no-store when the geocoder has nothing there", async () => {
   stub("reverseGeocode", async () => null);
   const response = await getReverse("lat=45.4642&lng=9.19");

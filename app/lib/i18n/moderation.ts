@@ -153,6 +153,8 @@ export const en = {
   actor: "Actor",
   localModerator: "Local moderator",
   selectActor: "Acting reviewer",
+  actingAs: "Moderating as",
+  noReviewerProfile: "Your account has no moderator profile linked yet, so decisions cannot be recorded. Ask the administrator to link your account.",
   actorRequired: "Select the reviewer who records this decision.",
   actorHelp:
     "Required. Decisions are attributed to a named local reviewer; every action is written to the append-only audit trail.",
@@ -377,6 +379,8 @@ export const it: Translation<typeof en> = {
   actor: "Autore",
   localModerator: "Moderatore locale",
   selectActor: "Revisore agente",
+  actingAs: "Stai moderando come",
+  noReviewerProfile: "Il tuo account non ha ancora un profilo da moderatore collegato, quindi le decisioni non possono essere registrate. Chiedi all’amministratore di collegarlo.",
   actorRequired: "Seleziona il revisore che registra questa decisione.",
   actorHelp:
     "Obbligatorio. Le decisioni sono attribuite a un revisore locale nominativo; ogni azione viene scritta nel registro di controllo append-only.",

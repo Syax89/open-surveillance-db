@@ -81,7 +81,8 @@ function slug(value: string): string {
 /**
  * CSV serialisation — mirrors app/api/cameras/route.ts toCsv(): identical
  * header row, identical per-cell escaping (double quotes, spreadsheet
- * formula neutralisation for cells starting with = + - @) and the same ODbL
+ * formula neutralisation for TEXT cells starting with = + - @ TAB CR; numbers
+ * are never prefixed) and the same ODbL
  * attribution footer, so existing spreadsheet consumers keep working.
  */
 export function camerasToCsv(records: ExportCameraRow[]): string {
@@ -108,9 +109,17 @@ export function camerasToCsv(records: ExportCameraRow[]): string {
   return `${header.join(",")}\n${rows.join("\n")}\n# ${DATA_LICENSE_NOTICE}\n`;
 }
 
-function csvCell(value: string | number | null): string {
-  const text = value === null ? "" : String(value);
-  const safeText = /^[=+\-@]/.test(text) ? `'${text}` : text;
+function csvCell(value: string | number | null | undefined): string {
+  // Numeric columns (id, latitude, longitude, direction) are written
+  // verbatim: a negative coordinate is data, not a formula, and prefixing it
+  // with `'` corrupted every western/southern record. The formula guard
+  // (CSV injection) applies to TEXT cells only, and also covers a leading
+  // TAB or CR, which some spreadsheets strip before evaluating.
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? `"${String(value)}"` : '""';
+  }
+  const text = value == null ? "" : String(value);
+  const safeText = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
   return `"${safeText.replaceAll('"', '""')}"`;
 }
 

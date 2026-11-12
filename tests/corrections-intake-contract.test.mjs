@@ -297,6 +297,19 @@ test("A5 (route mapping): a repeat report on an already-removed record answers 4
   assert.match((await responseBody(response)).error, /already been removed/);
 });
 
+test("route mapping: a missing or non-visible cameraId answers 404, never 201/500", async () => {
+  stub("createCorrectionRequest", async () => ({ kind: "camera_not_found" }));
+  const { POST } = await route();
+  const response = await POST(
+    intakePost(
+      { cameraId: 424242, issueType: "inaccurate", message: "Probe.", contact: null },
+      { "cf-connecting-ip": "203.0.113.172" },
+    ),
+  );
+  assert.equal(response.status, 404);
+  assert.match((await responseBody(response)).error, /Camera not found/);
+});
+
 test("A4: the intake fails closed with 503 when submissions are disabled", async () => {
   const env = await correctionsEnv();
   env.POST_SUBMISSIONS_DISABLED = "true";

@@ -151,6 +151,14 @@ test("camerasToCsv: escapes quotes and neutralises spreadsheet formulas (same as
   assert.match(row, /"'-1; DROP TABLE cameras;--"/);
 });
 
+test("camerasToCsv: negative coordinates stay numeric; TAB/CR-led text is neutralised (security audit 2026-11)", () => {
+  const western = { id: 10, title: "\tcmd", kind: "\r=1+1", status: "active", latitude: -33.8688, longitude: -73.98, direction: 0, source: "Community report", updated: "2026-07-01", description: "+tip", address: "@home" };
+  const row = camerasToCsv([western]).split("\n")[1];
+  assert.match(row, /,"-33\.8688","-73\.98","0"$/, "negative numbers must never get a formula-guard apostrophe");
+  assert.match(row, /^"10","'\tcmd","'\r=1\+1"/);
+  assert.match(row, /"'\+tip","'@home"/);
+});
+
 test("camerasToCsv: a directional camera keeps its bearing in the trailing direction column", () => {
   const csv = camerasToCsv([SIX_RECORDS[3]]);
   const row = csv.split("\n")[1];

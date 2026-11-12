@@ -147,6 +147,8 @@ export const de: Translation<typeof en> = {
   actor: "Handelnde Person",
   localModerator: "Lokale Moderation",
   selectActor: "Prüfende Person",
+  actingAs: "Du moderierst als",
+  noReviewerProfile: "Mit deinem Konto ist noch kein Moderationsprofil verknüpft, daher können keine Entscheidungen gespeichert werden. Bitte die Administration, es zu verknüpfen.",
   actorRequired: "Wähle die prüfende Person, die diese Entscheidung erfasst.",
   actorHelp:
     "Pflicht. Entscheidungen werden einer namentlich genannten lokalen prüfenden Person zugeordnet; jede Aktion wird in das unveränderliche Audit-Protokoll geschrieben.",

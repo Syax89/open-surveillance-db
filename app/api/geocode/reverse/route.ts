@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import { originOnlyReferer } from "../../../lib/upstream-referer";
 import { geocodeLimits } from "../../../lib/rate-limit";
 import { rateLimitResponse } from "../../../lib/rate-limit-response";
 import { reverseGeocode } from "../../../../db/reverse-geocode";
@@ -15,7 +16,9 @@ import { reverseGeocode } from "../../../../db/reverse-geocode";
  *     migration 0041) serves repeat/nearby positions WITHOUT any network
  *     call ("salviamo il record così non dobbiamo richiederlo ogni volta");
  *   - only a cache MISS touches Nominatim, with the same identifying
- *     User-Agent as the forward geocoder (usage policy);
+ *     User-Agent as the forward geocoder (usage policy) and the same
+ *     origin-only Referer (app/lib/upstream-referer.ts: never stripped or
+ *     blanked, but no page path or query);
  *   - a per-caller rate limit (same GEOCODE_RATE_LIMIT_* knobs, default
  *     30/min) keeps any scrape far below the ~1 req/s policy ceiling;
  *   - strict input validation: lat ∈ [-90, 90], lng ∈ [-180, 180], so the
@@ -69,7 +72,9 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   try {
-    const result = await reverseGeocode(env.DB, lat, lng);
+    const result = await reverseGeocode(env.DB, lat, lng, {
+      referer: originOnlyReferer(request.headers.get("Referer")),
+    });
     // Cache-Control: the reply is stable (OSM addresses change rarely) and
     // the D1 cache is the source of truth — an edge cache just saves DB
     // reads for identical repeat queries.

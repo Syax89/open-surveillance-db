@@ -256,6 +256,9 @@ test("correction moderation records events and keeps decisions private", async (
   const { env, cameras, corrections, moderation } = await realDb();
   await resetDb({ env, cameras });
   const camera = await makePendingCamera(env, cameras);
+  // Correction intake only accepts a record reachable on a public record page
+  // (security audit): publish the fixture first.
+  await env.DB.prepare("UPDATE cameras SET status = 'active' WHERE id = ?").bind(camera.id).run();
   const request = await corrections.createCorrectionRequest({
     cameraId: camera.id,
     issueType: "inaccurate details",

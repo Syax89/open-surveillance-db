@@ -162,6 +162,54 @@ test("applyCameraEdit on a non-terminal, non-published status answers status_blo
 });
 
 // ---------------------------------------------------------------------------
+// No status/existence oracle for non-owners (security audit)
+// ---------------------------------------------------------------------------
+
+test("applyCameraEdit: a non-owner gets not_found for every non-public status, like a missing id", async () => {
+  await freshDb();
+  const ownerId = await insertContributor();
+  const strangerId = await insertContributor();
+  for (const status of ["pending", "needs_review", "stale", "hidden", "removed", "rejected"]) {
+    const cameraId = await insertCamera({ contributorId: ownerId, status });
+    const result = await cameraEdits.applyCameraEdit({
+      cameraId, contributorId: strangerId, fields: { title: "Probe" }, now: NOW,
+    });
+    assert.equal(result.kind, "not_found", status);
+  }
+  // A public record still tells a non-owner "not yours" (403).
+  const active = await insertCamera({ contributorId: ownerId, status: "active" });
+  const publicResult = await cameraEdits.applyCameraEdit({
+    cameraId: active, contributorId: strangerId, fields: { title: "Probe" }, now: NOW,
+  });
+  assert.equal(publicResult.kind, "not_owner");
+  const requests = await db.prepare("SELECT COUNT(*) AS n FROM camera_edit_requests").first();
+  assert.equal(Number(requests.n), 0, "no probe writes anything");
+});
+
+test("applyCameraEdit: the owner of a removed/rejected/hidden record still gets status_blocked", async () => {
+  await freshDb();
+  const ownerId = await insertContributor();
+  for (const status of ["removed", "rejected", "hidden"]) {
+    const cameraId = await insertCamera({ contributorId: ownerId, status });
+    const result = await cameraEdits.applyCameraEdit({
+      cameraId, contributorId: ownerId, fields: { title: "Owner edit" }, now: NOW,
+    });
+    assert.equal(result.kind, "status_blocked", status);
+  }
+});
+
+test("getCameraEditView: a non-owner gets not_found for every non-public status", async () => {
+  await freshDb();
+  const ownerId = await insertContributor();
+  const strangerId = await insertContributor();
+  for (const status of ["needs_review", "stale", "removed", "rejected"]) {
+    const cameraId = await insertCamera({ contributorId: ownerId, status });
+    const result = await cameraEdits.getCameraEditView(cameraId, strangerId);
+    assert.equal(result.kind, "not_found", status);
+  }
+});
+
+// ---------------------------------------------------------------------------
 // getCameraEditView — the C6 owner view, previously only stubbed at route
 // ---------------------------------------------------------------------------
 

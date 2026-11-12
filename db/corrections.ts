@@ -1,4 +1,5 @@
 import { getD1 } from "./cameras";
+import { RECORD_PAGE_STATUSES } from "../app/lib/public-status";
 
 /**
  * Correction/removal intake (COMMUNITY_PLAN §2.4, C4).
@@ -43,7 +44,12 @@ export type CorrectionRequest = {
 export type CreateCorrectionResult =
   | { kind: "created"; correction: CorrectionRequest }
   | { kind: "duplicate_open" }
-  | { kind: "already_removed" };
+  | { kind: "already_removed" }
+  // The cameraId is missing, or names a record the reporter cannot see
+  // (not reachable on a public record page and not their own): answered
+  // exactly like a missing id — never a 201 on a hidden pending row, never
+  // a 500 from the foreign-key constraint.
+  | { kind: "camera_not_found" };
 
 /**
  * The `correction_requests` table and its index are applied by the Drizzle
@@ -82,6 +88,15 @@ export async function createCorrectionRequest(input: {
   const createdAt = new Date().toISOString();
 
   if (input.cameraId !== null) {
+    const statusList = RECORD_PAGE_STATUSES.map(() => "?").join(", ");
+    const visible = await d1
+      .prepare(
+        `SELECT 1 AS ok FROM cameras WHERE id = ? AND (status IN (${statusList}) OR (contributor_id IS NOT NULL AND contributor_id = ?))`,
+      )
+      .bind(input.cameraId, ...RECORD_PAGE_STATUSES, contributorId)
+      .first<{ ok: number }>();
+    if (!visible) return { kind: "camera_not_found" };
+
     const open = await d1
       .prepare(
         contributorId === null
@@ -108,19 +123,28 @@ export async function createCorrectionRequest(input: {
   // `ON CONFLICT DO NOTHING` swallows the conflict and returns no row, which
   // the caller maps to `duplicate_open`. Inputs are already validated by the
   // route (whitelist + cleanText bounds), so no other constraint can fire.
-  const result = await d1
-    .prepare(
-      "INSERT INTO correction_requests (camera_id, issue_type, message, contact, contributor_id, status, created_at) VALUES (?, ?, ?, ?, ?, 'pending', ?) ON CONFLICT DO NOTHING RETURNING id, camera_id AS cameraId, issue_type AS issueType, message, contact, contributor_id AS contributorId, status, outcome, created_at AS createdAt",
-    )
-    .bind(
-      input.cameraId,
-      input.issueType,
-      input.message,
-      input.contact || null,
-      contributorId,
-      createdAt,
-    )
-    .first<CorrectionRequest>();
+  let result: CorrectionRequest | null;
+  try {
+    result = await d1
+      .prepare(
+        "INSERT INTO correction_requests (camera_id, issue_type, message, contact, contributor_id, status, created_at) VALUES (?, ?, ?, ?, ?, 'pending', ?) ON CONFLICT DO NOTHING RETURNING id, camera_id AS cameraId, issue_type AS issueType, message, contact, contributor_id AS contributorId, status, outcome, created_at AS createdAt",
+      )
+      .bind(
+        input.cameraId,
+        input.issueType,
+        input.message,
+        input.contact || null,
+        contributorId,
+        createdAt,
+      )
+      .first<CorrectionRequest>();
+  } catch (error) {
+    // The camera vanished between the visibility check and the INSERT.
+    if (error instanceof Error && /FOREIGN KEY constraint failed/i.test(error.message)) {
+      return { kind: "camera_not_found" };
+    }
+    throw error;
+  }
   if (!result) return { kind: "duplicate_open" };
   return { kind: "created", correction: result };
 }

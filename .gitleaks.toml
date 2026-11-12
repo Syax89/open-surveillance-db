@@ -22,4 +22,9 @@ useDefault = true
 description = "Test-fixture placeholder tokens (tok-* convention) — not real secrets"
 regexes = [
     '''^tok-[a-z0-9]{3,32}$''',
+    # Public domain-separation label for the passkey decoy credential ids
+    # (app/lib/passkey.ts DECOY_CREDENTIAL_PEPPER). Not a secret: it is only
+    # the fallback HMAC label when REGISTRATION_IP_HMAC_KEY is unset, and the
+    # decoys it produces are public by design. Exact value only.
+    '''^osdb-passkey-decoy-v1$''',
 ]

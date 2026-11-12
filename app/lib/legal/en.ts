@@ -21,7 +21,7 @@ export const enLegal: LegalContent = {
     intro:
       "How OpenSurveillanceDB processes personal data, what we publish, what we never collect, and how you can exercise your rights under the GDPR.",
     versionNote:
-      "Version 0.8 — 9 August 2026. Legal-audit alignment: re-synchronised with the canonical PRIVACY_NOTICE v0.14 (docs/legal/PRIVACY_NOTICE.md remains canonical). § 5 adds the Nominatim geocoding processor (PR6); § 7 documents the legacy `pending`/`rejected` hard-delete rules (R19/R20); § 10 Cookie section; OIDC processor references corrected to PR4/PR5; special-category note reworded to the text-only model (image evidence removed).",
+      "Version 0.9 — 12 November 2026. § 10 Cookies rewritten to list every cookie in use (language, colour theme, sign-in session and CSRF protection), all strictly necessary, so still no consent banner; re-synchronised with the canonical PRIVACY_NOTICE v0.16 (docs/legal/PRIVACY_NOTICE.md remains canonical).",
     sections: [
       {
         heading: "1. Who we are (controller)",
@@ -245,31 +245,34 @@ export const enLegal: LegalContent = {
         blocks: [
           {
             type: "paragraph",
-            text: "OpenSurveillanceDB uses a single functional cookie:",
+            text: "OpenSurveillanceDB uses only the cookies listed below. All of them are strictly necessary or functional: they contain no tracking identifiers, are never shared with third parties and are not used for analytics, advertising or profiling. That is why no consent banner is shown.",
           },
           {
-            type: "paragraph",
-            text: "**opensurveillancedb-locale** — remembers the language you selected on this device/browser (Italian or English). It is set **only when you change the language**; it is never used to track you.",
+            type: "table",
+            caption: "Cookies set by OpenSurveillanceDB",
+            headers: ["Cookie", "Purpose", "When it is set", "Duration", "Properties"],
+            rows: [
+              ["**opensurveillancedb-locale**", "Remembers your interface language (en, it, fr, de, es or pt). It is also read when you ask for a verification or password-reset email, so that the message is sent in English and in your language.", "When you choose a language in the language menu, or open a language link (/api/locale)", "1 year", "SameSite=Lax, path=/"],
+              ["**opensurveillancedb-theme**", "Remembers the light or dark colour theme you chose (light / dark). Without it, the site follows your system setting.", "When you use the theme switch", "1 year", "SameSite=Lax, path=/"],
+              ["**osdb_session**", "Keeps you signed in: holds a random session token (our servers store only its hash).", "When you sign in or create an account; deleted when you sign out", "Length of the login (30 days by default), or until you sign out", "HttpOnly, Secure, SameSite=Strict, path=/"],
+              ["**osdb_csrf**", "Protects the actions you take while signed in against cross-site request forgery (CSRF): holds a random per-session token that the page sends back with every change.", "Together with osdb_session; deleted when you sign out", "Same as osdb_session", "Secure, SameSite=Strict, path=/; readable by the site's own scripts by design"],
+            ],
           },
           {
             type: "list",
             items: [
-              "**Type:** functional — strictly necessary to provide the language preference you explicitly requested",
-              "**Purpose:** persist your interface language",
-              "**Duration:** 1 year (`max-age=31536000`)",
-              "**Content:** none of your data — a plain language code (`it` / `en`)",
-              "**Properties:** `SameSite=Lax`, `path=/`, not readable cross-site (no tracking or session surface)",
+              "**Content:** none of these cookies contains your name, your email address or any other personal data; the two sign-in cookies hold random tokens that mean nothing outside this site.",
               "**Legal basis:** art. 122 D.Lgs. 196/2003 (transposing art. 5(3) of Directive 2002/58/EC as amended by 2009/136/EC) — consent is **not** required for cookies strictly necessary to provide a service explicitly requested by the user, so no consent banner is shown.",
-              "**Managing it:** you can delete it at any time from your browser settings; without it the interface defaults to the pilot language (English) on this device.",
+              "**Managing them:** you can delete them at any time from your browser settings. Without the language cookie the interface uses the pilot language (English); without the theme cookie it follows your system setting; deleting the sign-in cookies signs you out.",
             ],
           },
           {
             type: "paragraph",
-            text: "The same preference is mirrored in your browser's `localStorage` for multi-tab synchronisation. `localStorage` is a browser storage technology, not a cookie, and is never transmitted to our servers.",
+            text: "The language preference is also mirrored in your browser's `localStorage` for multi-tab synchronisation. `localStorage` is a browser storage technology, not a cookie, and is never transmitted to our servers.",
           },
           {
             type: "note",
-            text: "**Commitment:** if the redesign or any future feature introduces cookies that are not strictly necessary (analytics, advertising, profiling), we will ask for your explicit consent through a banner **before** installing them, in accordance with art. 122 D.Lgs. 196/2003.",
+            text: "**Commitment:** if any future feature introduces cookies that are not strictly necessary (analytics, advertising, profiling), we will ask for your explicit consent through a banner **before** installing them, in accordance with art. 122 D.Lgs. 196/2003.",
           },
         ],
       },

@@ -5,8 +5,10 @@
 // The geolocation button of step 1 sits on the same row, to its right.
 //
 // Since issue #439 the input/dropdown mechanics live in the shared
-// PlaceAutocomplete primitive (250 ms debounce, /api/geocode with limit=5
-// and the current locale, 429 cooldown, ARIA combobox + listbox with
+// PlaceAutocomplete primitive (submit-only search: nothing is sent while
+// typing — a search runs only on Enter or the search button, coordinates
+// are resolved locally, and only a real place query reaches /api/geocode
+// with limit=5 and the current locale; 429 cooldown, ARIA combobox + listbox with
 // arrow-key navigation, Enter selects the highlighted option (or the
 // first), Escape closes, click/touch outside closes, honest no-results /
 // rate-limited / error states announced via role=status). This component

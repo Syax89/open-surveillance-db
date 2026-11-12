@@ -40,7 +40,7 @@ const pendingCameras = (start, count) =>
 const base = {
   cameraReports: [], publishedCameras: [], publishedNextCursor: null, reviewCameras: [], staleCameras: [],
   correctionRequests: [], cameraEditRequests: [], recentEvents: [],
-  reviewers: [{ id: 2, displayName: "Fixture Reviewer", role: "moderator" }], queueItems: [],
+  actingReviewer: { id: 2, displayName: "Fixture Reviewer", role: "moderator" }, reviewers: [{ id: 2, displayName: "Fixture Reviewer", role: "moderator" }], queueItems: [],
   queueTotals: { pending: 25, published: 0, review: 0, stale: 0, corrections: 0, edits: 0 },
   queueNextCursors: { pending: null, review: null, stale: null, corrections: null, edits: null },
 };
@@ -149,8 +149,6 @@ test("moderation queues: a decision keeps the pages loaded with load more (minus
   await waitFor(() => assert.ok(screen.queryByText("Pending fixture 1")));
   await user.click(loadMoreButton(screen));
   await waitFor(() => assert.ok(screen.queryByText("Pending fixture 25")));
-
-  await user.selectOptions(screen.getByRole("combobox", { name: /^Acting reviewer/ }), "2");
   await user.selectOptions(screen.getByLabelText("Required reason", { selector: "#camera-3-reason" }), "verified-public-infrastructure");
   await user.click(screen.getByLabelText("Decision for camera 3").querySelector('button[type="button"]'));
 

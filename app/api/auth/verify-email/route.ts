@@ -14,6 +14,11 @@ import { urlTooLong } from "../../../lib/input-limits";
  *                                  write-capable (the write gate, Fase E1,
  *                                  reads the column on every state-changing
  *                                  write; this response only confirms it).
+ *                                  On the FIRST verification, any passkey,
+ *                                  recovery code or API key bound before it
+ *                                  is purged in the same batch
+ *                                  (pre-registration takeover guard, see
+ *                                  markContributorEmailVerified).
  *   - 400  malformed/unknown    -> generic body, never reveals whether a
  *                                  token exists (anti-enumeration).
  *   - 410  already used or past its 24h TTL — Gone, the link is dead.

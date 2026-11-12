@@ -13,7 +13,7 @@ import { authLimit } from "../../../../../lib/auth-route-helpers";
 import { csrfVerified, sameOrigin } from "../../../../../lib/csrf";
 import { isRecord } from "../../../../../lib/guards";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../../../../lib/input-limits";
-import { toBase64Url, webauthnRpConfig } from "../../../../../lib/passkey";
+import { emailUnverifiedResponse, toBase64Url, webauthnRpConfig } from "../../../../../lib/passkey";
 
 /**
  * POST /api/auth/passkey/register/complete — finish a WebAuthn registration
@@ -25,6 +25,12 @@ import { toBase64Url, webauthnRpConfig } from "../../../../../lib/passkey";
  * in D1, and issues the contributor's fresh set of 10 one-time recovery
  * codes — returned in plaintext exactly once. The client must display them
  * and prompt the user to store them (Fase E2 /account UX).
+ *
+ * Like /begin, completion (credential storage AND recovery-code issuance)
+ * is refused with 403 `{ code: "email_unverified" }` while the account's
+ * email is unverified — the pre-registration takeover guard (see
+ * register/begin). The check runs before the challenge is consumed, so a
+ * refused request burns nothing.
  *
  * Privacy: `attestationType: "none"` was requested at /begin, so no device
  * attestation is verified or stored — only the credential itself
@@ -50,6 +56,7 @@ export async function POST(request: Request) {
     if (!csrfVerified(request, resolved.session.csrfToken)) {
       return Response.json({ error: "Invalid CSRF token. Refresh the page and try again." }, { status: 403 });
     }
+    if (!resolved.contributor.emailVerifiedAt) return emailUnverifiedResponse();
 
     const payload: unknown = await readJsonBody(request, env);
     if (!isRecord(payload) || !isRecord(payload.response) || typeof payload.challenge !== "string") {

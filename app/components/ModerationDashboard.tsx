@@ -46,12 +46,19 @@ export function ModerationDashboard() {
       {/* Compact toolbar (2026-11): the acting reviewer is one inline field,
           not a section of its own. */}
       <div className="moderation-toolbar">
-        <label htmlFor="actor-select">{t.selectActor}</label>
-        <select id="actor-select" value={q.actorId} onChange={(event) => q.setActorId(event.target.value)} required aria-describedby="actor-help">
-          <option value="">{t.selectReason.replace("reason", "reviewer")}</option>
-          {q.reviewers.map((reviewer) => <option key={reviewer.id} value={reviewer.id}>{reviewer.displayName} · {reviewer.role}</option>)}
-        </select>
-        <span className="search-count" id="actor-help">{t.actorHelp}</span>
+        {q.actorSelectable ? (<>
+          <label htmlFor="actor-select">{t.selectActor}</label>
+          <select id="actor-select" value={q.actorId} onChange={(event) => q.setActorId(event.target.value)} required aria-describedby="actor-help">
+            <option value="">{t.selectReason.replace("reason", "reviewer")}</option>
+            {q.reviewers.map((reviewer) => <option key={reviewer.id} value={reviewer.id}>{reviewer.displayName} · {reviewer.role}</option>)}
+          </select>
+          <span className="search-count" id="actor-help">{t.actorHelp}</span>
+        </>) : q.actingReviewer ? (
+          // The actor is always the logged-in moderator (owner 2026-11): shown, never asked.
+          <p className="moderation-acting-as"><span>{t.actingAs}</span> <strong>{q.actingReviewer.displayName}</strong> · {q.actingReviewer.role}</p>
+        ) : q.actingReviewer === null ? (
+          <p className="notice" role="alert">{t.noReviewerProfile}</p>
+        ) : null}
       </div>
 
       <QueueTabs label={t.queuesLabel} tab={tab} onSelect={setTab} labels={t.tabs}

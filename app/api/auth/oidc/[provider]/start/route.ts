@@ -4,11 +4,15 @@ import {
   buildAuthorizeUrl,
   codeChallenge,
   isKnownOidcProvider,
+  newOidcBinding,
+  oidcBindingCookie,
   oidcProviderConfig,
+  oidcStateForBinding,
   publicOrigin,
   safeRedirectTarget,
 } from "../../../../../lib/oidc";
 import { authLimit } from "../../../../../lib/auth-route-helpers";
+import { cookieSecure } from "../../../../../lib/auth-session";
 
 /**
  * GET /api/auth/oidc/[provider]/start — begin an external OIDC login
@@ -29,6 +33,10 @@ import { authLimit } from "../../../../../lib/auth-route-helpers";
  *     callback land on a phishing origin.
  *   - The `auth` rate-limit bucket metering also covers this route: state
  *     rows are cheap but the bucket stops a caller from flooding the table.
+ *   - Login-CSRF: the `state` is derived from a random binding value set in
+ *     a 10-minute HttpOnly SameSite=Lax cookie (`__Host-` prefixed when
+ *     Secure); the callback refuses a state the cookie does not derive
+ *     (see app/lib/oidc.ts, "Browser binding").
  *
  * The provider is parsed from the URL path (works identically under the
  * Next.js App Router and the plain-Node route harness, which invokes
@@ -56,9 +64,12 @@ export async function GET(request: Request) {
   const redirectTo = safeRedirectTarget(url.searchParams.get("redirect_to")) ?? "/account";
 
   try {
-    const { rawState, codeVerifier } = await createOidcState({
+    const binding = newOidcBinding();
+    const rawState = await oidcStateForBinding(binding);
+    const { codeVerifier } = await createOidcState({
       provider,
       redirectTo,
+      rawState,
     });
     const challenge = await codeChallenge(codeVerifier);
     const authorizeUrl = await buildAuthorizeUrl(config, {
@@ -70,6 +81,7 @@ export async function GET(request: Request) {
       headers: {
         Location: authorizeUrl,
         "Cache-Control": "no-store",
+        "Set-Cookie": oidcBindingCookie(binding, cookieSecure(env)),
       },
     });
   } catch (error) {

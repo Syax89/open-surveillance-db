@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useDomainMessages } from "../lib/use-domain-messages";
 import { authByLocale } from "../lib/i18n/auth";
+import { readCsrfToken } from "../lib/csrf";
 import { fetchSessionMe } from "../lib/session-fetch";
 
 /**
@@ -76,7 +77,11 @@ export function WriteGateWall({ returnTo, children }: { returnTo: string; childr
     setResendBusy(true);
     setResendMessage(null);
     try {
-      const response = await fetch("/api/auth/verify-email/resend", { method: "POST" });
+      const csrfToken = readCsrfToken();
+      const response = await fetch("/api/auth/verify-email/resend", {
+        method: "POST",
+        headers: csrfToken ? { "x-csrf-token": csrfToken } : {},
+      });
       if (response.ok) {
         setResendMessage(t.wallResent);
         return;

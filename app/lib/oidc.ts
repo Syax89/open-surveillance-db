@@ -167,17 +167,12 @@ export function oidcProviderConfig(
 /**
  * Validate a client-supplied post-login redirect target. Only relative
  * same-origin paths are accepted (`/account`, `/report/...`); anything with
- * a scheme, `//` prefix or backslash is rejected so a state row can never
- * steer the callback to a phishing URL. Returns the sanitised path or null.
+ * a scheme, `//` prefix, backslash, whitespace or control character is
+ * rejected so a state row can never steer the callback to a phishing URL.
+ * The implementation lives in ./safe-redirect (shared with the login page
+ * and /api/locale); re-exported here for the OIDC routes.
  */
-export function safeRedirectTarget(value: unknown): string | null {
-  if (typeof value !== "string" || value.length === 0) return null;
-  if (!value.startsWith("/") || value.startsWith("//")) return null;
-  if (/[\\\s]/.test(value)) return null;
-  // Keep the browser inside the app: no scheme-relative or protocol values.
-  if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(value)) return null;
-  return value.slice(0, 300);
-}
+export { safeRedirectTarget } from "./safe-redirect";
 
 // ---------------------------------------------------------------------------
 // PKCE (RFC 7636)
@@ -193,6 +188,94 @@ function base64UrlEncode(bytes: Uint8Array): string {
 export async function codeChallenge(verifier: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
   return base64UrlEncode(new Uint8Array(digest));
+}
+
+// ---------------------------------------------------------------------------
+// Browser binding of the authorization state (login-CSRF defence)
+// ---------------------------------------------------------------------------
+
+/**
+ * The `state` row in D1 proves that THIS server started a flow, but not that
+ * THIS browser did: without a browser binding, an attacker could start a
+ * flow in their own browser, authorize their own provider account, and then
+ * make the victim's browser load the callback URL (code + state), logging
+ * the victim into the ATTACKER's account (login CSRF, RFC 6749 §10.12).
+ *
+ * /start therefore sets a short-lived random BINDING value in an HttpOnly
+ * cookie and derives the `state` sent to the provider from it
+ * (`oidcStateForBinding`: base64url SHA-256 of a domain-separated binding).
+ * The callback recomputes the state from the cookie and requires it to
+ * equal the `state` query parameter BEFORE consuming the D1 row; a victim's
+ * browser never carries the attacker's binding cookie. The state leaks in
+ * URLs and provider logs, but the hash does not reveal the binding.
+ *
+ * Cookie: `SameSite=Lax` (the callback is a top-level cross-site GET from
+ * the provider, which Strict would not carry), HttpOnly, 10-minute Max-Age
+ * (= the state row TTL), and `Secure` + the `__Host-` prefix whenever the
+ * session cookies are Secure (`cookieSecure(env)`); the local
+ * plain-HTTP prototype uses the unprefixed name.
+ */
+export const OIDC_BINDING_COOKIE = "osdb_oidc_binding";
+export const OIDC_BINDING_COOKIE_SECURE = "__Host-osdb_oidc_binding";
+export const OIDC_BINDING_TTL_SECONDS = 10 * 60;
+
+/** Cookie name for the binding, per the Secure decision. */
+export function oidcBindingCookieName(secure: boolean): string {
+  return secure ? OIDC_BINDING_COOKIE_SECURE : OIDC_BINDING_COOKIE;
+}
+
+/** Fresh random binding value (32 bytes, base64url). */
+export function newOidcBinding(): string {
+  return base64UrlEncode(crypto.getRandomValues(new Uint8Array(32)));
+}
+
+/** The `state` nonce derived from a binding value. */
+export async function oidcStateForBinding(binding: string): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(`osdb-oidc-state-v1:${binding}`),
+  );
+  return base64UrlEncode(new Uint8Array(digest));
+}
+
+/** Set-Cookie value carrying the binding (see the section comment). */
+export function oidcBindingCookie(binding: string, secure: boolean): string {
+  return [
+    `${oidcBindingCookieName(secure)}=${binding}`,
+    "Path=/",
+    `Max-Age=${OIDC_BINDING_TTL_SECONDS}`,
+    "HttpOnly",
+    "SameSite=Lax",
+    secure ? "Secure" : "",
+  ].filter(Boolean).join("; ");
+}
+
+/** Set-Cookie value deleting the binding (every callback outcome). */
+export function clearOidcBindingCookie(secure: boolean): string {
+  return [
+    `${oidcBindingCookieName(secure)}=`,
+    "Path=/",
+    "Max-Age=0",
+    "Expires=Thu, 01 Jan 1970 00:00:00 GMT",
+    "HttpOnly",
+    "SameSite=Lax",
+    secure ? "Secure" : "",
+  ].filter(Boolean).join("; ");
+}
+
+/**
+ * True only when `binding` (the cookie value, or null when absent) derives
+ * exactly the `state` the callback received. Constant-time on the digest.
+ */
+export async function oidcBindingMatches(binding: string | null, state: string): Promise<boolean> {
+  if (!binding || !/^[A-Za-z0-9_-]{20,128}$/.test(binding)) return false;
+  const expected = await oidcStateForBinding(binding);
+  if (expected.length !== state.length) return false;
+  let difference = 0;
+  for (let index = 0; index < expected.length; index += 1) {
+    difference |= expected.charCodeAt(index) ^ state.charCodeAt(index);
+  }
+  return difference === 0;
 }
 
 // ---------------------------------------------------------------------------

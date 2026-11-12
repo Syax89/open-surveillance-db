@@ -72,9 +72,17 @@ function normalizeDomeDirection(kind: string, direction: number | null): number 
   return kind === DOME_KIND ? null : direction;
 }
 
-function csvCell(value: string | number | null) {
-  const text = value === null ? "" : String(value);
-  const safeText = /^[=+\-@]/.test(text) ? `'${text}` : text;
+function csvCell(value: string | number | null | undefined) {
+  // Numeric columns (id, latitude, longitude, direction) are written
+  // verbatim: a negative coordinate is data, not a formula, and prefixing it
+  // with `'` corrupted every western/southern record. The formula guard
+  // (CSV injection) applies to TEXT cells only, and also covers a leading
+  // TAB or CR, which some spreadsheets strip before evaluating.
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? `"${String(value)}"` : '""';
+  }
+  const text = value == null ? "" : String(value);
+  const safeText = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
   return `"${safeText.replaceAll('"', '""')}"`;
 }
 

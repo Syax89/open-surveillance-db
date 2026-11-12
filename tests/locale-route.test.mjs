@@ -48,14 +48,14 @@ async function workerModules() {
 }
 
 /** Dispatch a request to the built worker exactly like the deployed one. */
-async function dispatch(route) {
+async function dispatch(route, origin = "http://localhost") {
   const mf = new Miniflare({
     modules: await workerModules(),
     compatibilityDate: "2026-01-01",
     compatibilityFlags: ["nodejs_compat"],
   });
   try {
-    const response = await mf.dispatchFetch(`http://localhost${route}`, {
+    const response = await mf.dispatchFetch(`${origin}${route}`, {
       headers: { accept: "text/html" },
       redirect: "manual",
     });
@@ -100,6 +100,17 @@ test("locale deep-link rejects open-redirect and header-injection targets", asyn
     "//evil.example/phish",
     "/\\evil.example/phish",
     "/guide%0d%0aX-Evil:%20yes",
+    // Security audit 2026-11: browsers strip TAB/CR/LF and turn `\` into
+    // `/`, so each of these would otherwise land on //evil.example.
+    "/\t/evil.example/phish",
+    "/\n/evil.example",
+    "/\\/evil.example",
+    "/ /evil.example",
+    "/%09/evil.example",
+    "/%5Cevil.example",
+    "/%5c/evil.example",
+    "/guide\u0000",
+    "javascript:alert(1)",
   ]) {
     const result = await dispatch(`/api/locale?lang=it&next=${encodeURIComponent(next)}`);
     assert.equal(result.status, 302, `next=${next}`);
@@ -107,6 +118,17 @@ test("locale deep-link rejects open-redirect and header-injection targets", asyn
     assert.ok(!result.location.includes("\r") && !result.location.includes("\n"),
       `next=${next} must not leak CR/LF into the Location header`);
   }
+});
+
+test("locale deep-link marks the cookie Secure when served over https", async () => {
+  const result = await dispatch("/api/locale?lang=it&next=/guide", "https://localhost");
+
+  assert.equal(result.status, 302);
+  assert.equal(result.location, "/guide");
+  assert.equal(
+    result.setCookie,
+    "opensurveillancedb-locale=it; path=/; max-age=31536000; samesite=lax; secure",
+  );
 });
 
 test("locale deep-link falls back to the pilot language for unknown lang values", async () => {

@@ -53,7 +53,7 @@ const queueFixture = {
   ],
   cameraEditRequests: [],
   recentEvents: [],
-  reviewers: [
+  actingReviewer: { id: 2, displayName: "Fixture Reviewer", role: "moderator" }, reviewers: [
     { id: 2, displayName: "Fixture Reviewer", role: "moderator" },
   ],
   queueItems: [
@@ -123,7 +123,6 @@ test("correction rows offer the record outcome, record id and Link to record act
 
   // Select reviewer + reason: approve is still locked (outcome missing).
   const user = rtl.userEvent.setup();
-  await user.selectOptions(screen.getByRole("combobox", { name: /^Acting reviewer/ }), "2");
   await user.selectOptions(screen.getByLabelText("Required reason", { selector: "#correction-3-reason" }), "inaccurate-or-outdated");
   await waitFor(() => assert.equal(approve.disabled, true));
   // Choosing a record outcome unlocks approve; associate unlocks only with a record id.
@@ -149,8 +148,6 @@ test("approve on a correction dispatches PATCH with the record outcome and linke
   });
 
   await renderQueue();
-
-  await user.selectOptions(screen.getByRole("combobox", { name: /^Acting reviewer/ }), "2");
   await user.selectOptions(screen.getByLabelText("Required reason", { selector: "#correction-3-reason" }), "inaccurate-or-outdated");
   await user.selectOptions(screen.getByLabelText(/Record outcome/, { selector: "#correction-3-outcome" }), "corrected");
   await user.type(screen.getByLabelText(/Record ID/, { selector: "#correction-3-camera" }), "7");
@@ -185,8 +182,6 @@ test("associate links a pending correction to a record without deciding", async 
   });
 
   await renderQueue();
-
-  await user.selectOptions(screen.getByRole("combobox", { name: /^Acting reviewer/ }), "2");
   await user.selectOptions(screen.getByLabelText("Required reason", { selector: "#correction-3-reason" }), "insufficient-evidence");
   await user.type(screen.getByLabelText(/Record ID/, { selector: "#correction-3-camera" }), "7");
   const actions = screen.getByLabelText("Decision for correction 3");

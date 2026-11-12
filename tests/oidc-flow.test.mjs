@@ -134,6 +134,21 @@ const session = {
 
 const newSession = { rawToken: "raw-session-token-abc123", csrfToken: "csrf-token-123", session };
 
+const BINDING_COOKIE = "__Host-osdb_oidc_binding"; // harness env: Secure cookies
+
+/**
+ * A callback request carrying a VALID browser binding: a fresh binding
+ * cookie plus the `state` it derives (app/lib/oidc.ts), as a browser that
+ * went through /start would send.
+ */
+async function boundCallback(pathAndCode, binding = "test-binding-value-0123456789abcdef") {
+  const oidcLib = await loadTreeModule("app/lib/oidc.mjs");
+  const state = await oidcLib.oidcStateForBinding(binding);
+  return apiRequest(`${pathAndCode}&state=${encodeURIComponent(state)}`, {
+    headers: { cookie: `${BINDING_COOKIE}=${binding}` },
+  });
+}
+
 function findCookie(response, name) {
   const cookie = response.headers.getSetCookie().find((entry) => entry.startsWith(`${name}=`));
   return cookie ?? null;
@@ -175,12 +190,47 @@ test("start: redirects to GitHub with PKCE params and persists a state row", asy
   assert.equal(params.get("redirect_uri"), "https://osdb.test/api/auth/oidc/github/callback");
   assert.equal(params.get("response_type"), "code");
   assert.equal(params.get("scope"), "read:user user:email");
-  assert.equal(params.get("state"), "raw-state-abc");
+  assert.match(params.get("state"), /^[A-Za-z0-9_-]{43}$/, "state = base64url SHA-256 of the binding");
   assert.equal(params.get("code_challenge_method"), "S256");
   assert.ok(params.get("code_challenge"), "code_challenge must be present");
 
   const [stateArgs] = callArgs("createOidcState");
-  assert.deepEqual(stateArgs, [{ provider: "github", redirectTo: "/account" }]);
+  assert.equal(stateArgs[0].provider, "github");
+  assert.equal(stateArgs[0].redirectTo, "/account");
+  assert.equal(stateArgs[0].rawState, params.get("state"), "the stored state is the one sent to the provider");
+
+  // Login-CSRF binding cookie: HttpOnly, Lax, Secure + __Host-, 10 min, and
+  // it derives exactly the state sent to the provider.
+  const cookie = findCookie(response, BINDING_COOKIE);
+  assert.ok(cookie, "start must set the browser binding cookie");
+  assert.match(cookie, /; HttpOnly/);
+  assert.match(cookie, /; SameSite=Lax/);
+  assert.match(cookie, /; Secure/);
+  assert.match(cookie, /; Path=\//);
+  assert.match(cookie, /; Max-Age=600/);
+  assert.doesNotMatch(cookie, /Domain=/i, "__Host- cookies carry no Domain");
+  const binding = /^[^=]+=([^;]+)/.exec(cookie)[1];
+  const oidcLib = await loadTreeModule("app/lib/oidc.mjs");
+  assert.equal(await oidcLib.oidcStateForBinding(binding), params.get("state"));
+  assert.notEqual(binding, params.get("state"), "the cookie value never travels to the provider");
+});
+
+test("start: without Secure cookies (ENVIRONMENT=development) the binding cookie drops Secure and __Host-", async () => {
+  env.OIDC_GITHUB_CLIENT_ID = "gh-client";
+  env.OIDC_GITHUB_CLIENT_SECRET = "gh-secret";
+  env.ENVIRONMENT = "development";
+  try {
+    stub("createOidcState", async () => ({ rawState: "ignored", codeVerifier: "verifier-xyz" }));
+    const { GET } = await startRoute();
+    const response = await GET(apiRequest("/api/auth/oidc/github/start"));
+    assert.equal(response.status, 302);
+    const cookie = findCookie(response, "osdb_oidc_binding");
+    assert.ok(cookie);
+    assert.doesNotMatch(cookie, /; Secure/);
+    assert.equal(findCookie(response, BINDING_COOKIE), null);
+  } finally {
+    delete env.ENVIRONMENT;
+  }
 });
 
 test("start: google flow reads the discovery document at /start time", async () => {
@@ -208,10 +258,10 @@ test("start: redirect_to is sanitised to a relative same-origin path", async () 
   const { GET } = await startRoute();
 
   await GET(apiRequest("/api/auth/oidc/github/start?redirect_to=//evil.example"));
-  assert.deepEqual(callArgs("createOidcState")[0], [{ provider: "github", redirectTo: "/account" }]);
+  assert.equal(callArgs("createOidcState")[0][0].redirectTo, "/account");
 
   await GET(apiRequest("/api/auth/oidc/github/start?redirect_to=/report/42"));
-  assert.deepEqual(callArgs("createOidcState")[1], [{ provider: "github", redirectTo: "/report/42" }]);
+  assert.equal(callArgs("createOidcState")[1][0].redirectTo, "/report/42");
 });
 
 // ---------------------------------------------------------------------------
@@ -250,12 +300,46 @@ test("callback: missing code or state answers 400", async () => {
   assert.deepEqual(await responseBody(response), { error: "Missing OIDC authorization code." });
 });
 
+test("callback: WITHOUT the binding cookie (login CSRF) redirects to oidc_error and never consumes the state", async () => {
+  env.OIDC_GITHUB_CLIENT_ID = "gh-client";
+  env.OIDC_GITHUB_CLIENT_SECRET = "gh-secret";
+  stub("consumeOidcState", async () => ({ codeVerifier: "verifier-xyz", redirectTo: "/account" }));
+  const oidcLib = await loadTreeModule("app/lib/oidc.mjs");
+  const state = await oidcLib.oidcStateForBinding("attacker-binding-0123456789abcdef");
+  const { GET } = await callbackRoute();
+  const response = await GET(apiRequest(`/api/auth/oidc/github/callback?code=attacker-code&state=${state}`));
+  assert.equal(response.status, 302);
+  assert.equal(response.headers.get("location"), "https://osdb.test/login?oidc_error=1");
+  assert.equal(callArgs("consumeOidcState").length, 0, "the state row is not burned");
+  assert.equal(findCookie(response, "osdb_session"), null, "no session for the victim browser");
+});
+
+test("callback: a binding cookie that does not derive the state is rejected the same way", async () => {
+  env.OIDC_GITHUB_CLIENT_ID = "gh-client";
+  env.OIDC_GITHUB_CLIENT_SECRET = "gh-secret";
+  stub("consumeOidcState", async () => ({ codeVerifier: "verifier-xyz", redirectTo: "/account" }));
+  const oidcLib = await loadTreeModule("app/lib/oidc.mjs");
+  const attackerState = await oidcLib.oidcStateForBinding("attacker-binding-0123456789abcdef");
+  const { GET } = await callbackRoute();
+  for (const cookieValue of ["victim-own-binding-0123456789abcdef", attackerState, "short"]) {
+    const response = await GET(
+      apiRequest(`/api/auth/oidc/github/callback?code=attacker-code&state=${attackerState}`, {
+        headers: { cookie: `${BINDING_COOKIE}=${cookieValue}` },
+      }),
+    );
+    assert.equal(response.status, 302);
+    assert.equal(response.headers.get("location"), "https://osdb.test/login?oidc_error=1");
+    assert.match(findCookie(response, BINDING_COOKIE), /Max-Age=0/, "the binding cookie is cleared");
+  }
+  assert.equal(callArgs("consumeOidcState").length, 0);
+});
+
 test("callback: unknown/expired/replayed state answers 400 (single-use enforced in db layer)", async () => {
   env.OIDC_GITHUB_CLIENT_ID = "gh-client";
   env.OIDC_GITHUB_CLIENT_SECRET = "gh-secret";
   stub("consumeOidcState", async () => null);
   const { GET } = await callbackRoute();
-  const response = await GET(apiRequest("/api/auth/oidc/github/callback?code=c&state=stale-state"));
+  const response = await GET(await boundCallback("/api/auth/oidc/github/callback?code=c"));
   assert.equal(response.status, 400);
   assert.deepEqual(await responseBody(response), { error: "Invalid or expired OIDC state." });
 });
@@ -270,13 +354,14 @@ test("callback: returning external user is linked and gets a session", async () 
 
   const { GET } = await callbackRoute();
   const response = await GET(
-    apiRequest("/api/auth/oidc/github/callback?code=the-code&state=raw-state"),
+    await boundCallback("/api/auth/oidc/github/callback?code=the-code"),
   );
 
   assert.equal(response.status, 302);
   assert.equal(response.headers.get("location"), "https://osdb.test/account");
   assert.ok(findCookie(response, "osdb_session"));
   assert.ok(findCookie(response, "osdb_csrf"));
+  assert.match(findCookie(response, BINDING_COOKIE), /Max-Age=0/, "the single-flow binding cookie is cleared");
   // Fast path: no new account, no merge request.
   assert.equal(callArgs("createOidcContributor").length, 0);
   assert.equal(callArgs("createOidcMergeRequest").length, 0);
@@ -295,7 +380,7 @@ test("callback: google returning user works through discovery + sub identity", a
 
   const { GET } = await callbackRoute();
   const response = await GET(
-    apiRequest("/api/auth/oidc/google/callback?code=the-code&state=raw-state"),
+    await boundCallback("/api/auth/oidc/google/callback?code=the-code"),
   );
 
   assert.equal(response.status, 302);
@@ -315,7 +400,7 @@ test("callback: verified email conflict issues a merge token and never auto-link
 
   const { GET } = await callbackRoute();
   const response = await GET(
-    apiRequest("/api/auth/oidc/github/callback?code=the-code&state=raw-state"),
+    await boundCallback("/api/auth/oidc/github/callback?code=the-code"),
   );
 
   assert.equal(response.status, 302);
@@ -343,7 +428,7 @@ test("callback: unverified email conflict does NOT trigger a merge (no match att
 
   const { GET } = await callbackRoute();
   const response = await GET(
-    apiRequest("/api/auth/oidc/github/callback?code=the-code&state=raw-state"),
+    await boundCallback("/api/auth/oidc/github/callback?code=the-code"),
   );
 
   assert.equal(response.status, 302);
@@ -373,7 +458,7 @@ test("callback: private-email GitHub account falls back to /user/emails primary 
 
   const { GET } = await callbackRoute();
   const response = await GET(
-    apiRequest("/api/auth/oidc/github/callback?code=the-code&state=raw-state"),
+    await boundCallback("/api/auth/oidc/github/callback?code=the-code"),
   );
 
   assert.equal(response.status, 302);
@@ -402,7 +487,7 @@ test("callback: new external account is created WITHOUT storing the provider ema
 
   const { GET } = await callbackRoute();
   const response = await GET(
-    apiRequest("/api/auth/oidc/github/callback?code=the-code&state=raw-state"),
+    await boundCallback("/api/auth/oidc/github/callback?code=the-code"),
   );
 
   assert.equal(response.status, 302);
@@ -427,7 +512,7 @@ test("callback: provider exchange failure redirects to /login?oidc_error=1 (no d
 
   const { GET } = await callbackRoute();
   const response = await GET(
-    apiRequest("/api/auth/oidc/github/callback?code=bad-code&state=raw-state"),
+    await boundCallback("/api/auth/oidc/github/callback?code=bad-code"),
   );
 
   assert.equal(response.status, 302);
@@ -590,10 +675,11 @@ test("merge: concurrent consumption race answers 410 (single-use)", async () => 
   assert.equal(response.status, 410);
 });
 
-test("merge: locked account answers 429 before any credential work", async () => {
+test("merge: locked account answers 429 before any credential work, paying the dummy PBKDF2 (timing)", async () => {
   stubLockoutDefaults();
   stub("getOidcMergeRequest", async () => mergeRequest);
   stub("getLoginLockout", async () => ({ locked: true, retryAfterSeconds: 900 }));
+  stub("verifyPasswordDummy", async () => false);
   const { POST } = await mergeRoute();
   const response = await POST(
     apiRequest("/api/auth/oidc/merge", { method: "POST", body: mergeBody() }),
@@ -601,6 +687,7 @@ test("merge: locked account answers 429 before any credential work", async () =>
   assert.equal(response.status, 429);
   assert.equal(response.headers.get("retry-after"), "900");
   assert.equal(callArgs("authenticateContributor").length, 0);
+  assert.equal(callArgs("verifyPasswordDummy").length, 1, "the locked branch pays the same PBKDF2 cost as login");
 });
 
 test("merge: failed attempt that trips the lockout answers 429", async () => {

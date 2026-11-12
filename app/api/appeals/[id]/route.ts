@@ -130,6 +130,19 @@ export async function PATCH(request: Request) {
           { error: "Only a senior moderator or the administrator may decide an appeal." },
           { status: 403 },
         );
+      case "self_review":
+        return Response.json(
+          { error: "You cannot decide your own appeal.", code: "self_review" },
+          { status: 409 },
+        );
+      case "decision_superseded":
+        return Response.json(
+          {
+            error: "The record no longer carries the contested decision's outcome; there is nothing to reverse.",
+            code: "decision_superseded",
+          },
+          { status: 409 },
+        );
       case "original_reviewer":
         return Response.json(
           { error: "The reviewer who made the original decision cannot decide the appeal." },

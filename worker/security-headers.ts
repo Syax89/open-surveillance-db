@@ -218,6 +218,34 @@ export function hasSessionCookie(request: Request): boolean {
 }
 
 /**
+ * API cache policy (defence in depth, security audit 2026-11).
+ *
+ * Every response under /api/auth/* (sessions, keys, passkeys, OIDC,
+ * password reset — personal or token-bearing by definition) and every
+ * /api/* response to a request that carries an `osdb_session` cookie is
+ * forced to `Cache-Control: no-store`, unless the route already chose
+ * no-store. A route that forgets its own header, or a public cached
+ * response served to a signed-in caller, can then never be stored by a
+ * shared cache or the browser with personal content in it.
+ *
+ * Anonymous requests to public API routes (public-cache.ts reads, tiles,
+ * geocode) are left untouched, so their edge/browser caching is unchanged.
+ * `headers` is mutated in place.
+ */
+export function applyApiCachePolicy(request: Request, normalizedPath: string, headers: Headers): void {
+  const key = normalizedPath.toLowerCase();
+  if (key !== "/api" && !key.startsWith("/api/")) return;
+  const personal = key === "/api/auth" || key.startsWith("/api/auth/") || hasSessionCookie(request);
+  if (!personal) return;
+  const current = (headers.get("Cache-Control") ?? "").toLowerCase();
+  if (/(?:^|,)\s*no-store\s*(?:,|$)/.test(current)) return;
+  headers.set("Cache-Control", "no-store");
+  // A validator would let a cache revalidate a body it must not keep.
+  headers.delete("ETag");
+  headers.delete("Last-Modified");
+}
+
+/**
  * Apply the HTML document cache policy above to `headers` (mutated in
  * place) for a response rendered by the vinext page pipeline. Non-HTML
  * responses are returned untouched.

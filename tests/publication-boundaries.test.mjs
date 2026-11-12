@@ -606,9 +606,11 @@ test("moderation is gated at the worker edge and fails closed", async () => {
   assert.match(worker, /MODERATION_USER/, "the worker must read the moderator username from environment");
   assert.match(worker, /MODERATION_PASSWORD/, "the worker must read the moderator password from environment");
   assert.match(worker, /MODERATION_TOKEN/, "the worker must accept a bearer token when configured");
-  assert.match(worker, /status:\s*401/, "unauthenticated moderation requests must be rejected with 401");
-  assert.match(worker, /Unauthorized/, "the 401 response must identify itself as Unauthorized");
-  assert.match(worker, /status:\s*503/, "the gate must fail closed when no credentials are configured");
+  // Owner 2026-11: everyone who is not a moderator gets a plain 404 (no Basic
+  // prompt advertising the area); a malformed operator list still fails 503.
+  assert.match(worker, /status:\s*404/, "unauthenticated moderation requests must be rejected with a plain 404");
+  assert.doesNotMatch(worker, /WWW-Authenticate/, "the gate must never send a Basic challenge");
+  assert.match(worker, /status:\s*503/, "a malformed operator list must fail closed");
 });
 
 test("public POST endpoints are rate-limited per caller and can be disabled", async () => {

@@ -5,7 +5,7 @@ name: Ops Monitoring
 # Nessun segreto in questo file; l'URL di produzione arriva da una
 # repository variable (PROD_URL), non hardcoded. PROD_URL_ALT (opzionale)
 # abilita il dual-check su una seconda URL (audit ops 2026-08-09: l'ambiente
-# attivo è passato da workers.dev a osdb.syaxhome89.com via NPM→LXC).
+# attivo è passato da workers.dev all'host di pre-produzione via NPM→LXC).
 
 # GITHUB_TOKEN: scope minimo = checkout (contents: read) + apertura issue
 # (issues: write). Senza questo blocco il token default e' read-only e lo
@@ -32,7 +32,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Health check (homepage + API pubblica)
         id: health
@@ -47,8 +47,8 @@ jobs:
             exit 2
           fi
           fail=0
-          # Audit ops 2026-08-09: l'ambiente attivo è NPM→LXC su
-          # osdb.syaxhome89.com (non più workers.dev). Il check gira su PROD_URL
+          # Audit ops 2026-08-09: l'ambiente attivo è NPM→LXC sull'host di
+          # pre-produzione (non più workers.dev). Il check gira su PROD_URL
           # (primaria) e, se configurata, anche su PROD_URL_ALT (dual-check):
           # entrambe devono passare o il run fallisce e apre l'issue.
           hosts=("$PROD_URL")
@@ -81,7 +81,7 @@ jobs:
         # verifica manuale (fix t_c9b427e8): il run manuale DEVE aprire
         # l'issue anche quando fallisce al guard PROD_URL.
         if: failure()
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         with:
           script: |
             const { data: issues } = await github.rest.issues.listForRepo({

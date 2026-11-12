@@ -737,7 +737,7 @@ function assertSecurityHeaders(response, route) {
 test("security headers reach HTML pages, API errors, 404s and the moderation gate", async () => {
   // Every response class the worker can produce, without a DB binding:
   // SSR HTML (200), JSON 404 (non-integer camera id — no DB hit), plain
-  // 404, the moderation gate (503 fail-closed, no credentials), and the
+  // 404, the moderation gate (plain 404 for non-moderators), and the
   // image optimizer (400 malformed request).
   const probes = [
     { route: "/", expect: 200 },
@@ -745,31 +745,32 @@ test("security headers reach HTML pages, API errors, 404s and the moderation gat
     { route: "/faq", expect: 200 },
     { route: "/api/cameras/abc", expect: 404 },
     { route: "/nonexistent-xyz", expect: 404 },
-    { route: "/moderation", expect: 503 },
+    { route: "/moderation", expect: "gate" },
     { route: "/_vinext/image?url=/x.png&w=100", expect: 400 },
   ];
 
   for (const { route, expect } of probes) {
     const { response } = await renderRoute(route);
-    assert.equal(response.status, expect, `${route} status`);
+    // The moderation gate denies with a plain 404 (owner 2026-11).
+    assert.equal(response.status, expect === "gate" ? 404 : expect, `${route} status`);
     assertSecurityHeaders(response, route);
   }
 });
 
 test("production moderation gate follows both Vinext decoding phases", async () => {
   // The first 7 entries below all normalize to the /moderation PAGE route
-  // (worker/index.ts normalizeGatePath); everything else that expects 503
+  // (worker/index.ts normalizeGatePath); everything else marked "gate"
   // normalizes to an /api/* alias and keeps the plain JSON contract.
   const MODERATION_PAGE_ALIASES = [
     "/moderation", "/moderation.rsc", "/moderation//.rsc",
     "/moderation.rsc/", "/%6doderation", "/%256doderation", "/%256doderation.rsc",
   ];
   const probes = [
-    ["/moderation", 503], ["/moderation.rsc", 503], ["/moderation//.rsc", 503],
-    ["/moderation.rsc/", 503], ["/%6doderation", 503], ["/%256doderation", 503],
-    ["/%256doderation.rsc", 503], ["/api//moderation", 503],
-    ["/%2561pi/moderation", 503], ["/api/%256doderation", 503],
-    ["/api//appeals", 503], ["/%2561pi/%2561ppeals", 503],
+    ["/moderation", "gate"], ["/moderation.rsc", "gate"], ["/moderation//.rsc", "gate"],
+    ["/moderation.rsc/", "gate"], ["/%6doderation", "gate"], ["/%256doderation", "gate"],
+    ["/%256doderation.rsc", "gate"], ["/api//moderation", "gate"],
+    ["/%2561pi/moderation", "gate"], ["/api/%256doderation", "gate"],
+    ["/api//appeals", "gate"], ["/%2561pi/%2561ppeals", "gate"],
     ["/moderation%zz", 400], ["//moderation", 404], ["//moderation/", 404],
     ["/%2fmoderation", 404], ["/%5cmoderation", 404],
     ["/%25256doderation", 404], ["/moderation%252ersc", 404],
@@ -778,18 +779,18 @@ test("production moderation gate follows both Vinext decoding phases", async () 
   ];
   for (const [route, status] of probes) {
     const { response, html } = await renderRoute(route);
-    assert.equal(response.status, status, route);
+    assert.equal(response.status, status === "gate" ? 404 : status, route);
     assert.doesNotMatch(html, /Moderation dashboard|class="moderation-/i, route);
-    if (status === 503) {
+    if (status === "gate") {
       // These aliases all normalize to the /moderation PAGE route (not
       // /api/*): the gate denial renders the shared HTML shell there (see
       // tests/worker-edge.test.mjs for exhaustive shell coverage), while
       // the API aliases below keep the plain JSON body unchanged.
       if (MODERATION_PAGE_ALIASES.includes(route)) {
         assert.match(html, /^<!DOCTYPE html>/, route);
-        assert.match(html, /<p class="eyebrow"><span><\/span> 503<\/p>/, route);
+        assert.match(html, /<p class="eyebrow"><span><\/span> 404<\/p>/, route);
       } else {
-        assert.equal(html, '{"error":"Moderation is unavailable."}', route);
+        assert.equal(html, '{"error":"Not found."}', route);
         assert.match(response.headers.get("content-type") ?? "", /^application\/json\b/, route);
       }
       assert.equal(response.headers.get("cache-control"), "no-store", route);

@@ -13,6 +13,24 @@ import { authByLocale } from "./i18n/auth";
 import { readCsrfToken } from "./csrf";
 import { browserSupportsWebAuthn, createCredential } from "./webauthn-client";
 
+/**
+ * Marker of the enrolment routes' "email not verified" 403 (mirrors
+ * EMAIL_UNVERIFIED_CODE in app/lib/passkey.ts, a server-only module).
+ */
+const EMAIL_UNVERIFIED_CODE = "email_unverified";
+
+/** True when a 403 body is the enrolment routes' unverified-email refusal. */
+async function isEmailUnverifiedRefusal(response: Response): Promise<boolean> {
+  if (response.status !== 403) return false;
+  try {
+    // Only called on a 403, which never reads the body again.
+    const body = (await response.json()) as { code?: unknown };
+    return body.code === EMAIL_UNVERIFIED_CODE;
+  } catch {
+    return false;
+  }
+}
+
 /** Public descriptor of an enrolled passkey (GET /api/auth/passkey/credentials). */
 export type Passkey = {
   id: number;
@@ -87,6 +105,11 @@ export function usePasskeys(contributor: object | null, onSessionLost: () => voi
         method: "POST",
         headers: csrfToken ? { "x-csrf-token": csrfToken } : {},
       });
+      if (await isEmailUnverifiedRefusal(beginResponse)) {
+        // Enrolment needs a verified email (pre-registration takeover guard).
+        setEnrollError(t.wallVerifyBody);
+        return;
+      }
       if (beginResponse.status === 401 || beginResponse.status === 403) {
         // Same-origin fetch: a 403 here is the expired/mismatched CSRF
         // token (backend: "Invalid CSRF token"), never a real cross-site
@@ -115,6 +138,10 @@ export function usePasskeys(contributor: object | null, onSessionLost: () => voi
       }
       if (completeResponse.status === 401) {
         setEnrollError(t.passkeySessionLost);
+        return;
+      }
+      if (await isEmailUnverifiedRefusal(completeResponse)) {
+        setEnrollError(t.wallVerifyBody);
         return;
       }
       if (completeResponse.status === 403) {

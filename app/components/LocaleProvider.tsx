@@ -117,7 +117,9 @@ export function LocaleProvider({
       // Mirror the preference to a cookie so Server Components can render the
       // right bundle (and <html lang>) on the next request. Privacy by design:
       // a pure interface-locale preference, no personal data (LOCALE_COOKIE).
-      document.cookie = `${LOCALE_COOKIE}=${nextLocale}; path=/; max-age=31536000; samesite=lax`;
+      // Secure on https (the deployed site); plain http dev keeps working.
+      const secure = window.location.protocol === "https:" ? "; secure" : "";
+      document.cookie = `${LOCALE_COOKIE}=${nextLocale}; path=/; max-age=31536000; samesite=lax${secure}`;
       window.dispatchEvent(new Event(localeChangeEvent));
     },
   }), [locale]);

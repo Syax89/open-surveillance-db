@@ -341,9 +341,12 @@ test("moderation decision controls are labelled and described (label-for, aria-d
   assert.match(component, /<select id=\{reasonId\}[\s\S]*?required/, "reason select must be required");
   assert.match(component, /<label htmlFor=\{noteId\}>/, "note textarea must have a label-for");
   assert.match(component, /<textarea id=\{noteId\}[\s\S]*?aria-describedby=\{`\$\{noteId\}-help`\}/, "note must be described by its help text");
-  // Actor selector (rendered in the SSR shell already).
-  const { html } = await renderRoute("/moderation", MODERATION_CREDENTIALS);
-  assert.match(html, /<label for="actor-select">[\s\S]*?<select id="actor-select"[\s\S]*?required/);
+  // Actor selector: only in the dev demo mode (owner 2026-11 — the actor is
+  // the logged-in moderator, shown not asked); when present it stays a
+  // labelled, required select.
+  const dashboard = await readFile(path.join(root, "app", "components", "ModerationDashboard.tsx"), "utf8");
+  assert.match(dashboard, /<label htmlFor="actor-select">[\s\S]*?<select id="actor-select"[\s\S]*?required/);
+  assert.match(dashboard, /q\.actorSelectable \?/, "the selector renders only when the server allows picking an actor");
 });
 
 test("moderation action groups are labelled and queues are labelled lists", async () => {

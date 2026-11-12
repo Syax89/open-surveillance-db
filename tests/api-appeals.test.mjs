@@ -468,6 +468,8 @@ test("PATCH maps decideAppeal results to stable status codes", async () => {
     { result: { kind: "reviewer_inactive" }, status: 403 },
     { result: { kind: "forbidden" }, status: 403 },
     { result: { kind: "original_reviewer" }, status: 409 },
+    { result: { kind: "self_review" }, status: 409 },
+    { result: { kind: "decision_superseded" }, status: 409 },
     { result: { kind: "escalation_requires_note" }, status: 400 },
   ];
   for (const { result, status } of cases) {

@@ -42,7 +42,14 @@ export default {
       // the RFC 8288 Link-header tests need a realistic content-type.
       return new Response("<html><head><title>osdb</title></head><body>ok</body></html>", { status: 200, headers: { "content-type": "text/html; charset=utf-8" } });
     }
-    return new Response("handler-ok", { status: 200, headers: { "content-type": "text/plain" } });
+    // Cache-policy tests ask the "route" to answer with a given policy.
+    const cacheControl = request.headers.get("x-test-cache-control");
+    const headers = { "content-type": "text/plain" };
+    if (cacheControl) {
+      headers["cache-control"] = cacheControl;
+      headers.etag = '"v1"';
+    }
+    return new Response("handler-ok", { status: 200, headers });
   },
 };
 `;
@@ -360,6 +367,99 @@ test("analytics: valid tile coordinates collapse to one low-cardinality endpoint
   assert.deepEqual(analytics.calls[0].blobs, ["api", "2xx", "/api/tiles/[z]/[x]/[y]", "GET", "200"]);
 });
 
+test("analytics: dynamic API segments are recorded as route patterns, unknown paths as other (security audit 2026-11)", async () => {
+  const { worker } = await loadWorker();
+  const analytics = analyticsMock();
+  const env = testEnv({ ANALYTICS: analytics.binding });
+  const cases = [
+    ["/api/cameras/12345", "/api/cameras/[id]"],
+    ["/api/cameras/12345/edit", "/api/cameras/[id]/edit"],
+    ["/api/cameras/9/events?limit=5", "/api/cameras/[id]/events"],
+    ["/api/cameras/nearby?lat=1&lng=2", "/api/cameras/nearby"],
+    ["/api/appeals/77", "/api/appeals/[id]"],
+    ["/api/auth/keys/key_abc123", "/api/auth/keys/[id]"],
+    ["/api/auth/oidc/github/start", "/api/auth/oidc/[provider]/start"],
+    ["/api/auth/oidc/merge", "/api/auth/oidc/merge"],
+    ["/api/auth/passkey/credentials", "/api/auth/passkey/credentials"],
+    ["/api/auth/passkey/credentials/cred-id-xyz", "other"],
+    ["/api/cameras/nearby/edit", "other"],
+    ["/api/wp-login.php", "other"],
+    ["/api/users/alice@example.test", "other"],
+    ["/api/cameras/", "/api/cameras"],
+  ];
+  for (const [requestPath] of cases) {
+    await worker.fetch(request(requestPath), env, ctx());
+  }
+  assert.deepEqual(
+    analytics.calls.map((point) => point.blobs[2]),
+    cases.map(([, expected]) => expected),
+  );
+});
+
+test("API cache policy: /api/auth/* and sessioned API responses are forced to no-store (security audit 2026-11)", async () => {
+  const { worker } = await loadWorker();
+  const send = (requestPath, { cacheControl, cookie } = {}) => {
+    const headers = {};
+    if (cacheControl) headers["x-test-cache-control"] = cacheControl;
+    if (cookie) headers.cookie = cookie;
+    return worker.fetch(request(requestPath, { headers }), testEnv(), ctx());
+  };
+
+  // /api/auth/* is always no-store, even when the route forgot (or chose a
+  // public policy), and even for an anonymous caller.
+  for (const requestPath of ["/api/auth/me", "/api/auth/oidc/providers", "/api/AUTH/me", "/api//auth/me"]) {
+    const missing = await send(requestPath);
+    assert.equal(missing.headers.get("cache-control"), "no-store", `${requestPath} without a route policy`);
+    const publicPolicy = await send(requestPath, { cacheControl: "public, max-age=3600" });
+    assert.equal(publicPolicy.headers.get("cache-control"), "no-store", `${requestPath} with a public route policy`);
+    assert.equal(publicPolicy.headers.get("etag"), null, "no validator on a forced no-store response");
+  }
+  // A route that already chose no-store keeps its exact policy.
+  const own = await send("/api/auth/me", { cacheControl: "private, no-store, max-age=0" });
+  assert.equal(own.headers.get("cache-control"), "private, no-store, max-age=0");
+
+  // Any API response to a request carrying the session cookie.
+  const sessioned = await send("/api/cameras?limit=1", { cacheControl: "public, s-maxage=300", cookie: "theme=dark; osdb_session=abc" });
+  assert.equal(sessioned.headers.get("cache-control"), "no-store");
+  const sessionedTile = await send("/api/tiles/13/1/1.png", { cacheControl: "public, max-age=604800", cookie: "osdb_session=abc" });
+  assert.equal(sessionedTile.headers.get("cache-control"), "no-store");
+
+  // Anonymous public API responses keep their cache policy (public-cache
+  // reads, tiles, geocode) — including a look-alike cookie name.
+  for (const [requestPath, policy] of [
+    ["/api/cameras?limit=1", "public, s-maxage=300"],
+    ["/api/tiles/13/1/1.png", "public, max-age=604800"],
+    ["/api/geocode?q=roma", "public, max-age=86400"],
+  ]) {
+    const anonymous = await send(requestPath, { cacheControl: policy, cookie: "not_osdb_session=1; theme=dark" });
+    assert.equal(anonymous.headers.get("cache-control"), policy, `${requestPath} stays cacheable for anonymous callers`);
+    assert.equal(anonymous.headers.get("etag"), '"v1"');
+  }
+  // Non-API pages are not touched by this policy.
+  const page = await send("/directory", { cacheControl: "public, max-age=60" });
+  assert.equal(page.headers.get("cache-control"), "public, max-age=60");
+});
+
+test("analytics: the route-pattern list covers every app/api route.ts", async () => {
+  const tree = await getTree();
+  const { API_ROUTE_PATTERNS, normalizeApiPath } = await import(pathToFileURL(path.join(tree, "worker", "analytics.mjs")).href);
+  const apiDir = path.join(root, "app", "api");
+  const found = [];
+  const walk = async (dir) => {
+    for (const entry of await readdir(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) await walk(full);
+      else if (entry.name === "route.ts") found.push(`/api/${path.relative(apiDir, dir).split(path.sep).join("/")}`);
+    }
+  };
+  await walk(apiDir);
+  assert.deepEqual([...API_ROUTE_PATTERNS].sort(), found.sort(), "worker/analytics.ts API_ROUTE_PATTERNS must mirror app/api");
+  for (const pattern of found) {
+    const sample = pattern.replace(/\[[^\]]+\]/g, "123");
+    assert.equal(normalizeApiPath(sample), pattern, `${sample} must normalise to ${pattern}`);
+  }
+});
+
 test("analytics: website traffic is logged as web without per-page breakdown", async () => {
   const { worker } = await loadWorker();
   const analytics = analyticsMock();
@@ -487,7 +587,7 @@ test("anti-scanner: legitimate site paths are never blocked", async () => {
   // anti-scanner blocked — covered by the moderation gate tests below.
   for (const path of ["/moderation", "/api/moderation/corrections/1"]) {
     const response = await worker.fetch(request(path), testEnv(), ctxObj);
-    assert.equal(response.status, 503, `${path} must hit the moderation gate, not the scanner 403`);
+    assert.equal(response.status, 404, `${path} must hit the moderation gate, not the scanner 403`);
   }
 });
 
@@ -986,10 +1086,11 @@ function denialEnv(overrides = {}) {
 
 async function assertGateDenial(response, status, route) {
   assert.equal(response.status, status, route);
-  assert.equal(await response.text(), status === 503 ? '{"error":"Moderation is unavailable."}' : "Unauthorized", route);
+  assert.equal(await response.text(), status === 503 ? '{"error":"Moderation is unavailable."}' : '{"error":"Not found."}', route);
   assert.equal(response.headers.get("cache-control"), "no-store", route);
-  assert.equal(response.headers.get("www-authenticate"), status === 401 ? 'Basic realm="moderation", charset="UTF-8"' : null, route);
-  if (status === 503) assert.match(response.headers.get("content-type") ?? "", /^application\/json\b/, route);
+  // Owner 2026-11: no Basic prompt ever advertises the moderation area.
+  assert.equal(response.headers.get("www-authenticate"), null, route);
+  assert.match(response.headers.get("content-type") ?? "", /^application\/json\b/, route);
   assert.equal(response.headers.get("x-content-type-options"), "nosniff", route);
   assert.equal(response.headers.get("x-frame-options"), "DENY", route);
   assert.equal(response.headers.get("referrer-policy"), "strict-origin-when-cross-origin", route);
@@ -1002,12 +1103,12 @@ test("normalized moderation and appeals aliases deny before router or binding ge
   const basicConfig = { MODERATION_USER: "fixture", MODERATION_PASSWORD: "fixture-pass" };
   const tokenConfig = { MODERATION_TOKEN: "fixture-token" };
   const configs = [
-    [{}, undefined, 503], [{ MODERATION_USER: "fixture" }, undefined, 503],
-    [basicConfig, undefined, 401], [basicConfig, basic("fixture", "wrong"), 401],
-    [tokenConfig, undefined, 401], [tokenConfig, bearer("wrong"), 401],
+    [{}, undefined, 404], [{ MODERATION_USER: "fixture" }, undefined, 404],
+    [basicConfig, undefined, 404], [basicConfig, basic("fixture", "wrong"), 404],
+    [tokenConfig, undefined, 404], [tokenConfig, bearer("wrong"), 404],
     [{ ...basicConfig, MODERATION_OPERATORS: "not-json" }, basic("fixture", "fixture-pass"), 503],
     [{ ...tokenConfig, MODERATION_OPERATORS: '[{"user":"fixture"}]' }, bearer("fixture-token"), 503],
-    [{ MODERATION_OPERATORS: JSON.stringify([{ user: "alice", password: "alice-pass", email: "alice@osdb.test" }]) }, basic("alice", "wrong"), 401],
+    [{ MODERATION_OPERATORS: JSON.stringify([{ user: "alice", password: "alice-pass", email: "alice@osdb.test" }]) }, basic("alice", "wrong"), 404],
   ];
   for (const [config, authorization, status] of configs) {
     const env = denialEnv(config);
@@ -1025,30 +1126,30 @@ test("moderation page denial renders the shared HTML shell, only for /moderation
   const { worker, app } = await loadWorker();
   const htmlHeaders = { accept: "text/html,application/xhtml+xml" };
 
-  // 503 (not configured) + text/html -> the site shell, not the JSON body.
+  // Denied + text/html -> the site shell styled as a plain "page not found"
+  // (owner 2026-11: the area is not advertised to non-moderators).
   let response = await worker.fetch(request("/moderation", { headers: htmlHeaders }), denialEnv(), ctx());
-  assert.equal(response.status, 503);
+  assert.equal(response.status, 404);
   assert.equal(response.headers.get("content-type"), "text/html; charset=utf-8");
   assert.equal(response.headers.get("cache-control"), "no-store");
   let body = await response.text();
   assert.match(body, /^<!DOCTYPE html>/);
-  assert.match(body, /<p class="eyebrow"><span><\/span> 503<\/p>/);
+  assert.match(body, /<p class="eyebrow"><span><\/span> 404<\/p>/);
+  assert.match(body, /Page not found/);
   assert.match(body, /href="\/app\/globals\.css"/);
   assert.match(body, /lang="en"/);
   assert.match(body, /Back to the homepage/);
 
-  // 401 (wrong Basic credential) + text/html -> same shell, now 401, and
-  // WWW-Authenticate must survive (RFC 7235 — a human who mistyped the
-  // password still gets the browser's native re-auth prompt, same as the
-  // untouched JSON path).
+  // Wrong Basic credential + text/html -> the same 404 shell, and no
+  // WWW-Authenticate prompt.
   response = await worker.fetch(
     request("/moderation", { headers: { ...htmlHeaders, authorization: basic("fixture", "wrong") } }),
     denialEnv({ MODERATION_USER: "fixture", MODERATION_PASSWORD: "fixture-pass" }),
     ctx(),
   );
-  assert.equal(response.status, 401);
-  assert.equal(response.headers.get("www-authenticate"), 'Basic realm="moderation", charset="UTF-8"');
-  assert.match(await response.text(), /<p class="eyebrow"><span><\/span> 401<\/p>/);
+  assert.equal(response.status, 404);
+  assert.equal(response.headers.get("www-authenticate"), null);
+  assert.match(await response.text(), /<p class="eyebrow"><span><\/span> 404<\/p>/);
 
   // Locale cookie selects the Italian copy, same markup shape.
   response = await worker.fetch(
@@ -1061,10 +1162,10 @@ test("moderation page denial renders the shared HTML shell, only for /moderation
   assert.match(body, /Torna alla home/);
 
   // /api/moderation keeps the plain JSON contract even with Accept: text/html.
-  await assertGateDenial(await worker.fetch(request("/api/moderation", { headers: htmlHeaders }), denialEnv(), ctx()), 503, "/api/moderation");
+  await assertGateDenial(await worker.fetch(request("/api/moderation", { headers: htmlHeaders }), denialEnv(), ctx()), 404, "/api/moderation");
 
   // /moderation without Accept: text/html keeps the existing JSON contract (no fixture breakage).
-  await assertGateDenial(await worker.fetch(request("/moderation", {}), denialEnv(), ctx()), 503, "/moderation");
+  await assertGateDenial(await worker.fetch(request("/moderation", {}), denialEnv(), ctx()), 404, "/moderation");
 
   assert.equal(app.__calls.length, 0);
 });
@@ -1077,8 +1178,8 @@ test("HEAD, RSC and prefetch headers cannot bypass normalized moderation gates",
   ];
   for (const route of ["/%256doderation.rsc", "/api//moderation.rsc", "/%2561pi/appeals.rsc"]) {
     for (const options of variants) {
-      await assertGateDenial(await worker.fetch(request(route, options), denialEnv(), ctx()), 503, route);
-      await assertGateDenial(await worker.fetch(request(route, options), denialEnv({ MODERATION_TOKEN: "fixture-token" }), ctx()), 401, route);
+      await assertGateDenial(await worker.fetch(request(route, options), denialEnv(), ctx()), 404, route);
+      await assertGateDenial(await worker.fetch(request(route, options), denialEnv({ MODERATION_TOKEN: "fixture-token" }), ctx()), 404, route);
     }
   }
   assert.equal(app.__calls.length, 0);
@@ -1191,30 +1292,29 @@ test("session fallback: every degraded case falls through to Basic/bearer, never
     users.__state.usersByContributorId = {};
     setup();
     // No Basic/bearer credential configured at all here: the request must
-    // still get the SAME 503 it would get with no session feature at all —
-    // the session check must never be the reason a request is denied.
+    // get the SAME 404 it would get with no session at all — the session
+    // check must never be the reason a request is admitted wrongly.
     const response = await worker.fetch(
       request("/moderation", { headers: { cookie: sessionCookie("whatever") } }),
       denialEnv(),
       ctx(),
     );
-    assert.equal(response.status, 503, label);
+    assert.equal(response.status, 404, label);
   }
 });
 
-test("session check never runs when no Basic/bearer credential is configured (fail-closed floor unchanged)", async () => {
+test("a moderator session is admitted even with no Basic/bearer credential configured (owner 2026-11: own login only)", async () => {
   const { worker, auth, users } = await loadWorker();
   auth.__state.session = { contributor: { id: 41, email: "mod@osdb.test" } };
   users.__state.usersByContributorId[41] = { email: "mod@osdb.test", role: "moderator", active: 1 };
-  // denialEnv() fails the test if the gate touches DB/ASSETS/etc for a
-  // request that must be denied without doing any work — a valid session
-  // must NOT rescue a host with zero MODERATION_* secrets configured.
+  // Owner decision 2026-11: the moderator's own site login is the primary
+  // access path and must work without any shared MODERATION_* secret.
   const response = await worker.fetch(
     request("/moderation", { headers: { cookie: sessionCookie("real-token") } }),
-    denialEnv(),
+    testEnv(),
     ctx(),
   );
-  assert.equal(response.status, 503);
+  assert.equal(response.status, 200);
 });
 
 test("moderator session does not leak into the legacy identity headers it replaces", async () => {
@@ -1287,7 +1387,7 @@ test("contributor POST appeals aliases stay ungated while GET and PATCH remain g
   const { worker, app } = await loadWorker();
   for (const route of APPEALS_ALIASES) {
     for (const method of ["GET", "PATCH"]) {
-      await assertGateDenial(await worker.fetch(request(route, { method }), denialEnv(), ctx()), 503, route);
+      await assertGateDenial(await worker.fetch(request(route, { method }), denialEnv(), ctx()), 404, route);
     }
     const response = await worker.fetch(request(route, { method: "POST", headers: {
       cookie: "osdb_session=fixture-only", "x-osdb-user-email": "spoof@osdb.test",
@@ -1302,7 +1402,7 @@ test("contributor POST appeals aliases stay ungated while GET and PATCH remain g
     assert.equal(forwarded.headers["oai-authenticated-user-email"], undefined, route);
   }
   assert.equal(app.__calls.length, APPEALS_ALIASES.length);
-  await assertGateDenial(await worker.fetch(request("/%2561pi//appeals/1.rsc", { method: "POST" }), denialEnv(), ctx()), 503, "appeal subtree POST");
+  await assertGateDenial(await worker.fetch(request("/%2561pi//appeals/1.rsc", { method: "POST" }), denialEnv(), ctx()), 404, "appeal subtree POST");
 });
 
 // ---------------------------------------------------------------------------
@@ -1420,19 +1520,19 @@ test("malformed first-phase percent decoding answers 400 before router or bindin
   assert.equal(app.__calls.length, 0);
 });
 
-test("gate fails closed with no credentials configured (503, no-store, no handler call)", async () => {
+test("gate fails closed with no credentials configured (404, no-store, no handler call)", async () => {
   const { worker, app } = await loadWorker();
   const ctxObj = ctx();
   for (const pathname of ["/moderation", "/api/moderation", "/api/moderation/corrections/1"]) {
     const response = await worker.fetch(request(pathname), testEnv(), ctxObj);
-    assert.equal(response.status, 503, `${pathname} must be 503 without credentials`);
-    assert.deepEqual(JSON.parse(await response.text()), { error: "Moderation is unavailable." });
+    assert.equal(response.status, 404, `${pathname} must be a plain 404 without credentials`);
+    assert.deepEqual(JSON.parse(await response.text()), { error: "Not found." });
     assert.equal(response.headers.get("cache-control"), "no-store");
   }
   assert.equal(app.__calls.length, 0, "the app handler must never run when the gate denies");
 });
 
-test("gate rejects a wrong Basic credential with 401 + WWW-Authenticate", async () => {
+test("gate rejects a wrong Basic credential with a plain 404 (no Basic prompt)", async () => {
   const { worker, app } = await loadWorker();
   const env = testEnv({ MODERATION_USER: "moderator", MODERATION_PASSWORD: "s3cret" });
   const response = await worker.fetch(
@@ -1440,8 +1540,8 @@ test("gate rejects a wrong Basic credential with 401 + WWW-Authenticate", async 
     env,
     ctx(),
   );
-  assert.equal(response.status, 401);
-  assert.equal(response.headers.get("www-authenticate"), 'Basic realm="moderation", charset="UTF-8"');
+  assert.equal(response.status, 404);
+  assert.equal(response.headers.get("www-authenticate"), null);
   assert.equal(response.headers.get("cache-control"), "no-store");
   assert.equal(app.__calls.length, 0);
 });
@@ -1468,7 +1568,7 @@ test("gate admits a correct Bearer token and rejects a wrong one", async () => {
     env,
     ctx(),
   );
-  assert.equal(denied.status, 401, "a one-character-different token must be rejected");
+  assert.equal(denied.status, 404, "a one-character-different token must be rejected");
 
   const admitted = await worker.fetch(
     request("/api/moderation", { headers: { authorization: bearer("tok-123") } }),
@@ -1511,14 +1611,14 @@ test("gate with MODERATION_OPERATORS admits each operator only with their own pa
     env,
     ctx(),
   );
-  assert.equal(cross.status, 401);
+  assert.equal(cross.status, 404);
   // An operator not in the list is rejected.
   const stranger = await worker.fetch(
     request("/api/moderation", { headers: { authorization: basic("mallory", "alice-pass") } }),
     env,
     ctx(),
   );
-  assert.equal(stranger.status, 401);
+  assert.equal(stranger.status, 404);
   assert.equal(app.__calls.length, 2, "only the two admitted operators reach the handler");
 });
 
@@ -1561,7 +1661,7 @@ test("gate with MODERATION_OPERATORS ignores the legacy shared pair (no shared i
     env,
     ctx(),
   );
-  assert.equal(legacy.status, 401, "the legacy shared pair is ignored when operators are configured");
+  assert.equal(legacy.status, 404, "the legacy shared pair is ignored when operators are configured");
   // The operator's own pair still admits.
   const alice = await worker.fetch(
     request("/api/moderation", { headers: { authorization: basic("alice", "alice-pass") } }),
@@ -1613,7 +1713,7 @@ test("partial credential config still fails closed (user without password)", asy
     { MODERATION_USER: "moderator", MODERATION_PASSWORD: "" },
   ]) {
     const response = await worker.fetch(request("/api/moderation"), testEnv(partial), ctx());
-    assert.equal(response.status, 503, `partial env ${JSON.stringify(partial)} must fail closed`);
+    assert.equal(response.status, 404, `partial env ${JSON.stringify(partial)} must fail closed`);
     assert.equal(app.__calls.length, 0);
   }
 });
@@ -1634,12 +1734,12 @@ test("the moderation path predicate covers the API subtree, not lookalikes", asy
   const ungated = ["/moderation-help", "/api/moderation-extra", "/api/moderationx"];
   for (const pathname of gated) {
     const response = await worker.fetch(request(pathname), testEnv(), ctx());
-    assert.equal(response.status, 503, `${pathname} is a moderation path and must be gated`);
+    assert.equal(response.status, 404, `${pathname} is a moderation path and must be gated`);
   }
   for (const pathname of ungated) {
     const response = await worker.fetch(request(pathname), testEnv(), ctx());
     assert.notEqual(response.status, 503, `${pathname} is not a moderation path`);
-    assert.notEqual(response.status, 401, `${pathname} is not a moderation path`);
+    assert.notEqual(response.status, 404, `${pathname} is not a moderation path`);
   }
   assert.equal(app.__calls.length, ungated.length, "only the ungated paths reach the handler");
 });
@@ -1694,7 +1794,7 @@ test("POST /api/appeals/ (trailing slash) is normalised: filing still reaches th
 test("GET /api/appeals/ (trailing slash) stays gated after normalisation", async () => {
   const { worker, app } = await loadWorker();
   const noCreds = await worker.fetch(request("/api/appeals/"), testEnv(), ctx());
-  assert.equal(noCreds.status, 503, "the moderator list with a trailing slash must fail closed without moderation credentials");
+  assert.equal(noCreds.status, 404, "the moderator list with a trailing slash must fail closed without moderation credentials");
   assert.equal(app.__calls.length, 0, "the app handler must never run when the gate denies");
 });
 
@@ -1716,15 +1816,15 @@ test("POST /api/appeals strips client-supplied identity headers like every other
   assert.equal(app.__calls[0].headers["oai-authenticated-user-email"], undefined, "platform identity headers are stripped too (no TRUST_PLATFORM_HEADERS)");
 });
 
-test("GET /api/appeals stays gated: 503 without credentials, 401 without auth, 200 with credentials", async () => {
+test("GET /api/appeals stays gated: 404 without credentials or auth, 200 with credentials", async () => {
   const { worker, app } = await loadWorker();
 
   const noCreds = await worker.fetch(request("/api/appeals"), testEnv(), ctx());
-  assert.equal(noCreds.status, 503, "the moderator list must fail closed without moderation credentials");
+  assert.equal(noCreds.status, 404, "the moderator list must fail closed without moderation credentials");
 
   const env = testEnv({ MODERATION_USER: "moderator", MODERATION_PASSWORD: "s3cret" });
   const unauth = await worker.fetch(request("/api/appeals"), env, ctx());
-  assert.equal(unauth.status, 401);
+  assert.equal(unauth.status, 404);
   assert.equal(app.__calls.length, 0);
 
   const authed = await worker.fetch(
@@ -1740,7 +1840,7 @@ test("GET /api/appeals stays gated: 503 without credentials, 401 without auth, 2
 test("PATCH /api/appeals/[id] stays gated behind the moderation gate", async () => {
   const { worker, app } = await loadWorker();
   const noCreds = await worker.fetch(request("/api/appeals/1", { method: "PATCH" }), testEnv(), ctx());
-  assert.equal(noCreds.status, 503, "the decide route must fail closed without moderation credentials");
+  assert.equal(noCreds.status, 404, "the decide route must fail closed without moderation credentials");
 
   const env = testEnv({ MODERATION_TOKEN: "tok-123" });
   const denied = await worker.fetch(
@@ -1748,7 +1848,7 @@ test("PATCH /api/appeals/[id] stays gated behind the moderation gate", async () 
     env,
     ctx(),
   );
-  assert.equal(denied.status, 401);
+  assert.equal(denied.status, 404);
   assert.equal(app.__calls.length, 0);
 
   const admitted = await worker.fetch(
