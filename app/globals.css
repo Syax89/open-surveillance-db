@@ -374,7 +374,7 @@ details.locale-toggle .locale-menu button.is-active { background:var(--notice-bg
    .hero-copy (z-index:2) sits above .hero-visual, which is absolutely pinned
    to the section (inset:0, z-index:0). Both are navy-family, so the light
    hero ink keeps strong contrast over the gradient without any scrim. */
-.hero { width:var(--container-wide); margin:9px auto 0; min-height:590px; overflow:hidden; position:relative; border-radius:var(--radius-2xl); background:var(--navy); color:var(--hero-ink); }
+.hero { width:var(--container-wide); margin:9px auto 0; min-height:590px; overflow:visible; position:relative; border-radius:var(--radius-2xl); background:var(--navy); color:var(--hero-ink); }
 .hero-copy { position:relative; z-index:2; padding:78px 0 62px 70px; max-width:860px; }
 .hero-copy--intro { padding-bottom:0; }
 .hero-copy--details { padding-top:0; }
@@ -405,7 +405,9 @@ details.locale-toggle .locale-menu button.is-active { background:var(--notice-bg
 .hero-search input:focus-visible { outline:3px solid var(--mint); outline-offset:-3px; }
 .hero-search button { flex:none; border:0; border-left:1px solid rgba(222,245,234,.32); padding:0 16px; background:var(--mint); color:var(--button-ink); font-size:var(--text-base); font-weight:800; border-radius:0 var(--radius-lg) var(--radius-lg) 0; }
 .hero-search button:hover { background:var(--mint-hover); }
-.hero-search .geocode-dropdown { left:0; right:0; }
+/* The hero no longer clips its children (overflow:visible, the art is
+   clipped by .hero-visual) so the suggestion list can extend below it. */
+.hero-search .geocode-dropdown { left:0; right:0; z-index:40; }
 .hero-actions { display:flex; align-items:center; gap:var(--space-3); flex-wrap:wrap; }
 .button { border:1px solid transparent; padding:13px 18px; border-radius:var(--radius-lg); display:inline-flex; align-items:center; gap:13px; font-size:var(--text-base); font-weight:800; transition:transform .2s ease, background .2s ease; }
 .button:hover { transform:translateY(-2px); }
@@ -438,7 +440,7 @@ details.locale-toggle .locale-menu button.is-active { background:var(--notice-bg
     -webkit-mask-image:linear-gradient(90deg, transparent 0, #000 40%); mask-image:linear-gradient(90deg, transparent 0, #000 40%); }
   .hero-map-art .teaser-grid { opacity:.7; }
 }
-.hero-visual { position:absolute; inset:0; z-index:0; overflow:hidden; isolation:isolate; background:linear-gradient(135deg,rgb(9 35 58),rgb(16 35 50) 45%,rgb(20 45 62)); }
+.hero-visual { position:absolute; inset:0; z-index:0; overflow:hidden; border-radius:inherit; isolation:isolate; background:linear-gradient(135deg,rgb(9 35 58),rgb(16 35 50) 45%,rgb(20 45 62)); }
 /* Community map pattern: subtle topographic lines + organic shapes */
 .hero-map-pattern { position:absolute; inset:0; opacity:.15; background-image:
   radial-gradient(circle at 25% 30%, rgba(203,247,218,.3) 0, transparent 28%),

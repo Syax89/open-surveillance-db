@@ -12,6 +12,18 @@ changes accumulate under `[Unreleased]`.
 
 ## [Unreleased]
 
+### Added
+
+- **Suggerimenti mentre scrivi (2026-11-12):** i campi di ricerca di home,
+  mappa ed elenco mostrano suggerimenti dopo una pausa di ~300 ms (minimo 2
+  caratteri): schede dal nostro database tramite il nuovo endpoint pubblico
+  `GET /api/cameras/suggest` (solo campi pubblici, cache, rate limit, nessun
+  log del testo), coordinate e `#numero` risolti nel browser senza
+  richieste. Privacy invariata: nessun testo va a terzi mentre scrivi; la
+  ricerca di un luogo su OpenStreetMap parte solo con Invio o scegliendo
+  "Cerca il luogo «…»". Un solo combobox ARIA condiviso (PlaceAutocomplete).
+  Escape dei caratteri jolly `%`/`_` nella ricerca testuale pubblica.
+
 ### Security
 
 - **Privacy di chi contribuisce e segnalazioni privacy (2026-11-12, scelte
