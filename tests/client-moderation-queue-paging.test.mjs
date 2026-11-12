@@ -122,3 +122,44 @@ test("moderation queues: a failed load more keeps the rows and announces an aler
   assert.equal(pendingTitles(screen).length, 20, "the shown page is kept");
   assert.equal(loadMoreButton(screen).getAttribute("aria-disabled"), "false", "the control stays usable for a retry");
 });
+
+test("moderation queues: a decision keeps the pages loaded with load more (minus the decided item)", async () => {
+  const { screen, waitFor } = rtl;
+  const user = rtl.userEvent.setup();
+  let decided = false;
+  const requests = [];
+  installFetchMock((input, init) => {
+    const url = String(input);
+    requests.push(`${init?.method ?? "GET"} ${url}`);
+    if (init?.method === "PATCH") { decided = true; return jsonResponse({}, { status: 200 }); }
+    if (url.includes("pending_after_id=20")) return jsonResponse(secondPage());
+    // After the decision on #3 the server's first page has shifted by one:
+    // #3 is gone and #21 moved up from the second page.
+    if (decided) {
+      return jsonResponse({
+        ...firstPage(),
+        cameraReports: [...pendingCameras(1, 2), ...pendingCameras(4, 18)],
+        queueTotals: { ...base.queueTotals, pending: 24 },
+        queueNextCursors: { ...base.queueNextCursors, pending: { createdAt: "2026-03-01T00:21:00.000Z", id: 21 } },
+      });
+    }
+    return jsonResponse(firstPage());
+  });
+  await renderWithLocale(React.createElement(ModerationDashboard));
+  await waitFor(() => assert.ok(screen.queryByText("Pending fixture 1")));
+  await user.click(loadMoreButton(screen));
+  await waitFor(() => assert.ok(screen.queryByText("Pending fixture 25")));
+
+  await user.selectOptions(screen.getByRole("combobox", { name: /^Acting reviewer/ }), "2");
+  await user.selectOptions(screen.getByLabelText("Required reason", { selector: "#camera-3-reason" }), "verified-public-infrastructure");
+  await user.click(screen.getByLabelText("Decision for camera 3").querySelector('button[type="button"]'));
+
+  await waitFor(() => assert.equal(screen.queryByText("Pending fixture 3"), null));
+  assert.deepEqual(
+    pendingTitles(screen),
+    [1, 2, ...Array.from({ length: 22 }, (_, index) => index + 4)].map((n) => `Pending fixture ${n}`),
+    "the second page stays, the decided item is removed, no row is duplicated",
+  );
+  assert.ok(screen.getByText("24 of 24 pending"), "the count follows the server total");
+  assert.equal(loadMoreButton(screen).getAttribute("aria-disabled"), "true", "the old cursor (end of queue) is kept, not reset to page 1's");
+});
