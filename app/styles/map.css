@@ -246,6 +246,10 @@
 .osm-popup-fact { display:grid; grid-template-columns:auto minmax(0,1fr); gap:8px; align-items:baseline; min-width:0; }
 .osm-popup-fact dt { color:var(--label); font-size:var(--text-2xs); text-transform:uppercase; letter-spacing:.08em; font-weight:800; white-space:nowrap; }
 .osm-popup-fact dd { margin:0; color:var(--ink-5); font-size:var(--text-sm); overflow-wrap:anywhere; }
+/* Short facts (record id, "41.9068, 12.4808") stay on one line on desktop;
+   the balloon widens up to its 340px max instead of wrapping them. Phones
+   hide the facts block entirely (see the max-width rules below). */
+@media (min-width:769px) { .osm-popup-fact dd { white-space:nowrap; } }
 .osm-popup-address, .osm-popup-description { margin:6px 0 0; color:var(--ink-2); font-size:var(--text-sm); line-height:1.45; overflow-wrap:anywhere; }
 /* Footer: the single detail action (t_b7728ad0). The former "Report an
    issue" link is gone — the disclosure's Problema/Privacy actions cover
