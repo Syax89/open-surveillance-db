@@ -291,6 +291,26 @@ test("GET /api/cameras?format=csv escapes quotes and neutralises spreadsheet for
   );
 });
 
+test("GET /api/cameras?format=csv keeps negative coordinates numeric and guards TAB/CR-led text (security audit 2026-11)", async () => {
+  const western = {
+    ...cameraFixture,
+    id: 2,
+    title: "\t=cmd",
+    manufacturer: "\rleading",
+    address: "-5 Main St",
+    latitude: -33.8688,
+    longitude: -73.98,
+    direction: 0,
+  };
+  stub("listPublicCameras", async () => [western]);
+  const { GET } = await camerasRoute();
+  const csv = await responseBody(await GET(apiRequest("/api/cameras?format=csv")));
+  const row = csv.split("\n")[1];
+  assert.match(row, /^"2","'\t=cmd",/);
+  assert.match(row, /"'\rleading"/);
+  assert.match(row, /"'-5 Main St","-33\.8688","-73\.98","0"$/, "negative numbers are data, never prefixed with an apostrophe");
+});
+
 test("GET /api/cameras ignores unknown format values and returns JSON", async () => {
   stub("listPublicCamerasPage", async () => ({ records: [cameraFixture], total: 1, nextOffset: null }));
   const { GET } = await camerasRoute();

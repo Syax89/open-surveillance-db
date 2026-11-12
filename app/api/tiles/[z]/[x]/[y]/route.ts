@@ -112,17 +112,42 @@ async function readCappedUpstreamBody(
  * non-integer, out-of-zoom, or out-of-bounds value so the route can answer
  * 400 before touching the network. The optional `.png` suffix (Leaflet keeps
  * it in the URL template) is stripped from y.
+ *
+ * Only plain decimal digits are accepted (security audit 2026-11): Number()
+ * also parses `0x1`, `1e0`, ` 1` and `01`, which turned one tile into many
+ * cache entries and upstream fetches. A leading zero is rejected too (the
+ * map never emits one) and each coordinate is at most 7 digits
+ * (2^19 - 1 = 524287).
  */
+const TILE_COORD = /^(?:0|[1-9]\d{0,6})$/;
+
 function parseTile(params: TileParams): { z: number; x: number; y: number } | null {
+  const yText = params.y.replace(/\.png$/i, "");
+  if (!TILE_COORD.test(params.z) || !TILE_COORD.test(params.x) || !TILE_COORD.test(yText)) return null;
   const z = Number(params.z);
   const x = Number(params.x);
-  const y = Number(params.y.replace(/\.png$/i, ""));
-  if (!Number.isInteger(z) || !Number.isInteger(x) || !Number.isInteger(y)) return null;
+  const y = Number(yText);
   if (z < 0 || z > MAX_ZOOM) return null;
   const maxCoord = 2 ** z - 1;
   if (x < 0 || x > maxCoord || y < 0 || y > maxCoord) return null;
   return { z, x, y };
 }
+
+/**
+ * Canonical cache key built from the PARSED coordinates, with no query
+ * string: `/api/tiles/13/1/2900.png?junk=1` and `/api/tiles/13/1/2900` share
+ * one entry, and a caller cannot fill the cache with query-string variants.
+ */
+function tileCacheKey(request: Request, tile: { z: number; x: number; y: number }): Request {
+  return new Request(new URL(`/api/tiles/${tile.z}/${tile.x}/${tile.y}.png`, request.url).toString());
+}
+
+/**
+ * Response headers forwarded from the upstream (allow-list, security audit
+ * 2026-11). Everything else (Set-Cookie, CORS, CSP, server banners,
+ * provider debug headers, ...) stays upstream.
+ */
+const FORWARDED_UPSTREAM_HEADERS = ["Cache-Control", "ETag", "Last-Modified", "Expires"] as const;
 
 /**
  * The Cloudflare Cache API (`caches.default`) is available in the Workers
@@ -171,9 +196,9 @@ export async function GET(request: Request, context: { params: Promise<TileParam
   const cache = tileCache();
   // The Cache API matches on URL + method, and the incoming Request object is
   // sometimes a wrapped runtime object that workerd's cache cannot serialise
-  // ("Invalid URL: [object Request]"). A plain Request built from the URL is
-  // the stable, portable cache key.
-  const cacheKey = new Request(request.url);
+  // ("Invalid URL: [object Request]"). A plain Request built from the
+  // canonical tile URL is the stable, portable cache key.
+  const cacheKey = tileCacheKey(request, tile);
   if (cache) {
     try {
       const cached = await cache.match(cacheKey);
@@ -235,8 +260,21 @@ export async function GET(request: Request, context: { params: Promise<TileParam
     });
   }
 
-  const responseHeaders = new Headers(upstream.headers);
-  if (!responseHeaders.has("Content-Type")) responseHeaders.set("Content-Type", "image/png");
+  // Only an image may be served as a tile: a provider answering 200 with an
+  // HTML error page (or anything else) is a bad upstream → 502, not cached.
+  const upstreamType = upstream.headers.get("Content-Type");
+  if (upstreamType !== null && !/^image\//i.test(upstreamType.trim())) {
+    await upstream.body?.cancel().catch(() => {});
+    return new Response("Tile upstream unavailable", {
+      status: 502,
+      headers: { "Cache-Control": "no-store" },
+    });
+  }
+  const responseHeaders = new Headers({ "Content-Type": upstreamType ?? "image/png" });
+  for (const name of FORWARDED_UPSTREAM_HEADERS) {
+    const value = upstream.headers.get(name);
+    if (value !== null) responseHeaders.set(name, value);
+  }
   if (!responseHeaders.has("Cache-Control")) {
     responseHeaders.set("Cache-Control", `public, max-age=${MIN_CACHE_TTL_SECONDS}`);
   }

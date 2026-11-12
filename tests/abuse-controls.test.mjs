@@ -203,6 +203,74 @@ test("readJsonBody enforces the byte cap and urlTooLong guards the URI", async (
   assert.equal(inputLimits.urlTooLong(new Request(`https://osdb.test/${"a".repeat(5000)}`)), true);
 });
 
+/** A chunked request body with NO Content-Length, recording how far it was read. */
+function chunkedRequest(chunks) {
+  const state = { pulled: 0, cancelled: false };
+  const encoder = new TextEncoder();
+  const body = new ReadableStream({
+    pull(controller) {
+      if (state.pulled >= chunks.length) {
+        controller.close();
+        return;
+      }
+      controller.enqueue(encoder.encode(chunks[state.pulled]));
+      state.pulled += 1;
+    },
+    cancel() {
+      state.cancelled = true;
+    },
+  });
+  const request = new Request("https://osdb.test/api/cameras", { method: "POST", body, duplex: "half" });
+  assert.equal(request.headers.get("content-length"), null, "the test body must not declare a length");
+  return { request, state };
+}
+
+test("readJsonBody streams a chunked body and aborts at the byte cap (security audit 2026-11)", async () => {
+  // 100 chunks of 1 KiB against the 32 KiB default: the read must stop
+  // right after the cap is crossed, not buffer the whole body first.
+  const { request, state } = chunkedRequest(Array.from({ length: 100 }, () => "x".repeat(1024)));
+  await assert.rejects(
+    () => inputLimits.readJsonBody(request, {}),
+    (error) => {
+      assert.ok(error instanceof inputLimits.PayloadTooLargeError);
+      assert.equal(error.status, 413);
+      return true;
+    },
+  );
+  assert.ok(state.pulled <= 34, `the stream is abandoned at the cap (pulled ${state.pulled} of 100 chunks)`);
+  assert.equal(state.cancelled, true, "the stream is cancelled, not drained");
+
+  // The cap counts BYTES: 6 three-byte characters are 18 bytes (> 10) even
+  // though they are only 6 UTF-16 code units.
+  const multibyte = chunkedRequest([JSON.stringify("€€€€€€")]);
+  await assert.rejects(
+    () => inputLimits.readJsonBody(multibyte.request, { MAX_BODY_BYTES: "10" }),
+    inputLimits.PayloadTooLargeError,
+  );
+
+  // A chunked body under the cap is reassembled across chunk boundaries
+  // (including a multi-byte character split between chunks).
+  const euro = new TextEncoder().encode("€");
+  const split = new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode('{"title":"'));
+      controller.enqueue(euro.slice(0, 1));
+      controller.enqueue(euro.slice(1));
+      controller.enqueue(new TextEncoder().encode('Cam"}'));
+      controller.close();
+    },
+  });
+  const ok = new Request("https://osdb.test/api/cameras", { method: "POST", body: split, duplex: "half" });
+  assert.deepEqual(await inputLimits.readJsonBody(ok, {}), { title: "€Cam" });
+
+  // Malformed and empty bodies keep answering 400.
+  await assert.rejects(() => inputLimits.readJsonBody(chunkedRequest(["{nope"]).request, {}), inputLimits.MalformedJsonError);
+  await assert.rejects(
+    () => inputLimits.readJsonBody(new Request("https://osdb.test/api/cameras", { method: "POST" }), {}),
+    inputLimits.MalformedJsonError,
+  );
+});
+
 // ---------------------------------------------------------------------------
 // abuse-alerts.ts
 // ---------------------------------------------------------------------------

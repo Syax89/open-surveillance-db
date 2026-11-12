@@ -1,6 +1,7 @@
 import { LOCALE_COOKIE, resolveLocale } from "../../lib/i18n/types";
 import type { Locale } from "../../lib/i18n/types";
 import { urlTooLong } from "../../lib/input-limits";
+import { safeSameOriginRedirect } from "../../lib/safe-redirect";
 
 /**
  * GET /api/locale?lang=it&next=/guide — persist the interface locale and
@@ -29,21 +30,16 @@ export async function GET(request: Request) {
   // else falls back to the pilot language (no it/en ternary).
   const locale: Locale = resolveLocale(url.searchParams.get("lang"));
 
-  // Safe redirect target: same-site path only. Rejects absolute URLs,
-  // protocol-relative //host and backslash tricks, literal CR/LF and the
-  // percent-encoded forms (%0d/%0a): URL parsing decodes once, so an
-  // encoded CRLF arrives here as literal "%0d%0a" text and must not reach
-  // the Location header (defense in depth — the headers API would throw on
-  // raw CR/LF, but proxies and clients may decode differently).
-  const next = url.searchParams.get("next") ?? "/";
-  const target =
-    next.startsWith("/") &&
-    !next.startsWith("//") &&
-    !next.startsWith("/\\") &&
-    !/[\r\n]/.test(next) &&
-    !/%0d|%0a/i.test(next)
-      ? next
-      : "/";
+  // Safe redirect target: same-site path only (shared helper, security
+  // audit 2026-11). Rejects absolute URLs, protocol-relative //host,
+  // backslash and whitespace anywhere (browsers turn `/\host` and
+  // `/<TAB>/host` into //host), control characters and the percent-encoded
+  // CR/LF/TAB/backslash forms; the resolved URL must also stay on this
+  // request's origin. Anything else falls back to `/`.
+  const target = safeSameOriginRedirect(url.searchParams.get("next"), request.url) ?? "/";
+  // Secure on https (the deployed site); plain http stays usable for local
+  // dev, where a Secure cookie would be dropped.
+  const secure = url.protocol === "https:" ? "; secure" : "";
 
   return new Response(null, {
     status: 302,
@@ -51,7 +47,7 @@ export async function GET(request: Request) {
       Location: target,
       // Same attributes as the client-side write (LocaleProvider):
       // a one-year interface preference, never a tracker.
-      "Set-Cookie": `${LOCALE_COOKIE}=${locale}; path=/; max-age=31536000; samesite=lax`,
+      "Set-Cookie": `${LOCALE_COOKIE}=${locale}; path=/; max-age=31536000; samesite=lax${secure}`,
       // Redirect stub: keep it out of the index so deep-links don't
       // compete with the canonical content URL in search results.
       "X-Robots-Tag": "noindex",

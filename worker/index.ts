@@ -8,7 +8,7 @@ import { gatedPath, normalizeGatePath, requireModerationAuth, SCANNER_PATH_PATTE
 import { localeFromRequest, renderGateUnavailablePage, wantsHtml } from "./gate-page";
 import { injectIdentityAfterGate, stripIdentityHeaders } from "./identity";
 import { hostRedirect } from "./host";
-import { applyHtmlDocumentCachePolicy, buildCspWithNonce, generateCspNonce, withSecurityHeaders } from "./security-headers";
+import { applyApiCachePolicy, applyHtmlDocumentCachePolicy, buildCspWithNonce, generateCspNonce, withSecurityHeaders } from "./security-headers";
 import { AGENT_INDEX, AUTH_MD, MARKDOWN_PAGES, OAUTH_AUTHORIZATION_SERVER, OAUTH_PROTECTED_RESOURCE } from "./discovery";
 import { recordRequestAnalytics } from "./analytics";
 
@@ -310,6 +310,9 @@ async function dispatch(request: Request, env: Env, ctx: ExecutionContext, url: 
     // bfcache: public anonymous HTML -> `private, no-cache`; sessioned,
     // personal/auth and cookie-setting HTML -> `no-store` (see the helper).
     applyHtmlDocumentCachePolicy(request, gateTarget, rendered.status, taggedHeaders);
+    // /api/auth/* and sessioned API responses -> `no-store` (defence in
+    // depth; anonymous public API caching is untouched, see the helper).
+    applyApiCachePolicy(request, gateTarget, taggedHeaders);
     const tagged = new Response(rendered.body, { status: rendered.status, statusText: rendered.statusText, headers: taggedHeaders });
     return withSecurityHeaders(tagged, url.pathname, url.hostname, routedThroughGate);
 }

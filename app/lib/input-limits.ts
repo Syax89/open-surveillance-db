@@ -79,9 +79,45 @@ export function urlTooLong(request: Request): boolean {
 }
 
 /**
+ * Read a request body as UTF-8 text, counting BYTES as they stream in and
+ * cancelling the stream as soon as the running total passes `cap` (same
+ * pattern as the tile proxy's readCappedUpstreamBody). A chunked body with
+ * no Content-Length can therefore never be buffered past the cap, and the
+ * limit is measured in bytes, not UTF-16 code units (security audit
+ * 2026-11; the previous request.text() read everything first).
+ */
+async function readCappedText(request: Request, cap: number): Promise<string> {
+  const body = request.body;
+  if (!body) return "";
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > cap) {
+      await reader.cancel().catch(() => {});
+      throw new PayloadTooLargeError();
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  // Same decoding as Request#text(): UTF-8 with replacement characters,
+  // leading BOM stripped.
+  return new TextDecoder().decode(bytes);
+}
+
+/**
  * Parse a JSON request body under a byte cap.
  *
- * - Body over the cap (declared via Content-Length or measured after read):
+ * - Body over the cap (declared via Content-Length, or counted in BYTES
+ *   while streaming — the read aborts at the cap, see readCappedText):
  *   throws `PayloadTooLargeError` → handlers answer 413.
  * - Malformed JSON / unreadable body: throws `MalformedJsonError` → handlers
  *   answer 400 with a clear message instead of a 500.
@@ -94,10 +130,7 @@ export async function readJsonBody(request: Request, env: unknown): Promise<unkn
   if (Number.isFinite(contentLength) && contentLength > cap) {
     throw new PayloadTooLargeError();
   }
-  const text = await request.text();
-  if (text.length > cap) {
-    throw new PayloadTooLargeError();
-  }
+  const text = await readCappedText(request, cap);
   try {
     return JSON.parse(text);
   } catch {

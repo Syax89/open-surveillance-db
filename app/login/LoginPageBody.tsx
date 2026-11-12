@@ -8,6 +8,7 @@ import { authByLocale } from "../lib/i18n/auth";
 import { PublicNav } from "../components/PublicNav";
 import { browserSupportsWebAuthn, getCredential } from "../lib/webauthn-client";
 import { hardNavigate } from "../lib/navigate";
+import { safeRedirectTarget, safeSameOriginRedirect } from "../lib/safe-redirect";
 
 /**
  * /login — multi-method sign-in (Fase E2, design review).
@@ -42,11 +43,17 @@ import { hardNavigate } from "../lib/navigate";
  * and per-page metadata via getServerMessages (F2/F5 QA#6).
  */
 
-/** Same-site redirect target from ?returnTo= (login wall return, P1-2). */
+/**
+ * Same-site redirect target from ?returnTo= (login wall return, P1-2).
+ * Shared validation (safeRedirectTarget: no `//`, backslash, whitespace,
+ * control characters, encoded CR/LF or scheme) plus a final check that the
+ * value resolved against this page stays on this origin — `/\evil.com`
+ * or `/<TAB>/evil.com` would otherwise end on another host via
+ * window.location.assign.
+ */
 function safeReturnTo(value: string | null): string | null {
-  if (!value) return null;
-  if (!value.startsWith("/") || value.startsWith("//")) return null;
-  return value;
+  if (typeof window === "undefined") return safeRedirectTarget(value);
+  return safeSameOriginRedirect(value, window.location.origin);
 }
 
 export function LoginPageBody() {

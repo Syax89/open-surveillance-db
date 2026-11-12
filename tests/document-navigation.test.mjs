@@ -28,6 +28,7 @@ async function renderLinks() {
     link("/api/cameras?format=csv"),
     link("#section"),
     link("/guide", { target: "_blank" }),
+    link("/regole", { "data-client-nav": "" }),
   ));
   return routerClicks;
 }
@@ -54,4 +55,11 @@ test("external, /api/ downloads, same-page anchors, new tabs and modified clicks
   click("/guide");
   click("/faq", { metaKey: true });
   assert.deepEqual(routerClicks, ["https://example.org/elsewhere", "/api/cameras?format=csv", "#section", "/guide", "/faq"]);
+});
+
+test("links marked data-client-nav are left to the framework router (opt-out)", async () => {
+  const routerClicks = await renderLinks();
+  const event = click("/regole");
+  assert.deepEqual(routerClicks, ["/regole"], "the link's own onClick (router) runs");
+  assert.equal(event.defaultPrevented, true, "the router handled the navigation itself");
 });

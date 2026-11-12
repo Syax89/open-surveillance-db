@@ -20,16 +20,26 @@ import { useEffect } from "react";
  * navigations (filters, form redirects) are untouched.
  *
  * Left alone: modified/middle clicks, target/download links, other origins,
- * /api/ downloads, and same-page #anchors. Browsers without cross-document
- * View Transitions simply navigate (no animation) — and back/forward can
- * restore pages from the bfcache.
+ * /api/ downloads, same-page #anchors, and links marked `data-client-nav`
+ * (opt-out: the framework router handles them as usual). Browsers without
+ * cross-document View Transitions simply navigate (no animation) — and
+ * back/forward can restore pages from the bfcache.
+ *
+ * IMPORTANT for link authors: because propagation stops in the capture
+ * phase, an `onClick` handler on an internal <a>/<Link> does NOT run
+ * (analytics, closing a menu, saving a draft...). Put `data-client-nav` on
+ * any link whose onClick must run, or handle the work on the next page.
+ *
+ * No `event.defaultPrevented` check: this capture listener on window is the
+ * first listener to see the click, so nothing can have prevented it yet.
  */
 export function DocumentNavigation() {
   useEffect(() => {
     const onClick = (event: MouseEvent) => {
-      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       const anchor = (event.target as Element | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
       if (!anchor) return;
+      if (anchor.hasAttribute("data-client-nav")) return;
       if ((anchor.target && anchor.target !== "_self") || anchor.hasAttribute("download")) return;
       let url: URL;
       try {

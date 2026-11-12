@@ -42,7 +42,14 @@ export default {
       // the RFC 8288 Link-header tests need a realistic content-type.
       return new Response("<html><head><title>osdb</title></head><body>ok</body></html>", { status: 200, headers: { "content-type": "text/html; charset=utf-8" } });
     }
-    return new Response("handler-ok", { status: 200, headers: { "content-type": "text/plain" } });
+    // Cache-policy tests ask the "route" to answer with a given policy.
+    const cacheControl = request.headers.get("x-test-cache-control");
+    const headers = { "content-type": "text/plain" };
+    if (cacheControl) {
+      headers["cache-control"] = cacheControl;
+      headers.etag = '"v1"';
+    }
+    return new Response("handler-ok", { status: 200, headers });
   },
 };
 `;
@@ -358,6 +365,99 @@ test("analytics: valid tile coordinates collapse to one low-cardinality endpoint
 
   assert.equal(response.status, 200);
   assert.deepEqual(analytics.calls[0].blobs, ["api", "2xx", "/api/tiles/[z]/[x]/[y]", "GET", "200"]);
+});
+
+test("analytics: dynamic API segments are recorded as route patterns, unknown paths as other (security audit 2026-11)", async () => {
+  const { worker } = await loadWorker();
+  const analytics = analyticsMock();
+  const env = testEnv({ ANALYTICS: analytics.binding });
+  const cases = [
+    ["/api/cameras/12345", "/api/cameras/[id]"],
+    ["/api/cameras/12345/edit", "/api/cameras/[id]/edit"],
+    ["/api/cameras/9/events?limit=5", "/api/cameras/[id]/events"],
+    ["/api/cameras/nearby?lat=1&lng=2", "/api/cameras/nearby"],
+    ["/api/appeals/77", "/api/appeals/[id]"],
+    ["/api/auth/keys/key_abc123", "/api/auth/keys/[id]"],
+    ["/api/auth/oidc/github/start", "/api/auth/oidc/[provider]/start"],
+    ["/api/auth/oidc/merge", "/api/auth/oidc/merge"],
+    ["/api/auth/passkey/credentials", "/api/auth/passkey/credentials"],
+    ["/api/auth/passkey/credentials/cred-id-xyz", "other"],
+    ["/api/cameras/nearby/edit", "other"],
+    ["/api/wp-login.php", "other"],
+    ["/api/users/alice@example.test", "other"],
+    ["/api/cameras/", "/api/cameras"],
+  ];
+  for (const [requestPath] of cases) {
+    await worker.fetch(request(requestPath), env, ctx());
+  }
+  assert.deepEqual(
+    analytics.calls.map((point) => point.blobs[2]),
+    cases.map(([, expected]) => expected),
+  );
+});
+
+test("API cache policy: /api/auth/* and sessioned API responses are forced to no-store (security audit 2026-11)", async () => {
+  const { worker } = await loadWorker();
+  const send = (requestPath, { cacheControl, cookie } = {}) => {
+    const headers = {};
+    if (cacheControl) headers["x-test-cache-control"] = cacheControl;
+    if (cookie) headers.cookie = cookie;
+    return worker.fetch(request(requestPath, { headers }), testEnv(), ctx());
+  };
+
+  // /api/auth/* is always no-store, even when the route forgot (or chose a
+  // public policy), and even for an anonymous caller.
+  for (const requestPath of ["/api/auth/me", "/api/auth/oidc/providers", "/api/AUTH/me", "/api//auth/me"]) {
+    const missing = await send(requestPath);
+    assert.equal(missing.headers.get("cache-control"), "no-store", `${requestPath} without a route policy`);
+    const publicPolicy = await send(requestPath, { cacheControl: "public, max-age=3600" });
+    assert.equal(publicPolicy.headers.get("cache-control"), "no-store", `${requestPath} with a public route policy`);
+    assert.equal(publicPolicy.headers.get("etag"), null, "no validator on a forced no-store response");
+  }
+  // A route that already chose no-store keeps its exact policy.
+  const own = await send("/api/auth/me", { cacheControl: "private, no-store, max-age=0" });
+  assert.equal(own.headers.get("cache-control"), "private, no-store, max-age=0");
+
+  // Any API response to a request carrying the session cookie.
+  const sessioned = await send("/api/cameras?limit=1", { cacheControl: "public, s-maxage=300", cookie: "theme=dark; osdb_session=abc" });
+  assert.equal(sessioned.headers.get("cache-control"), "no-store");
+  const sessionedTile = await send("/api/tiles/13/1/1.png", { cacheControl: "public, max-age=604800", cookie: "osdb_session=abc" });
+  assert.equal(sessionedTile.headers.get("cache-control"), "no-store");
+
+  // Anonymous public API responses keep their cache policy (public-cache
+  // reads, tiles, geocode) — including a look-alike cookie name.
+  for (const [requestPath, policy] of [
+    ["/api/cameras?limit=1", "public, s-maxage=300"],
+    ["/api/tiles/13/1/1.png", "public, max-age=604800"],
+    ["/api/geocode?q=roma", "public, max-age=86400"],
+  ]) {
+    const anonymous = await send(requestPath, { cacheControl: policy, cookie: "not_osdb_session=1; theme=dark" });
+    assert.equal(anonymous.headers.get("cache-control"), policy, `${requestPath} stays cacheable for anonymous callers`);
+    assert.equal(anonymous.headers.get("etag"), '"v1"');
+  }
+  // Non-API pages are not touched by this policy.
+  const page = await send("/directory", { cacheControl: "public, max-age=60" });
+  assert.equal(page.headers.get("cache-control"), "public, max-age=60");
+});
+
+test("analytics: the route-pattern list covers every app/api route.ts", async () => {
+  const tree = await getTree();
+  const { API_ROUTE_PATTERNS, normalizeApiPath } = await import(pathToFileURL(path.join(tree, "worker", "analytics.mjs")).href);
+  const apiDir = path.join(root, "app", "api");
+  const found = [];
+  const walk = async (dir) => {
+    for (const entry of await readdir(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) await walk(full);
+      else if (entry.name === "route.ts") found.push(`/api/${path.relative(apiDir, dir).split(path.sep).join("/")}`);
+    }
+  };
+  await walk(apiDir);
+  assert.deepEqual([...API_ROUTE_PATTERNS].sort(), found.sort(), "worker/analytics.ts API_ROUTE_PATTERNS must mirror app/api");
+  for (const pattern of found) {
+    const sample = pattern.replace(/\[[^\]]+\]/g, "123");
+    assert.equal(normalizeApiPath(sample), pattern, `${sample} must normalise to ${pattern}`);
+  }
 });
 
 test("analytics: website traffic is logged as web without per-page breakdown", async () => {
