@@ -95,7 +95,7 @@ async function toStatus(id, status, reason = REASON.verified) {
 // ---------------------------------------------------------------------------
 
 test("a correction request is stored privately and only surfaces in the moderation queue", async () => {
-  const report = await cameras.createPendingCamera(reportInput);
+  const report = await cameras.createCamera(reportInput);
   const request = await corrections.createCorrectionRequest({
     cameraId: report.id,
     issueType: "No longer present",
@@ -343,8 +343,39 @@ test("a cameraId-less removal request can be resolved with a removed outcome", a
   assert.equal(queue.correctionRequests.some((item) => item.id === request.correction.id), false);
 });
 
+test("correction intake answers camera_not_found for a missing or non-visible record (no oracle, no 500)", async () => {
+  // Missing id: no foreign-key exception escapes as a 500.
+  assert.deepEqual(
+    await corrections.createCorrectionRequest({ cameraId: 999999, issueType: "other", message: "x", contact: null }),
+    { kind: "camera_not_found" },
+  );
+  // A pending (never public) record is invisible to a non-owner reporter.
+  const pending = await cameras.createPendingCamera(reportInput);
+  assert.deepEqual(
+    await corrections.createCorrectionRequest({ cameraId: pending.id, issueType: "other", message: "x", contact: null }),
+    { kind: "camera_not_found" },
+  );
+  const rows = await db.prepare("SELECT COUNT(*) AS n FROM correction_requests").first();
+  assert.equal(Number(rows.n), 0, "nothing is stored for a non-visible target");
+});
+
+test("the owner may still report their own non-public record; hidden/removed record pages stay reportable", async () => {
+  const owner = (await db
+    .prepare("INSERT INTO contributors (email, display_name, password_hash, created_at, updated_at) VALUES ('owner-intake@example.test', NULL, 'x', ?, ?) RETURNING id")
+    .bind(new Date().toISOString(), new Date().toISOString())
+    .first()).id;
+  const own = await cameras.createPendingCamera({ ...reportInput, contributorId: owner });
+  const ownReport = await corrections.createCorrectionRequest({ cameraId: own.id, issueType: "other", message: "x", contact: null, contributorId: owner });
+  assert.equal(ownReport.kind, "created");
+
+  const removed = await cameras.createCamera(reportInput);
+  await db.prepare("UPDATE cameras SET status = 'removed' WHERE id = ?").bind(removed.id).run();
+  const removedReport = await corrections.createCorrectionRequest({ cameraId: removed.id, issueType: "removal", message: "x", contact: null });
+  assert.equal(removedReport.kind, "created");
+});
+
 test("a correction request can be resolved with a reasoned, auditable decision", async () => {
-  const report = await cameras.createPendingCamera(reportInput);
+  const report = await cameras.createCamera(reportInput);
   const request = await corrections.createCorrectionRequest({
     cameraId: report.id,
     issueType: "Privacy concern",

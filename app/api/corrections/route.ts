@@ -120,6 +120,11 @@ export async function POST(request: Request) {
       contact,
       contributorId: gate.contributor.id,
     });
+    if (result.kind === "camera_not_found") {
+      // Missing id, or a record the reporter cannot see: the same 404 either
+      // way (no existence/status oracle, never a 500 from the FK).
+      return Response.json({ error: "Camera not found." }, { status: 404 });
+    }
     if (result.kind === "duplicate_open") {
       return Response.json({ error: "A report for this record is already under review." }, { status: 409 });
     }
