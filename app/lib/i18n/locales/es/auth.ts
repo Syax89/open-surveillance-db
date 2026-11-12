@@ -247,6 +247,8 @@ export const es: Translation<typeof en> = {
   verifyExpiredTitle: "Este enlace ya no es válido",
   verifyExpiredBody:
     "Este enlace de verificación ya se ha usado o ha caducado. Solicita un enlace nuevo para continuar.",
+  verifyForgotPasswordHint:
+    "¿No puedes iniciar sesión para pedir un nuevo enlace? Usa «¿Has olvidado tu contraseña?» con la misma dirección: establecer una nueva contraseña también confirma tu correo.",
   verifyResend: "Reenviar correo de verificación",
   verifyResent: "Correo de verificación enviado.",
   verifyResendRateLimited: "Demasiados correos. Inténtalo de nuevo más tarde.",

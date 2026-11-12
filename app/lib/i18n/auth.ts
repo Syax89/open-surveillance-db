@@ -253,6 +253,8 @@ export const en = {
   verifyExpiredTitle: "This link is no longer valid",
   verifyExpiredBody:
     "This verification link has already been used or has expired. Request a new link to continue.",
+  verifyForgotPasswordHint:
+    "Can't sign in to request a new link? Use “Forgot password?” with the same address: setting a new password also confirms your email.",
   verifyResend: "Resend verification email",
   verifyResent: "Verification email sent.",
   verifyResendRateLimited: "Too many emails. Please try again later.",
@@ -559,6 +561,8 @@ export const it: Translation<typeof en> = {
   verifyExpiredTitle: "Questo link non è più valido",
   verifyExpiredBody:
     "Questo link di verifica è già stato usato o è scaduto. Richiedi un nuovo link per continuare.",
+  verifyForgotPasswordHint:
+    "Non riesci ad accedere per chiedere un nuovo link? Usa «Password dimenticata?» con lo stesso indirizzo: impostare una nuova password conferma anche la tua email.",
   verifyResend: "Invia di nuovo l'email di verifica",
   verifyResent: "Email di verifica inviata.",
   verifyResendRateLimited: "Troppe email. Riprova più tardi.",

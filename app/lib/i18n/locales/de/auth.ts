@@ -247,6 +247,8 @@ export const de: Translation<typeof en> = {
   verifyExpiredTitle: "Dieser Link ist nicht mehr gültig",
   verifyExpiredBody:
     "Dieser Bestätigungslink wurde bereits verwendet oder ist abgelaufen. Fordere einen neuen Link an, um fortzufahren.",
+  verifyForgotPasswordHint:
+    "Du kannst dich nicht anmelden, um einen neuen Link anzufordern? Nutze „Passwort vergessen?“ mit derselben Adresse: Ein neues Passwort bestätigt auch deine E-Mail.",
   verifyResend: "Bestätigungs-E-Mail erneut senden",
   verifyResent: "Bestätigungs-E-Mail gesendet.",
   verifyResendRateLimited: "Zu viele E-Mails. Bitte versuche es später erneut.",

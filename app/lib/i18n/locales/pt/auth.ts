@@ -247,6 +247,8 @@ export const pt: Translation<typeof en> = {
   verifyExpiredTitle: "Esta ligação já não é válida",
   verifyExpiredBody:
     "Esta ligação de verificação já foi utilizada ou expirou. Pede uma nova ligação para continuar.",
+  verifyForgotPasswordHint:
+    "Não consegues iniciar sessão para pedir uma nova ligação? Usa «Esqueceste-te da palavra-passe?» com o mesmo endereço: definir uma nova palavra-passe também confirma o teu email.",
   verifyResend: "Reenviar email de verificação",
   verifyResent: "Email de verificação enviado.",
   verifyResendRateLimited: "Demasiados emails. Tenta novamente mais tarde.",

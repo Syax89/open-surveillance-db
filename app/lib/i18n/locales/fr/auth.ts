@@ -247,6 +247,8 @@ export const fr: Translation<typeof en> = {
   verifyExpiredTitle: "Ce lien n’est plus valide",
   verifyExpiredBody:
     "Ce lien de vérification a déjà été utilisé ou a expiré. Demandez un nouveau lien pour continuer.",
+  verifyForgotPasswordHint:
+    "Vous ne pouvez pas vous connecter pour demander un nouveau lien ? Utilisez « Mot de passe oublié ? » avec la même adresse : définir un nouveau mot de passe confirme aussi votre e-mail.",
   verifyResend: "Renvoyer l’e-mail de vérification",
   verifyResent: "E-mail de vérification envoyé.",
   verifyResendRateLimited: "Trop d’e-mails envoyés. Veuillez réessayer plus tard.",

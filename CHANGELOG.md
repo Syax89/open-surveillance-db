@@ -14,6 +14,26 @@ changes accumulate under `[Unreleased]`.
 
 ### Security
 
+- **Privacy di chi contribuisce e segnalazioni privacy (2026-11-12, scelte
+  etiche del maintainer):**
+  - *Registrazione senza enumerazione:* `POST /api/auth/register` risponde
+    sempre 202 "controlla la tua email" (stesso corpo, nessun cookie), sia
+    per indirizzi nuovi sia esistenti; non apre più una sessione. Se
+    l'account esiste, il titolare riceve un avviso "qualcuno ha provato a
+    registrarsi con il tuo indirizzo" (6 lingue, max 3 al giorno, nessun
+    tracciamento). Link scaduto: la pagina di verifica indica "Password
+    dimenticata?", che conferma anche l'email.
+  - *Segnalazioni privacy:* una segnalazione nasconde ancora subito la scheda
+    (protezione della persona prima di tutto), ma la scheda entra subito
+    nella coda di revisione come sensibile; il ripristino del moderatore è
+    definitivo. Massimo 5 segnalazioni privacy al giorno per account; un
+    account con 2 segnalazioni respinte in 90 giorni non nasconde più nulla
+    in automatico (le sue segnalazioni vanno solo in coda).
+  - *Regole documentate:* le rimozioni decise da un moderatore, da una
+    correzione o migrate da `rejected` non sono mai annullabili dalla
+    community (solo appello) — ADR 0021 (emendamento 2026-11),
+    docs/MODERATION.md e Condizioni d'uso § 6.3 (6 lingue + canonica v0.10).
+
 - **Audit di sicurezza completo (2026-11-12) e correzioni:**
   - *Account:* niente passkey prima della verifica dell'email; il primo
     login verificato e il reset della password cancellano passkey, codici di
