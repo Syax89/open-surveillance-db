@@ -43,10 +43,19 @@ export function Hero() {
         <p className="hero-trust-note">{t.trustNote} <a href="/fonti">{t.sourcesLink} <span aria-hidden="true">→</span></a></p>
         {total !== null && <p className="sr-only" role="status">{total} {t.publicRecords}</p>}
       </div>
+      {/* Background art (home redesign 2026-11): a quiet map preview that
+          bleeds to the right edge of the hero and fades towards the text —
+          no inner box, no scattered dots, no floating caption. */}
       <div className="hero-visual" aria-hidden="true">
         <div className="hero-map-pattern" />
-        <div className="hero-map-dots" />
-        <div className="visual-label">{t.visualLabelFirst}<br />{t.visualLabelSecond}</div>
+        <div className="hero-map-art">
+          <div className="teaser-grid" />
+          <span className="teaser-pin teaser-pin-one" />
+          <span className="teaser-pin teaser-pin-two" />
+          <span className="teaser-pin teaser-pin-three" />
+          <span className="teaser-pin teaser-pin-four" />
+          <span className="teaser-pin teaser-pin-five" />
+        </div>
       </div>
     </section>
 

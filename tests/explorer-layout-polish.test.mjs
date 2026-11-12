@@ -231,10 +231,18 @@ test("cross-document explorer transitions opt in and crossfade continuously with
   assert.ok(reducedMotion.some((block) => /::view-transition-old\(\*\)[\s\S]*animation\s*:\s*none\s*!important/.test(block)), "reduced-motion users keep transitions disabled");
 });
 
-test("the @view-transition opt-in is scoped to the map/directory explorer, never global", async () => {
-  // A global rule made EVERY same-origin navigation pay full-page snapshots.
-  assert.doesNotMatch(css, /@view-transition\s*\{/, "app/globals.css must not opt every navigation in");
-  assert.doesNotMatch(css, /::view-transition-(old|new)\(root\)/, "root transition animations stay with the scoped opt-in");
+test("every page change crossfades (site-wide opt-in, opacity only); the explorer adds its shared element on top", async () => {
+  // Owner 2026-11: the list → record fade everywhere. The global rule is a
+  // cheap opacity-only crossfade with reduced-motion respected.
+  assert.match(css, /@view-transition\s*\{\s*navigation:\s*auto;?\s*\}/, "app/globals.css opts every navigation in");
+  const oldRoot = ruleBlock(css, "::view-transition-old(root)");
+  const newRoot = ruleBlock(css, "::view-transition-new(root)");
+  assert.match(oldRoot, /animation:\s*osdb-page-out/);
+  assert.match(newRoot, /animation:\s*osdb-page-in/);
+  assert.match(css, /@keyframes osdb-page-out \{ to \{ opacity:0; \} \}/, "opacity only, no transform");
+  // Internal links are document navigations, so the crossfade applies to them.
+  const layout = await readFile(path.join(root, "app", "layout.tsx"), "utf8");
+  assert.match(layout, /<DocumentNavigation \/>/, "the root layout mounts the document-navigation listener");
 
   const component = await readFile(path.join(root, "app", "components", "ExplorerViewTransitionStyles.tsx"), "utf8");
   assert.match(component, /EXPLORER_VIEW_TRANSITION_CSS = "\/explorer-view-transition\.css"/);

@@ -543,7 +543,8 @@ test("account: display name inline edit — save PATCHes /api/auth/me with CSRF 
   const patchRequest = requests.find((request) => request.input === "/api/auth/me" && request.init.method === "PATCH");
   assert.equal(JSON.parse(patchRequest.init.body).displayName, "Updated Name");
   assert.equal(patchRequest.init.headers["x-csrf-token"], "fixture-csrf-token");
-  await waitFor(() => assert.ok(screen.queryByText("Updated Name")));
+  // The profile row shows the saved name (the header eyebrow names the signed-in person too).
+  await waitFor(() => assert.ok(rtl.within(document.querySelector(".account-identity")).queryByText("Updated Name")));
   assert.ok(screen.getByText("Display name saved."));
 });
 

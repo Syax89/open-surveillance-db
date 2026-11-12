@@ -395,6 +395,26 @@ changes accumulate under `[Unreleased]`.
 
 ### Changed
 
+- **Page transitions, account dashboard and home hero (2026-11, owner
+  request):**
+  - Every page change now crossfades, like the directory → record
+    transition: a site-wide `@view-transition` opt-in (opacity-only, 0.2s,
+    off under reduced motion) and `app/components/DocumentNavigation.tsx`,
+    which turns internal link clicks into document navigations (next/link
+    swapped content in place with no transition). External links, `/api/`
+    downloads, same-page anchors, new tabs and modified clicks are untouched.
+    The map ↔ directory switch keeps its shared-element motion on top.
+  - `/account` is a dashboard: the page is no longer one big card holding
+    grey boxes; the header shows who is signed in plus the trust level and
+    e-mail state as pills; contributions take a wide main column and
+    profile / passkeys / API keys / danger zone a compact side column (one
+    column on phones). With no contributions the filters and the duplicate
+    header actions are hidden.
+  - Home hero: headline, intro, search, actions and figures share one left
+    column; a quiet map preview is background art on the right half,
+    bleeding to the hero's edges and fading towards the text (no box inside
+    the box, no scattered dots, no floating caption). Hidden below 1100px.
+
 - **Search sends as little as possible to third parties (2026-11, owner
   request — "as little data as possible should reach other companies"):**
   - Nothing is sent while typing in any search box. The map and report-form

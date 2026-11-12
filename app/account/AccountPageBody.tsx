@@ -158,7 +158,9 @@ export default function AccountPageBody() {
       <PublicNav navLabel={t.navigation} homeLabel={t.homeAria} />
 
       <article className="record-detail auth-card account-card account-dashboard">
-        <p className="eyebrow"><span /> {t.accountTitle}</p>
+        {/* Signed in, the eyebrow names WHO is signed in instead of repeating
+            the page title (2026-11 redesign). */}
+        <p className="eyebrow"><span /> {!loading && !loggedOut && contributor ? (contributor.displayName ?? contributor.email) : t.accountTitle}</p>
         <h1>{t.accountTitle}</h1>
 
         {/* Trust-level badge ABOVE the identity tile (issue #435): the
@@ -211,14 +213,21 @@ export default function AccountPageBody() {
                 thing an unverified contributor sees, before the profile. */}
             <VerifyEmailBanner emailVerifiedAt={contributor.emailVerifiedAt} />
 
+            {/* Dashboard layout (owner 2026-11 redesign): contributions are
+                the main column; profile, sign-in methods, API keys and the
+                danger zone form a compact side column (one column on
+                phones, contributions first). */}
+            <div className="account-layout">
+            <div className="account-main">
+              <ContributionsSection contributor={contributor} onSessionLost={onSessionLost} onLevel={setLevel} />
+            </div>
+            <div className="account-aside">
             <ProfileSection
               contributor={contributor}
               role={role}
               onContributorUpdated={setContributor}
               onLogout={() => void onLogout()}
             />
-
-            <ContributionsSection contributor={contributor} onSessionLost={onSessionLost} onLevel={setLevel} />
 
             <PasskeysSection api={passkeysApi} />
 
@@ -232,6 +241,8 @@ export default function AccountPageBody() {
             {error ? <p className="auth-error" role="alert">{error}</p> : null}
 
             <DeleteAccountSection onRequestDelete={() => setConfirmDelete(true)} />
+            </div>
+            </div>
           </>
         ) : null}
 

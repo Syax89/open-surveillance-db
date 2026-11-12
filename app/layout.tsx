@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { LocaleProvider } from "./components/LocaleProvider";
 import { LegacyAnchorRedirect } from "./components/LegacyAnchorRedirect";
+import { DocumentNavigation } from "./components/DocumentNavigation";
 import { SiteFooter } from "./components/SiteFooter";
 import { getServerLocale, getServerMessages } from "./lib/server-i18n";
 import { getConfiguredSiteUrl } from "./lib/site-url";
@@ -83,6 +84,9 @@ export default async function RootLayout({
               bookmark lands on; SSR renders nothing (progressive
               enhancement, maintainer t_f24c3227). */}
           <LegacyAnchorRedirect />
+          {/* Every internal link is a document navigation, so every page
+              change gets the site-wide crossfade (owner 2026-11). */}
+          <DocumentNavigation />
           {children}
           <SiteFooter />
         </LocaleProvider>
