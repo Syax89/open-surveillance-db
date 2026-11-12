@@ -1094,6 +1094,13 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .nav-shell:has(.menu-button) .menu-button { margin-left:auto; }
   .menu-button::before { content:""; display:inline-block; width:16px; height:2px; margin-right:9px; vertical-align:middle; border-radius:1px; background:currentColor; box-shadow:0 -5px 0 currentColor, 0 5px 0 currentColor; }
   .menu-button[aria-expanded="true"]::before { content:"\2715"; width:16px; height:auto; background:none; box-shadow:none; font-size:14px; line-height:1; text-align:center; }
+  /* Theme + language controls stay on the brand row next to "Menu" (2026-11):
+     borderless and tighter on phones so brand · prefs · Menu fit at 320px. */
+  .nav-shell:has(.menu-button) .header-preferences { gap:2px; }
+  .nav-shell:has(.menu-button) .theme-toggle { width:40px; border:0; }
+  .nav-shell:has(.menu-button) details.locale-toggle { border:0; }
+  .nav-shell:has(.menu-button) details.locale-toggle > summary { padding:0 6px; gap:4px; }
+  .nav-shell:has(.menu-button) .menu-button { padding:10px 8px; }
   .nav-shell:has(.menu-button) .nav-links { display:none; position:absolute; z-index:10; top:62px; right:0; left:0; padding:var(--space-4); border:1px solid var(--line); border-radius:var(--radius-lg); background:var(--white); box-shadow:0 12px 24px rgba(30,45,45,.15); flex-direction:column; flex-wrap:nowrap; align-items:stretch; gap:14px }
   .nav-shell:has(.menu-button) .nav-links.is-open { display:flex }
   /* Auth links travel with the dropdown: separated from the primary
@@ -2494,4 +2501,15 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   --overlay-bg:rgba(20,30,37,.95);
   --overlay-border:rgba(70,88,96,.9);
   color-scheme:dark;
+}
+
+/* Narrow phones: the language menu shows just "PT ▾" (the globe returns at
+   wider widths) so the header row never wraps. */
+@media (max-width: 400px) {
+  .nav-shell:has(.menu-button) details.locale-toggle > summary svg { display:none; }
+}
+/* ≤360px: the hamburger glyph alone (the word stays the accessible name). */
+@media (max-width: 360px) {
+  .nav-shell:has(.menu-button) .menu-button { font-size:0; min-width:44px; }
+  .nav-shell:has(.menu-button) .menu-button::before { margin-right:0; }
 }

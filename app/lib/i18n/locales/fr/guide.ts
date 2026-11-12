@@ -9,15 +9,15 @@ export const fr: Translation<typeof en> = {
   navigation: "Navigation du guide",
   homeAria: "Accueil OpenSurveillanceDB",
   map: "Carte",
-  directory: "Annuaire",
+  directory: "Répertoire",
   home: "Accueil",
   manifesto: "Manifeste",
   eyebrow: "Guide du projet",
   title: "Une base de données publique, construite avec soin.",
   intro:
-    "Ce guide explique ce que documente OpenSurveillanceDB et comment utiliser la carte et l’annuaire. Il montre aussi comment un signalement devient une donnée publique, et ce que la base de données ne prétend pas établir.",
+    "Ce guide explique ce que documente OpenSurveillanceDB et comment utiliser la carte et le répertoire. Il montre aussi comment un signalement devient une donnée publique, et ce que la base de données ne prétend pas établir.",
   exploreMap: "Explorer la carte",
-  browseDirectory: "Parcourir l’annuaire",
+  browseDirectory: "Parcourir le répertoire",
   overviewEyebrow: "Guide rapide",
   overviewTitle: "Trouvez ce qu’il vous faut.",
   overviewPurpose: "Ce que documente la base de données",
@@ -42,7 +42,7 @@ export const fr: Translation<typeof en> = {
   cycleEyebrow: "Un processus communautaire",
   cycleTitle: "De l’observation à la fiche publique.",
   cycleBody:
-    "Un signalement envoyé depuis un compte vérifié devient immédiatement une fiche publique. La communauté veille ensuite à l’exactitude de l’annuaire : ce qui est toujours là est confirmé, ce qui a disparu est signalé, ce qui est utile est marqué.",
+    "Un signalement envoyé depuis un compte vérifié devient immédiatement une fiche publique. La communauté veille ensuite à l’exactitude du répertoire : ce qui est toujours là est confirmé, ce qui a disparu est signalé, ce qui est utile est marqué.",
   cycleRuleTitle: "La publication est immédiate.",
   cycleRuleBody:
     "Un signalement est publié dès qu’un contributeur vérifié l’envoie. Pas de file d’attente, pas de délai : l’exactitude est assurée par la communauté, pas par un relecteur.",
@@ -68,7 +68,7 @@ export const fr: Translation<typeof en> = {
     "Un statut décrit l’état actuel ; il ne garantit pas qu’une caméra est active, que la fiche est complète ni qu’elle restera exacte.",
   verifiedTitle: "Publiée et en ligne",
   verifiedBody:
-    "La fiche est publique : elle apparaît sur la carte, dans l’annuaire et dans l’export GeoJSON. La communauté peut agir dessus à tout moment.",
+    "La fiche est publique : elle apparaît sur la carte, dans le répertoire et dans l’export GeoJSON. La communauté peut agir dessus à tout moment.",
   reviewTitle: "Masquée",
   reviewBody:
     "La fiche a été retirée dans l’attente d’une vérification communautaire ou juridique. Elle n’est pas listée, mais son historique public reste visible et des confirmations peuvent la rétablir.",
@@ -87,7 +87,7 @@ export const fr: Translation<typeof en> = {
     "Vous vous inscrivez avec une adresse e-mail et un mot de passe, conservé sous forme de hachage et jamais exposé. La vérification de l’adresse e-mail est obligatoire avant de pouvoir publier ou participer aux actions communautaires. Vous pouvez aussi ajouter une clé d’accès ou une connexion via un réseau social au même compte.",
   accountAnonymousTitle: "La consultation reste ouverte",
   accountAnonymousBody:
-    "Vous pouvez explorer la carte, l’annuaire et les exports sans compte. Envoyer un signalement, une correction ou participer aux actions communautaires nécessite un compte contributeur vérifié.",
+    "Vous pouvez explorer la carte, le répertoire et les exports sans compte. Envoyer un signalement, une correction ou participer aux actions communautaires nécessite un compte contributeur vérifié.",
   editEyebrow: "Modifier une contribution",
   editTitle: "Vous pouvez modifier vos propres contributions.",
   editBody:
@@ -100,7 +100,7 @@ export const fr: Translation<typeof en> = {
     "Lorsqu’une fiche est déjà publique, une modification ne l’écrase jamais : le changement est enregistré comme proposition privée, qu’un modérateur applique ou rejette. La version publique actuelle reste visible pendant tout ce temps.",
   editNotImmediateTitle: "La proposition reste privée",
   editNotImmediateBody:
-    "Seul le changement proposé reste privé pendant son examen. La fiche publiée continue d’apparaître sur la carte, dans l’annuaire et dans les exports jusqu’à ce qu’une décision soit prise sur la proposition.",
+    "Seul le changement proposé reste privé pendant son examen. La fiche publiée continue d’apparaître sur la carte, dans le répertoire et dans les exports jusqu’à ce qu’une décision soit prise sur la proposition.",
   verifyEyebrow: "Confirmations",
   verifyTitle: "Ce que signifient les confirmations.",
   verifyBody:
@@ -120,7 +120,7 @@ export const fr: Translation<typeof en> = {
   levelEyebrow: "Niveaux de confiance",
   levelTitle: "De la reconnaissance, pas de la compétition.",
   levelBody:
-    "Les niveaux de confiance reflètent le nombre de vos contributions en ligne dans l’annuaire. Ils reconnaissent discrètement un travail exact ; ce n’est pas un classement.",
+    "Les niveaux de confiance reflètent le nombre de vos contributions en ligne dans le répertoire. Ils reconnaissent discrètement un travail exact ; ce n’est pas un classement.",
   levelThresholdsTitle: "Niveaux et seuils",
   levelThresholdsBody:
     "Seules les contributions en ligne comptent. Les seuils sont 1, 5, 20 et 50 ; les fiches masquées ou supprimées ne comptent pas.",

@@ -157,6 +157,9 @@ export function DirectoryCatalog({ filteredRecords, loading, loadError, onRetryL
   // Nothing is guessed — an unknown/absent batch keeps the raw value.
   function sourceValue(camera: Camera) {
     if (camera.status === "demo") return t.demoSource;
+    // The raw marker of a community report is stored in English: show it
+    // in the visitor's language (the stored value is unchanged).
+    if (camera.source === "Community report") return t.communityReportSource;
     const provenance = importSourceOf(camera, sources);
     if (!provenance) return camera.source;
     return (

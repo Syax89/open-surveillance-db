@@ -8,11 +8,11 @@ import type { en } from "../../map";
 export const fr: Translation<typeof en> = {
   mapLabel: "Carte interactive OpenStreetMap",
   mapDescription:
-    "La carte affiche les mêmes fiches publiques que l’annuaire accessible ci-dessous. Vous pouvez utiliser l’annuaire pour rechercher, filtrer et ouvrir les fiches sans passer par la carte.",
-  mapDirectoryLink: "Aller à l’annuaire accessible",
+    "La carte affiche les mêmes fiches publiques que le répertoire accessible ci-dessous. Vous pouvez utiliser le répertoire pour rechercher, filtrer et ouvrir les fiches sans passer par la carte.",
+  mapDirectoryLink: "Aller au répertoire accessible",
   mapFallbackTitle: "La carte interactive n’est pas disponible.",
   mapFallbackBody:
-    "Vous pouvez toujours rechercher, filtrer et ouvrir chaque fiche publique depuis l’annuaire accessible, qui fonctionne sans la carte.",
+    "Vous pouvez toujours rechercher, filtrer et ouvrir chaque fiche publique depuis le répertoire accessible, qui fonctionne sans la carte.",
   // Page-level chrome (/mappa).
   pageTitle: "Carte interactive",
   pageIntro:
@@ -74,7 +74,7 @@ export const fr: Translation<typeof en> = {
   // Truthful empty state (never a silent map).
   emptyTitle: "Aucune fiche publiée ne correspond à ces filtres.",
   emptyBody:
-    "Cela ne signifie pas qu’il n’y a aucune caméra dans la zone. Vous pouvez réinitialiser les filtres, parcourir l’annuaire ou signaler une caméra observée depuis l’espace public.",
+    "Cela ne signifie pas qu’il n’y a aucune caméra dans la zone. Vous pouvez réinitialiser les filtres, parcourir le répertoire ou signaler une caméra observée depuis l’espace public.",
   clearSearch: "Effacer les filtres",
   offlineTitle: "Vous êtes hors ligne",
   offlineBody: "Affichage des dernières fiches chargées.",

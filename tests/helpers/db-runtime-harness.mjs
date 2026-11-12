@@ -82,6 +82,11 @@ const DB_MODULES = [
   // app/lib/email-templates.ts imports the locale registry from
   // ./i18n/types (kanban t_6424f961); mirror it so the import resolves.
   { source: "app/lib/i18n/types.ts", output: "app/lib/i18n/types.mjs" },
+  // Per-locale email copy for the languages beyond EN/IT (2026-11).
+  ...["fr", "de", "es", "pt"].map((code) => ({
+    source: `app/lib/i18n/locales/${code}/email.ts`,
+    output: `app/lib/i18n/locales/${code}/email.mjs`,
+  })),
   // Auth roles + appeals (ADR 0014): db/users (identity accounts, coarse
   // role) and db/appeals (appeal workflow) run against the same env.DB.
   // db/appeals imports ./moderation + ./users; db/users imports ./cameras.

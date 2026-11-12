@@ -146,6 +146,7 @@ export const pt: Translation<typeof en> = {
   // ("Development seed"/"Demo data" — test contract, see DATA_DICTIONARY);
   // the presentation shows these localized labels instead.
   demoSource: "Dados de exemplo ilustrativos",
+  communityReportSource: "Reporte da comunidade",
   demoUpdated: "Dados de demonstração",
   location: "Localização",
   unknown: "Desconhecido",

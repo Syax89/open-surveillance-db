@@ -597,7 +597,7 @@ test("the SSR root declares lang and the toggle exposes aria-label + aria-presse
     assert.match(html, /<html[^>]*lang="en"/, `${route} must declare a lang attribute`);
     assert.match(
       html,
-      /<div class="locale-toggle" aria-label="Language selection"><button[^>]*aria-pressed="true">EN<\/button><button[^>]*aria-pressed="false">IT<\/button><\/div>/,
+      /<details class="locale-toggle"><summary aria-label="Language selection \(English\)"[^>]*>[\s\S]*?<\/summary><div class="locale-menu" role="group" aria-label="Language selection"><button[^>]*aria-pressed="true"[^>]*>EN<\/button><button[^>]*aria-pressed="false"[^>]*>IT<\/button>/,
       `${route} must render the toggle with aria-pressed states`,
     );
   }
@@ -615,7 +615,7 @@ test("switching locale updates document.documentElement.lang (screen-reader read
   // t_6424f961): one button per SUPPORTED_LOCALES entry, each reflecting
   // its pressed state via `locale === code`. The SSR regex above pins the
   // rendered EN/IT output; this pins the data-driven source.
-  assert.match(provider, /aria-pressed=\{locale === code\}/, "each generated toggle button must reflect its pressed state");
+  assert.match(provider, /aria-pressed=\{locale === info\.code\}/, "each generated toggle button must reflect its pressed state");
   assert.match(provider, /locales\.map\(/, "the toggle buttons must be generated from the locale registry (not a hardcoded EN/IT pair)");
   assert.match(provider, /SUPPORTED_LOCALES/, "the toggle must default to the registered locales");
 });

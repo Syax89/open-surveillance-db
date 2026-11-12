@@ -12,7 +12,7 @@ export const fr: Translation<typeof en> = {
   intro:
     "Chaque caméra de la base de données est disponible via une API publique. La lecture se fait sans clé ni inscription : les endpoints ci-dessous sont à vous sous l’Open Database Licence. Les contributeurs vérifiés peuvent aussi écrire via l’API avec des clés privées.",
   apiNote:
-    "Sans clé par conception pour la lecture : l’annuaire reste simple à consommer. L’écriture est possible via l’API, mais uniquement avec une clé privée délivrée à un compte vérifié. Les réponses sont en JSON (sauf les tuiles et les exports) et les coordonnées sont arrondies à ~10 m.",
+    "Sans clé par conception pour la lecture : le répertoire reste simple à consommer. L’écriture est possible via l’API, mais uniquement avec une clé privée délivrée à un compte vérifié. Les réponses sont en JSON (sauf les tuiles et les exports) et les coordonnées sont arrondies à ~10 m.",
   endpointsTitle: "Endpoints de lecture",
   endpointsIntro:
     "Tous les endpoints de lecture acceptent GET et renvoient du JSON (sauf les tuiles et les exports). Les paramètres de chemin sont indiqués entre {accolades} ; tous les autres sont des paramètres de la query string.",

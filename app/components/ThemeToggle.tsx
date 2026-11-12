@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { commonByLocale } from "../lib/i18n/common";
 import { THEME_COOKIE, type Theme } from "../lib/theme";
 import { useLocale } from "./LocaleProvider";
@@ -11,6 +11,19 @@ function effectiveTheme(): Theme {
   const chosen = document.documentElement.dataset.theme;
   if (chosen === "light" || chosen === "dark") return chosen;
   return window.matchMedia?.(darkQuery).matches ? "dark" : "light";
+}
+
+const themeChangeEvent = "opensurveillancedb-theme-change";
+
+/** Re-read on a system theme change or after a click (any tab-local toggle). */
+function subscribe(callback: () => void) {
+  const media = window.matchMedia?.(darkQuery);
+  media?.addEventListener?.("change", callback);
+  window.addEventListener(themeChangeEvent, callback);
+  return () => {
+    media?.removeEventListener?.("change", callback);
+    window.removeEventListener(themeChangeEvent, callback);
+  };
 }
 
 /**
@@ -26,21 +39,13 @@ function effectiveTheme(): Theme {
 export function ThemeToggle() {
   const { locale } = useLocale();
   const t = commonByLocale[locale];
-  const [dark, setDark] = useState(false);
-
-  useEffect(() => {
-    setDark(effectiveTheme() === "dark");
-    const media = window.matchMedia?.(darkQuery);
-    const sync = () => setDark(effectiveTheme() === "dark");
-    media?.addEventListener?.("change", sync);
-    return () => media?.removeEventListener?.("change", sync);
-  }, []);
+  const dark = useSyncExternalStore(subscribe, () => effectiveTheme() === "dark", () => false);
 
   const toggle = () => {
     const next: Theme = effectiveTheme() === "dark" ? "light" : "dark";
     document.documentElement.dataset.theme = next;
     document.cookie = `${THEME_COOKIE}=${next}; path=/; max-age=31536000; samesite=lax`;
-    setDark(next === "dark");
+    window.dispatchEvent(new Event(themeChangeEvent));
   };
 
   return (

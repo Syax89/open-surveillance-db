@@ -14,6 +14,22 @@ changes accumulate under `[Unreleased]`.
 
 ### Added
 
+- **Quattro nuove lingue e tema scuro (2026-11):** l'interfaccia, le pagine
+  legali (privacy, termini, licenze, accessibilità) e le email
+  transazionali sono ora disponibili anche in francese, tedesco, spagnolo e
+  portoghese (pt-PT), oltre a inglese e italiano. Le traduzioni vivono in
+  `app/lib/i18n/locales/<codice>/` e `app/lib/legal/<codice>.ts`, con
+  parità di chiavi verificata da `tsc`. Il selettore lingua è un menu
+  compatto (🌐 EN ▾) con il nome nativo di ogni lingua. Le email di verifica
+  e reset arrivano in inglese più la lingua che usava chi le ha richieste
+  (cookie di preferenza), non più in tutte le lingue. Tema scuro: segue
+  l'impostazione di sistema; il pulsante luna/sole lo fissa con il cookie
+  `opensurveillancedb-theme` letto dal layout server (niente lampo, niente
+  script inline). La palette scura ridefinisce i token colore, i pulsanti
+  pieni usano nuovi token di ruolo (`--on-accent`, `--*-fill`), le tile OSM
+  e i controlli Leaflet sono scuriti. Nell'elenco la fonte "Community
+  report" è ora tradotta.
+
 - **Auth.md agent registration (2026-08-22, isitagentready `authMd`):**
   `/auth.md` servita dal worker come documento Markdown self-contained per
   agenti AI: H1 `# auth.md`, audience, endpoint di registrazione

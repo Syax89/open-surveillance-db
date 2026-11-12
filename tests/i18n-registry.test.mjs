@@ -48,7 +48,7 @@ let LocaleToggle;
 const MOCK_THREE_LOCALES = [
   { code: "en", label: "EN", bcp47: "en-GB" },
   { code: "it", label: "IT", bcp47: "it-IT" },
-  { code: "de", label: "DE", bcp47: "de-DE" },
+  { code: "xx", label: "XX", bcp47: "xx-XX" },
 ];
 
 before(async () => {
@@ -113,14 +113,14 @@ test("resolution: resolveLocale accepts registered codes and falls back to the p
   const { resolveLocale, isLocale } = i18n;
   assert.equal(resolveLocale("en"), "en");
   assert.equal(resolveLocale("it"), "it");
-  assert.equal(resolveLocale("fr"), "en", "unknown code → pilot");
+  assert.equal(resolveLocale("xx"), "en", "unknown code → pilot");
   assert.equal(resolveLocale(""), "en", "empty string → pilot");
   assert.equal(resolveLocale(null), "en");
   assert.equal(resolveLocale(undefined), "en");
 
   assert.equal(isLocale("en"), true);
   assert.equal(isLocale("it"), true);
-  assert.equal(isLocale("fr"), false);
+  assert.equal(isLocale("xx"), false);
   assert.equal(isLocale(null), false);
 });
 
@@ -175,7 +175,7 @@ test("toggle: with a 3+ language mock registry it renders every entry (data-driv
   const buttons = screen.getAllByRole("button");
   assert.deepEqual(
     buttons.map((b) => b.textContent),
-    ["EN", "IT", "DE"],
+    ["EN", "IT", "XX"],
     "a third registry entry must produce a third button with zero component changes",
   );
   assert.equal(buttons[0].getAttribute("aria-pressed"), "true", "EN pressed by default");
@@ -185,7 +185,7 @@ test("toggle: with a 3+ language mock registry it renders every entry (data-driv
   // Clicking an unregistered mock locale must not break the store: it falls
   // back to the pilot (same contract as the invalid stored-value test).
   const user = rtl.userEvent.setup();
-  await user.click(screen.getByText("DE"));
+  await user.click(screen.getByText("XX"));
   assert.equal(document.documentElement.getAttribute("lang"), "en", "unknown locale falls back to the pilot");
   assert.equal(screen.getByText("EN").getAttribute("aria-pressed"), "true");
 });

@@ -1,5 +1,9 @@
 /**
- * English legal content — PILOT LANGUAGE.
+ * German legal content (de-DE).
+ *
+ * Mirror of the English pilot bundle (app/lib/legal/en.ts), pinned to the
+ * same `LegalContent` type, so missing/extra keys fail `tsc` (parity per
+ * ADR 0007 — English is the pilot language, German must mirror it).
  *
  * Web adaptation of the legal documents:
  *   - docs/TERMS_OF_USE.md          → terms
@@ -9,234 +13,232 @@
  * The repository copies of those documents remain the canonical source
  * of record; this file is the presentation layer for the public pages.
  * Inline markup: **bold** and [label](url) (see app/lib/legal/types.ts).
- * Italian mirror: app/lib/legal/it.ts (pinned to the same LegalContent
- * type, so missing/extra keys fail `tsc` — parity per ADR 0007).
  */
 import type { LegalContent } from "./types";
 
 export const deLegal: LegalContent = {
   privacy: {
-    eyebrow: "Legal · Privacy",
-    title: "Privacy notice",
+    eyebrow: "Rechtliches · Datenschutz",
+    title: "Datenschutzerklärung",
     intro:
-      "How OpenSurveillanceDB processes personal data, what we publish, what we never collect, and how you can exercise your rights under the GDPR.",
+      "Wie OpenSurveillanceDB personenbezogene Daten verarbeitet, was wir veröffentlichen, was wir niemals erheben und wie du deine Rechte nach der DSGVO ausüben kannst.",
     versionNote:
-      "Version 0.8 — 9 August 2026. Legal-audit alignment: re-synchronised with the canonical PRIVACY_NOTICE v0.14 (docs/legal/PRIVACY_NOTICE.md remains canonical). § 5 adds the Nominatim geocoding processor (PR6); § 7 documents the legacy `pending`/`rejected` hard-delete rules (R19/R20); § 10 Cookie section; OIDC processor references corrected to PR4/PR5; special-category note reworded to the text-only model (image evidence removed).",
+      "Version 0.8 — 9. August 2026. Abgleich mit der rechtlichen Prüfung: neu synchronisiert mit der kanonischen PRIVACY_NOTICE v0.14 (docs/legal/PRIVACY_NOTICE.md bleibt maßgeblich). § 5 ergänzt den Geocoding-Auftragsverarbeiter Nominatim (PR6); § 7 dokumentiert die Regeln zur endgültigen Löschung von Altdaten mit Status `pending`/`rejected` (R19/R20); § 10 Abschnitt zu Cookies; Verweise auf OIDC-Auftragsverarbeiter auf PR4/PR5 korrigiert; Hinweis zu besonderen Kategorien an das reine Textmodell angepasst (Bildnachweise entfernt).",
     sections: [
       {
-        heading: "1. Who we are (controller)",
+        heading: "1. Wer wir sind (Verantwortlicher)",
         blocks: [
           {
             type: "paragraph",
-            text: "**Controller:** Simone Rondina (syax89) / OpenSurveillanceDB — Italy.",
+            text: "**Verantwortlicher:** Simone Rondina (syax89) / OpenSurveillanceDB — Italien.",
           },
           {
             type: "paragraph",
-            text: "**Privacy contact:** [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) — a dedicated mailbox — for any question, data-subject request or report. First response within 48 hours, substantive response within 14 days.",
-          },
-        ],
-      },
-      {
-        heading: "2. What the service does",
-        blocks: [
-          {
-            type: "paragraph",
-            text: "OpenSurveillanceDB publishes a public-interest map of **visible, public surveillance infrastructure** (for example cameras mounted in public streets, squares, station exteriors), published immediately from verified contributor accounts and kept accurate by the community through confirmations, flags and automatic thresholds (ADR 0021). It is a civic-transparency project, not a commercial platform: no behavioural advertising, no tracking, no sale of data.",
+            text: "**Datenschutzkontakt:** [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) — ein eigenes Postfach — für alle Fragen, Anträge betroffener Personen oder Meldungen. Erste Antwort innerhalb von 48 Stunden, inhaltliche Antwort innerhalb von 14 Tagen.",
           },
         ],
       },
       {
-        heading: "3. What personal data we process",
+        heading: "2. Was der Dienst tut",
         blocks: [
           {
             type: "paragraph",
-            text: "The table below describes the personal data processed by the Service, its source, purpose and legal basis.",
+            text: "OpenSurveillanceDB veröffentlicht eine Karte im öffentlichen Interesse mit **sichtbarer, öffentlicher Überwachungsinfrastruktur** (zum Beispiel Kameras an öffentlichen Straßen, Plätzen oder an der Außenseite von Bahnhöfen). Die Einträge werden von verifizierten Konten sofort veröffentlicht und von der Community durch Bestätigungen, Meldungen und automatische Schwellen aktuell gehalten (ADR 0021). Es handelt sich um ein Projekt für zivilgesellschaftliche Transparenz, nicht um eine kommerzielle Plattform: keine verhaltensbasierte Werbung, kein Tracking, kein Verkauf von Daten.",
+          },
+        ],
+      },
+      {
+        heading: "3. Welche personenbezogenen Daten wir verarbeiten",
+        blocks: [
+          {
+            type: "paragraph",
+            text: "Die folgende Tabelle beschreibt die vom Dienst verarbeiteten personenbezogenen Daten, ihre Herkunft, ihren Zweck und ihre Rechtsgrundlage.",
           },
           {
             type: "table",
-            caption: "Personal data processed by the Service",
-            headers: ["Data", "Source", "Purpose", "Legal basis"],
+            caption: "Vom Dienst verarbeitete personenbezogene Daten",
+            headers: ["Daten", "Herkunft", "Zweck", "Rechtsgrundlage"],
             rows: [
               [
-                "Report content: location, description, optional manufacturer / observation date, private notes",
-                "Reporter (data subject)",
-                "Build the public record; community accuracy actions",
-                "Art. 6(1)(f) GDPR",
+                "Inhalt der Meldung: Standort, Beschreibung, optional Hersteller / Beobachtungsdatum, private Notizen",
+                "Meldende Person (betroffene Person)",
+                "Erstellung des öffentlichen Eintrags; Community-Aktionen zur Genauigkeit",
+                "Art. 6 Abs. 1 lit. f DSGVO",
               ],
               [
-                "Contributor pseudonymous internal ID + submission timestamp",
-                "Reporter",
-                "Abuse prevention, provenance",
-                "Art. 6(1)(f) GDPR",
+                "Pseudonyme interne ID der beitragenden Person + Zeitstempel der Einreichung",
+                "Meldende Person",
+                "Missbrauchsverhinderung, Herkunftsnachweis",
+                "Art. 6 Abs. 1 lit. f DSGVO",
               ],
               [
-                "Contributor account (email, optional display name, password hash)",
-                "Contributor (voluntary registration)",
-                "Login, attribution of submissions, abuse prevention",
-                "Art. 6(1)(f) GDPR — minimising: optional, pseudonymous handle, PBKDF2-SHA256 hashed password, never exposed in API responses",
+                "Konto der beitragenden Person (E-Mail, optionaler Anzeigename, Passwort-Hash)",
+                "Beitragende Person (freiwillige Registrierung)",
+                "Anmeldung, Zuordnung von Einreichungen, Missbrauchsverhinderung",
+                "Art. 6 Abs. 1 lit. f DSGVO — Datenminimierung: optionaler, pseudonymer Name, mit PBKDF2-SHA256 gehashtes Passwort, nie in API-Antworten offengelegt",
               ],
               [
-                "Session records (hashed token, CSRF token, timestamps)",
-                "The project (login)",
-                "Keep the contributor logged in; CSRF protection",
-                "Art. 6(1)(f) GDPR; token stored only as SHA-256, expires after 30 days or on logout",
+                "Sitzungsdaten (gehashtes Token, CSRF-Token, Zeitstempel)",
+                "Das Projekt (Anmeldung)",
+                "Angemeldet bleiben; CSRF-Schutz",
+                "Art. 6 Abs. 1 lit. f DSGVO; Token nur als SHA-256 gespeichert, läuft nach 30 Tagen oder bei Abmeldung ab",
               ],
               [
-                "Correction / takedown request (contact details the requester provides, e.g. email)",
-                "Requester",
-                "Exercise of rights, harm reports",
-                "Art. 6(1)(c) GDPR (Articles 15–22) and 6(1)(f)",
+                "Korrektur- / Löschantrag (von der antragstellenden Person angegebene Kontaktdaten, z. B. E-Mail)",
+                "Antragstellende Person",
+                "Ausübung von Rechten, Meldungen von Schäden",
+                "Art. 6 Abs. 1 lit. c DSGVO (Artikel 15–22) und Art. 6 Abs. 1 lit. f",
               ],
               [
-                "Community actions on records (action type `like` / `confirm` / `gone` / `problem` / `privacy`, weight snapshot, timestamp)",
-                "Contributor (verified account)",
-                "Dataset accuracy — community-driven moderation",
-                "Art. 6(1)(f) GDPR; one action per user per record (`UNIQUE(camera_id, contributor_id)`), weight snapshot at action time, **aggregates only in public payloads** — never attributed to any profile (ADR 0021 §3/§13)",
+                "Community-Aktionen zu Einträgen (Aktionstyp `like` / `confirm` / `gone` / `problem` / `privacy`, Momentaufnahme der Gewichtung, Zeitstempel)",
+                "Beitragende Person (verifiziertes Konto)",
+                "Genauigkeit des Datensatzes — von der Community getragene Moderation",
+                "Art. 6 Abs. 1 lit. f DSGVO; eine Aktion pro Person und Eintrag (`UNIQUE(camera_id, contributor_id)`), Momentaufnahme der Gewichtung zum Zeitpunkt der Aktion, **in öffentlichen Daten nur aggregiert** — nie einem Profil zugeordnet (ADR 0021 §3/§13)",
               ],
               [
-                "OIDC identity attributes (provider, subject id, display name, verified flag — never the email)",
-                "GitHub / Google (identity provider — only if you choose that method)",
-                "Optional contributor sign-in; account linking to the contributor",
-                "Art. 6(1)(f) GDPR; no email imported; the provider observes the sign-in and the IP (§ 5/§ 6)",
+                "OIDC-Identitätsattribute (Anbieter, Subject-ID, Anzeigename, Verifizierungskennzeichen — nie die E-Mail)",
+                "GitHub / Google (Identitätsanbieter — nur wenn du diese Methode wählst)",
+                "Optionale Anmeldung für Beitragende; Verknüpfung mit dem Konto der beitragenden Person",
+                "Art. 6 Abs. 1 lit. f DSGVO; keine E-Mail importiert; der Anbieter sieht die Anmeldung und die IP-Adresse (§ 5/§ 6)",
               ],
               [
-                "Moderation audit entries (decision, reason code, timestamp, reviewer pseudonym)",
-                "The project",
-                "Accountability; historical appeals closed by migration (ADR 0021 §7)",
-                "Art. 6(1)(f) GDPR; never public (aggregate transparency reports only)",
+                "Einträge im Moderations-Audit (Entscheidung, Begründungscode, Zeitstempel, Pseudonym der prüfenden Person)",
+                "Das Projekt",
+                "Rechenschaftspflicht; historische Einsprüche durch Migration abgeschlossen (ADR 0021 §7)",
+                "Art. 6 Abs. 1 lit. f DSGVO; nie öffentlich (nur aggregierte Transparenzberichte)",
               ],
               [
-                "Published records",
-                "Published reports / official public sources",
-                "The public dataset (ODbL 1.0)",
-                "Art. 6(1)(f) / 6(1)(e) GDPR",
+                "Veröffentlichte Einträge",
+                "Veröffentlichte Meldungen / offizielle öffentliche Quellen",
+                "Der öffentliche Datensatz (ODbL 1.0)",
+                "Art. 6 Abs. 1 lit. f / Art. 6 Abs. 1 lit. e DSGVO",
               ],
             ],
           },
           {
             type: "note",
-            text: "**Records from official public sources:** where a record is republished from an official public source, the data was not obtained from the data subject. Source categories: public registers and transparency portals of public administrations (for example in Italy, D.Lgs. 33/2013 datasets), published public-authority documents, and other publicly accessible official sources. Such records are checked per record under the source's own legal regime.",
+            text: "**Einträge aus offiziellen öffentlichen Quellen:** Wird ein Eintrag aus einer offiziellen öffentlichen Quelle übernommen, wurden die Daten nicht bei der betroffenen Person erhoben. Kategorien von Quellen: öffentliche Register und Transparenzportale öffentlicher Verwaltungen (zum Beispiel in Italien Datensätze nach D.Lgs. 33/2013), veröffentlichte Dokumente von Behörden und andere öffentlich zugängliche offizielle Quellen. Solche Einträge werden einzeln nach dem für die jeweilige Quelle geltenden Rechtsrahmen geprüft.",
           },
           {
             type: "note",
-            text: "**Public per-record event history (ADR 0021 § 7):** every community transition (published, confirmed, liked, gone-flagged, hidden, removed, restored) is recorded in a **public lifecycle history without any attribution** — no contributor ids, emails, or IP-derived data in public rows. It is a transparency control of the controller, not a new collection of personal data (aggregates only).",
+            text: "**Öffentliche Ereignishistorie pro Eintrag (ADR 0021 § 7):** Jeder Übergang in der Community (veröffentlicht, bestätigt, als nützlich markiert, als nicht mehr vorhanden gemeldet, ausgeblendet, entfernt, wiederhergestellt) wird in einer **öffentlichen Lebenszyklus-Historie ohne jede Zuordnung** festgehalten — keine IDs von Beitragenden, keine E-Mails und keine aus IP-Adressen abgeleiteten Daten in öffentlichen Zeilen. Sie ist ein Transparenzinstrument des Verantwortlichen, keine neue Erhebung personenbezogener Daten (nur Aggregate).",
           },
           {
             type: "note",
-            text: "**Voluntary provision:** providing data for a report is **voluntary** — it is neither a statutory nor a contractual requirement. The only consequence of not providing it is that the report cannot be processed. There is no obligation to provide data, and no penalty for declining.",
+            text: "**Freiwillige Bereitstellung:** Die Angabe von Daten für eine Meldung ist **freiwillig** — sie ist weder gesetzlich noch vertraglich vorgeschrieben. Die einzige Folge einer Nichtangabe ist, dass die Meldung nicht bearbeitet werden kann. Es besteht keine Pflicht zur Angabe von Daten und es gibt keine Sanktion bei Verweigerung.",
           },
           {
             type: "note",
-            text: "**Special categories (Art. 9 GDPR):** none are intentionally collected. Records are **text metadata only** — the image-evidence feature was removed (2026-08-08, `photos` table dropped by migration 0043), so there is no media upload at all. Report text that carries incidental personal data (e.g. a name or a plate in the description) violates the content rules and is handled by community moderation and corrections.",
+            text: "**Besondere Kategorien (Art. 9 DSGVO):** Es werden keine absichtlich erhoben. Einträge bestehen **ausschließlich aus Text-Metadaten** — die Funktion für Bildnachweise wurde entfernt (2026-08-08, Tabelle `photos` durch Migration 0043 gelöscht), sodass es überhaupt keinen Medien-Upload gibt. Meldungstext mit beiläufig enthaltenen personenbezogenen Daten (z. B. ein Name oder ein Kennzeichen in der Beschreibung) verstößt gegen die Inhaltsregeln und wird durch die Community-Moderation und Korrekturen behandelt.",
           },
           {
             type: "note",
-            text: "**Children:** the service is addressed to adults. In Italy, submitting a report requires the age of consent for information-society services (14 years, art. 2-quinquies D.Lgs. 196/2003); other jurisdictions apply their own age thresholds.",
+            text: "**Kinder:** Der Dienst richtet sich an Erwachsene. In Italien setzt das Einreichen einer Meldung das Mindestalter für die Einwilligung bei Diensten der Informationsgesellschaft voraus (14 Jahre, Art. 2-quinquies D.Lgs. 196/2003); andere Rechtsordnungen wenden ihre eigenen Altersgrenzen an.",
           },
         ],
       },
       {
-        heading: "4. What we do NOT collect or publish",
+        heading: "4. Was wir NICHT erheben oder veröffentlichen",
         blocks: [
           {
             type: "list",
             items: [
-              "**No video, live streams, credentials, network information or control interfaces** — the project documents the *existence* of visible surveillance infrastructure, never its output or access.",
-              "**No private-home cameras** or cameras pointing into private interiors.",
-              "**No personal names, faces, vehicle plates or precise operational details.**",
-              "**No coordinates beyond zone-level precision:** published locations are rounded to **~4 decimal places (~10 m)**; the exact location stays in the database and is never published.",
-              "**No behavioural advertising, no tracking, no sale of data**, no analytics libraries.",
-              "Reports are published immediately from verified accounts and are part of the public dataset from the moment they are submitted. Content that violates the rules is withdrawn by the community or by a legal emergency, and withdrawn content is never re-published.",
+              "**Keine Videos, Live-Streams, Zugangsdaten, Netzwerkinformationen oder Steuerungsoberflächen** — das Projekt dokumentiert die *Existenz* sichtbarer Überwachungsinfrastruktur, nie deren Aufnahmen oder Zugänge.",
+              "**Keine Kameras an Privathäusern** und keine Kameras, die in private Innenräume gerichtet sind.",
+              "**Keine Namen, Gesichter, Kfz-Kennzeichen oder genauen betrieblichen Details.**",
+              "**Keine Koordinaten, die genauer als auf Zonenebene sind:** Veröffentlichte Standorte werden auf **ca. 4 Nachkommastellen (ca. 10 m)** gerundet; der genaue Standort bleibt in der Datenbank und wird nie veröffentlicht.",
+              "**Keine verhaltensbasierte Werbung, kein Tracking, kein Verkauf von Daten**, keine Analysebibliotheken.",
+              "Meldungen von verifizierten Konten werden sofort veröffentlicht und sind ab dem Moment der Einreichung Teil des öffentlichen Datensatzes. Inhalte, die gegen die Regeln verstoßen, werden von der Community oder im Rahmen eines rechtlichen Notfalls zurückgezogen, und zurückgezogene Inhalte werden nie erneut veröffentlicht.",
             ],
           },
         ],
       },
       {
-        heading: "5. Recipients and transfers",
+        heading: "5. Empfänger und Übermittlungen",
         blocks: [
           {
             type: "list",
             items: [
-              "**Cloudflare, Inc.** — hosting and database (Workers + D1). Processor (Art. 28) under the Cloudflare Data Processing Addendum (DPA v6.3, June 2025) incorporating **EU Standard Contractual Clauses (2021/914)**; Cloudflare is certified under the **EU–US Data Privacy Framework**. D1 is configured for EU residency.",
-              "**OpenStreetMap Foundation (Nominatim — nominatim.openstreetmap.org, processor PR6).** Geocoding for the report flow and record pages: forward place-name search (`GET /api/geocode`, up to 5 suggestions) and reverse coordinate→address (`GET /api/geocode/reverse`, report-form prefill). Only the query itself is sent — free-text place/address strings and coordinates rounded to ~4 decimals (~11 m); the reply (display address) is stored in the D1 cache (`geocode_reverse_cache`). **No personal data, no account data, no profiling, requestor data never sent or logged.** Usage respects the Nominatim policy: max **1 req/s**, identifying User-Agent, cache-first.",
-              "**GitHub, Inc. / Google LLC (OIDC identity providers — optional, only if you choose that method).** They are **independent controllers of their own authentication services** (their privacy policies apply at sign-in); no OpenSurveillanceDB data is sent to them — we only receive the identity attributes listed in § 3 (provider, subject id, display name, verified flag; never the email). The provider observes the sign-in and your IP. Never published, never logged.",
-              "**Publication itself:** published records become part of a public dataset licensed ODbL 1.0 and may be downloaded or exported (JSON/CSV/GeoJSON). Copies already downloaded cannot be recalled; withdrawn records are excluded from future exports.",
-              "No other recipients; no behavioural advertising; no analytics libraries.",
+              "**Cloudflare, Inc.** — Hosting und Datenbank (Workers + D1). Auftragsverarbeiter (Art. 28) auf Grundlage des Cloudflare Data Processing Addendum (DPA v6.3, Juni 2025), das die **EU-Standardvertragsklauseln (2021/914)** einbezieht; Cloudflare ist nach dem **Datenschutzrahmen EU-USA (EU–US Data Privacy Framework)** zertifiziert. D1 ist für die Datenhaltung in der EU konfiguriert.",
+              "**OpenStreetMap Foundation (Nominatim — nominatim.openstreetmap.org, Auftragsverarbeiter PR6).** Geocoding für den Meldeablauf und die Seiten der Einträge: Vorwärtssuche nach Ortsnamen (`GET /api/geocode`, bis zu 5 Vorschläge) und Rückwärtssuche Koordinaten→Adresse (`GET /api/geocode/reverse`, Vorbefüllung des Meldeformulars). Gesendet wird nur die Anfrage selbst — Freitext-Orts- bzw. Adressangaben und auf ca. 4 Nachkommastellen (ca. 11 m) gerundete Koordinaten; die Antwort (angezeigte Adresse) wird im D1-Cache (`geocode_reverse_cache`) gespeichert. **Keine personenbezogenen Daten, keine Kontodaten, kein Profiling; Daten der anfragenden Person werden nie gesendet oder protokolliert.** Die Nutzung entspricht der Nominatim-Richtlinie: höchstens **1 Anfrage/s**, identifizierender User-Agent, Cache zuerst.",
+              "**GitHub, Inc. / Google LLC (OIDC-Identitätsanbieter — optional, nur wenn du diese Methode wählst).** Sie sind **eigenständige Verantwortliche für ihre eigenen Authentifizierungsdienste** (bei der Anmeldung gelten ihre Datenschutzrichtlinien); es werden keine Daten von OpenSurveillanceDB an sie gesendet — wir erhalten nur die in § 3 aufgeführten Identitätsattribute (Anbieter, Subject-ID, Anzeigename, Verifizierungskennzeichen; nie die E-Mail). Der Anbieter sieht die Anmeldung und deine IP-Adresse. Nie veröffentlicht, nie protokolliert.",
+              "**Die Veröffentlichung selbst:** Veröffentlichte Einträge werden Teil eines öffentlichen, unter ODbL 1.0 lizenzierten Datensatzes und können heruntergeladen oder exportiert werden (JSON/CSV/GeoJSON). Bereits heruntergeladene Kopien können nicht zurückgerufen werden; zurückgezogene Einträge sind von künftigen Exporten ausgeschlossen.",
+              "Keine weiteren Empfänger; keine verhaltensbasierte Werbung; keine Analysebibliotheken.",
             ],
           },
         ],
       },
       {
-        heading: "6. International data transfers",
+        heading: "6. Internationale Datenübermittlungen",
         blocks: [
           {
             type: "list",
             items: [
-              "**Cloudflare:** transfers covered by the Cloudflare DPA incorporating **EU Standard Contractual Clauses (2021/914)**; supplementary measures assessed for US processing (encryption in transit, EU residency for D1).",
-              "**OIDC sign-in (GitHub/Google, if you choose that method):** identity attributes (provider, subject id, display name, verified flag) are exchanged with the provider's services at sign-in; the flow is governed by the provider's terms and privacy policy.",
+              "**Cloudflare:** Übermittlungen abgedeckt durch das Cloudflare-DPA, das die **EU-Standardvertragsklauseln (2021/914)** einbezieht; ergänzende Maßnahmen für die Verarbeitung in den USA wurden bewertet (Verschlüsselung bei der Übertragung, Datenhaltung in der EU für D1).",
+              "**OIDC-Anmeldung (GitHub/Google, wenn du diese Methode wählst):** Identitätsattribute (Anbieter, Subject-ID, Anzeigename, Verifizierungskennzeichen) werden bei der Anmeldung mit den Diensten des Anbieters ausgetauscht; der Ablauf unterliegt den Nutzungsbedingungen und der Datenschutzrichtlinie des Anbieters.",
             ],
           },
         ],
       },
       {
-        heading: "7. Retention",
+        heading: "7. Speicherdauer",
         blocks: [
           {
             type: "paragraph",
-            text: "Reports are published immediately and stay public while the community keeps confirming them; records withdrawn by the community or by a legal emergency are excluded from public outputs and follow the repository retention schedule (docs/legal/RETENTION_SCHEDULE.md). Correction requests and audit entries: 2 years. Operational logs: up to 12 months (aggregate). Backups: rotated by the provider (up to 30 days point-in-time recovery).",
+            text: "Meldungen werden sofort veröffentlicht und bleiben öffentlich, solange die Community sie weiter bestätigt; von der Community oder im Rahmen eines rechtlichen Notfalls zurückgezogene Einträge sind von öffentlichen Ausgaben ausgeschlossen und folgen dem Aufbewahrungsplan im Repository (docs/legal/RETENTION_SCHEDULE.md). Korrekturanträge und Audit-Einträge: 2 Jahre. Betriebsprotokolle: bis zu 12 Monate (aggregiert). Backups: vom Anbieter rotiert (bis zu 30 Tage Wiederherstellung zu einem beliebigen Zeitpunkt).",
           },
           {
             type: "paragraph",
-            text: "The detailed rules remain in the repository retention schedule (docs/legal/RETENTION_SCHEDULE.md), including: community data (R14) — community actions follow the account (active → erasure; actions cast on other records are deleted with the contributor, ADR 0021 § 13, and the public lifecycle history keeps only aggregates); authentication-method data (R15, ADR 0020) — email-verification tokens 24 hours, reset tokens 3 hours (single-use, deleted on use); passkeys and recovery codes while the account is active, hard-deleted at account erasure — nothing survives to link the account to a provider or a device; failed-login counters (R16), per-IP registration-cap log (R17) and the transactional-email log (R18) swept by the retention cron; demo records (R12) purged by the retention cron outside development.",
+            text: "Die detaillierten Regeln stehen weiterhin im Aufbewahrungsplan im Repository (docs/legal/RETENTION_SCHEDULE.md), darunter: Community-Daten (R14) — Community-Aktionen folgen dem Konto (aktiv → Löschung; Aktionen zu anderen Einträgen werden mit der beitragenden Person gelöscht, ADR 0021 § 13, und die öffentliche Lebenszyklus-Historie behält nur Aggregate); Daten der Authentifizierungsmethoden (R15, ADR 0020) — Tokens zur E-Mail-Bestätigung 24 Stunden, Tokens zum Zurücksetzen 3 Stunden (einmalig verwendbar, bei Verwendung gelöscht); Passkeys und Wiederherstellungscodes, solange das Konto aktiv ist, bei Löschung des Kontos endgültig gelöscht — nichts bleibt erhalten, das das Konto mit einem Anbieter oder einem Gerät verknüpfen könnte; Zähler fehlgeschlagener Anmeldungen (R16), Protokoll der Registrierungsgrenze pro IP (R17) und das Protokoll transaktionaler E-Mails (R18) werden vom Aufbewahrungs-Cron bereinigt; Demo-Einträge (R12) werden außerhalb der Entwicklung vom Aufbewahrungs-Cron entfernt.",
           },
           {
             type: "paragraph",
-            text: "The deletion and expiry rules are enforced automatically by the daily retention sweep (scheduled in `worker/index.ts`, daily at 03:00 UTC — RETENTION_SCHEDULE.md § 3): the cron deletes expired rows (R12/R16/R17/R18), hard-deletes legacy `pending` submissions 90 days after submission (**R19**) and legacy `rejected` records 30 days after the decision (**R20**, both skipped while an appeal is open or a legal hold is active), archives audit entries at the 2-year mark (R4/R5/R9), and never changes record lifecycle status of published records (community model, ADR 0021 § 2.2).",
+            text: "Die Lösch- und Ablaufregeln werden automatisch durch die tägliche Aufbewahrungsbereinigung durchgesetzt (geplant in `worker/index.ts`, täglich um 03:00 UTC — RETENTION_SCHEDULE.md § 3): Der Cron löscht abgelaufene Zeilen (R12/R16/R17/R18), löscht Alt-Einreichungen mit Status `pending` 90 Tage nach der Einreichung endgültig (**R19**) und Alt-Einträge mit Status `rejected` 30 Tage nach der Entscheidung (**R20**; beides wird übersprungen, solange ein Einspruch offen oder eine rechtliche Sperre aktiv ist), archiviert Audit-Einträge nach 2 Jahren (R4/R5/R9) und ändert nie den Lebenszyklus-Status veröffentlichter Einträge (Community-Modell, ADR 0021 § 2.2).",
           },
         ],
       },
       {
-        heading: "8. Your rights (GDPR Articles 15–22)",
+        heading: "8. Deine Rechte (Artikel 15–22 DSGVO)",
         blocks: [
           {
             type: "paragraph",
-            text: "You may request, free of charge:",
+            text: "Du kannst kostenlos Folgendes verlangen:",
           },
           {
             type: "list",
             items: [
-              "**Access** (Art. 15) — confirmation and copy of your data.",
-              "**Rectification** (Art. 16) — correction of inaccurate data.",
-              "**Erasure** (Art. 17) — deletion, subject to the exceptions in Art. 17(3) and the retention schedule.",
-              "**Restriction** (Art. 18) and **objection** (Art. 21).",
-              "**Portability** (Art. 20) — where technically applicable.",
-              "No automated decision-making, including profiling, is performed (Art. 22).",
+              "**Auskunft** (Art. 15) — Bestätigung und Kopie deiner Daten.",
+              "**Berichtigung** (Art. 16) — Korrektur unrichtiger Daten.",
+              "**Löschung** (Art. 17) — vorbehaltlich der Ausnahmen in Art. 17 Abs. 3 und des Aufbewahrungsplans.",
+              "**Einschränkung der Verarbeitung** (Art. 18) und **Widerspruch** (Art. 21).",
+              "**Datenübertragbarkeit** (Art. 20) — soweit technisch anwendbar.",
+              "Es findet keine automatisierte Entscheidungsfindung einschließlich Profiling statt (Art. 22).",
             ],
           },
           {
             type: "paragraph",
-            text: "**How to exercise them:** write to [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org). To protect data subjects, we may ask you to verify your identity, proportionately to the request.",
+            text: "**So übst du sie aus:** Schreibe an [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org). Zum Schutz der betroffenen Personen können wir dich bitten, deine Identität in einem dem Antrag angemessenen Umfang nachzuweisen.",
           },
           {
             type: "paragraph",
-            text: "**Timeline:** we respond within **1 month** (Art. 12(3)); this may be extended by up to 2 further months for complex requests, with notice. If we refuse, we explain why and remind you of your right to complain.",
+            text: "**Fristen:** Wir antworten innerhalb von **1 Monat** (Art. 12 Abs. 3); bei komplexen Anträgen kann diese Frist mit Mitteilung um bis zu 2 weitere Monate verlängert werden. Lehnen wir ab, erklären wir die Gründe und weisen dich auf dein Beschwerderecht hin.",
           },
           {
             type: "paragraph",
-            text: "**Complaints:** you may complain to the competent supervisory authority — in Italy, the [Garante per la protezione dei dati personali](https://www.garanteprivacy.it).",
+            text: "**Beschwerden:** Du kannst dich bei der zuständigen Aufsichtsbehörde beschweren — in Italien beim [Garante per la protezione dei dati personali](https://www.garanteprivacy.it).",
           },
         ],
       },
       {
-        heading: "9. Contact and monitoring",
+        heading: "9. Kontakt und Überprüfung",
         blocks: [
           {
             type: "paragraph",
-            text: "Privacy contact: [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) — first response within 48 hours, substantive response within 14 days.",
+            text: "Datenschutzkontakt: [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) — erste Antwort innerhalb von 48 Stunden, inhaltliche Antwort innerhalb von 14 Tagen.",
           },
           {
             type: "paragraph",
-            text: "This notice is reviewed at least annually, or on any material change; the version history is kept in the repository.",
+            text: "Diese Erklärung wird mindestens einmal jährlich oder bei jeder wesentlichen Änderung überprüft; die Versionshistorie wird im Repository geführt.",
           },
         ],
       },
@@ -245,31 +247,31 @@ export const deLegal: LegalContent = {
         blocks: [
           {
             type: "paragraph",
-            text: "OpenSurveillanceDB uses a single functional cookie:",
+            text: "OpenSurveillanceDB verwendet ein einziges funktionales Cookie:",
           },
           {
             type: "paragraph",
-            text: "**opensurveillancedb-locale** — remembers the language you selected on this device/browser (Italian or English). It is set **only when you change the language**; it is never used to track you.",
+            text: "**opensurveillancedb-locale** — speichert die Sprache, die du auf diesem Gerät/in diesem Browser gewählt hast (Italienisch oder Englisch). Es wird **nur gesetzt, wenn du die Sprache änderst**; es wird nie verwendet, um dich zu verfolgen.",
           },
           {
             type: "list",
             items: [
-              "**Type:** functional — strictly necessary to provide the language preference you explicitly requested",
-              "**Purpose:** persist your interface language",
-              "**Duration:** 1 year (`max-age=31536000`)",
-              "**Content:** none of your data — a plain language code (`it` / `en`)",
-              "**Properties:** `SameSite=Lax`, `path=/`, not readable cross-site (no tracking or session surface)",
-              "**Legal basis:** art. 122 D.Lgs. 196/2003 (transposing art. 5(3) of Directive 2002/58/EC as amended by 2009/136/EC) — consent is **not** required for cookies strictly necessary to provide a service explicitly requested by the user, so no consent banner is shown.",
-              "**Managing it:** you can delete it at any time from your browser settings; without it the interface defaults to the pilot language (English) on this device.",
+              "**Art:** funktional — unbedingt erforderlich, um die von dir ausdrücklich gewünschte Spracheinstellung bereitzustellen",
+              "**Zweck:** Speicherung deiner Oberflächensprache",
+              "**Dauer:** 1 Jahr (`max-age=31536000`)",
+              "**Inhalt:** keine deiner Daten — ein einfacher Sprachcode (`it` / `en`)",
+              "**Eigenschaften:** `SameSite=Lax`, `path=/`, nicht seitenübergreifend lesbar (keine Angriffsfläche für Tracking oder Sitzungen)",
+              "**Rechtsgrundlage:** Art. 122 D.Lgs. 196/2003 (zur Umsetzung von Art. 5 Abs. 3 der Richtlinie 2002/58/EG in der durch die Richtlinie 2009/136/EG geänderten Fassung) — für Cookies, die unbedingt erforderlich sind, um einen ausdrücklich von der nutzenden Person gewünschten Dienst bereitzustellen, ist **keine** Einwilligung erforderlich; daher wird kein Einwilligungsbanner angezeigt.",
+              "**Verwaltung:** Du kannst es jederzeit in deinen Browsereinstellungen löschen; ohne das Cookie wird die Oberfläche auf diesem Gerät standardmäßig in der Pilotsprache (Englisch) angezeigt.",
             ],
           },
           {
             type: "paragraph",
-            text: "The same preference is mirrored in your browser's `localStorage` for multi-tab synchronisation. `localStorage` is a browser storage technology, not a cookie, and is never transmitted to our servers.",
+            text: "Dieselbe Einstellung wird zur Synchronisierung zwischen mehreren Tabs im `localStorage` deines Browsers gespiegelt. `localStorage` ist eine Speichertechnologie des Browsers, kein Cookie, und wird nie an unsere Server übertragen.",
           },
           {
             type: "note",
-            text: "**Commitment:** if the redesign or any future feature introduces cookies that are not strictly necessary (analytics, advertising, profiling), we will ask for your explicit consent through a banner **before** installing them, in accordance with art. 122 D.Lgs. 196/2003.",
+            text: "**Verpflichtung:** Sollte die Neugestaltung oder eine künftige Funktion Cookies einführen, die nicht unbedingt erforderlich sind (Analyse, Werbung, Profiling), holen wir **vor** deren Setzen über ein Banner deine ausdrückliche Einwilligung ein, gemäß Art. 122 D.Lgs. 196/2003.",
           },
         ],
       },
@@ -277,229 +279,229 @@ export const deLegal: LegalContent = {
   },
 
   terms: {
-    eyebrow: "Legal · Terms of use",
-    title: "Terms of use",
+    eyebrow: "Rechtliches · Nutzungsbedingungen",
+    title: "Nutzungsbedingungen",
     intro:
-      "These terms govern the use of OpenSurveillanceDB, the open, community-maintained database of visible public surveillance infrastructure. They apply to the web application, the public API, the data exports and related services (\"the Service\").",
+      "Diese Bedingungen regeln die Nutzung von OpenSurveillanceDB, der offenen, von der Community gepflegten Datenbank sichtbarer öffentlicher Überwachungsinfrastruktur. Sie gelten für die Webanwendung, die öffentliche API, die Datenexporte und zugehörige Dienste („der Dienst“).",
     versionNote:
-      "Version 0.5 — 8 August 2026. Current-state alignment (template-ready): re-synchronised with the canonical TERMS_OF_USE v0.8 (docs/TERMS_OF_USE.md remains canonical). § 3.7 authentication disclosure (email verification for write access, passkeys, OIDC — ADR 0020, server-gated); § 5 immediate publication and community actions; § 6 private corrections and the legal-emergency power; image evidence removed (2026-08-08).",
+      "Version 0.5 — 8. August 2026. Abgleich mit dem aktuellen Stand (vorlagenbereit): neu synchronisiert mit den kanonischen TERMS_OF_USE v0.8 (docs/TERMS_OF_USE.md bleibt maßgeblich). § 3.7 Hinweise zur Authentifizierung (E-Mail-Bestätigung für Schreibzugriff, Passkeys, OIDC — ADR 0020, serverseitig abgesichert); § 5 sofortige Veröffentlichung und Community-Aktionen; § 6 private Korrekturen und die Befugnis für rechtliche Notfälle; Bildnachweise entfernt (2026-08-08).",
     sections: [
       {
-        heading: "1. Who we are",
+        heading: "1. Wer wir sind",
         blocks: [
           {
             type: "paragraph",
-            text: "**Controller / operator:** Simone Rondina (syax89) / OpenSurveillanceDB — Italy.",
+            text: "**Verantwortlicher / Betreiber:** Simone Rondina (syax89) / OpenSurveillanceDB — Italien.",
           },
           {
             type: "paragraph",
-            text: "**Contact:** [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) — a dedicated mailbox — for any question, correction, removal or privacy request. Response times: first response within 48 hours, substantive decision within 14 days.",
+            text: "**Kontakt:** [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) — ein eigenes Postfach — für alle Fragen, Korrekturen, Entfernungs- oder Datenschutzanfragen. Antwortzeiten: erste Antwort innerhalb von 48 Stunden, inhaltliche Entscheidung innerhalb von 14 Tagen.",
           },
         ],
       },
       {
-        heading: "2. What these terms cover",
+        heading: "2. Geltungsbereich dieser Bedingungen",
         blocks: [
           {
             type: "list",
             ordered: true,
             items: [
-              "OpenSurveillanceDB is a **non-commercial, community-governed civic-transparency project** documenting **visible public surveillance infrastructure** (for example cameras mounted in public streets, squares, station exteriors). It is free to use: no ads, no behavioural profiling, no sale of data.",
-              "By using the Service you accept these terms. If you **submit a report**, you additionally accept the submission obligations in section 5.",
-              "The Service does not provide video feeds, tracking tools, access to private cameras, or advice on avoiding lawful surveillance.",
+              "OpenSurveillanceDB ist ein **nicht-kommerzielles, von der Community getragenes Projekt für zivilgesellschaftliche Transparenz**, das **sichtbare öffentliche Überwachungsinfrastruktur** dokumentiert (zum Beispiel Kameras an öffentlichen Straßen, Plätzen oder an der Außenseite von Bahnhöfen). Die Nutzung ist kostenlos: keine Werbung, kein verhaltensbasiertes Profiling, kein Verkauf von Daten.",
+              "Mit der Nutzung des Dienstes akzeptierst du diese Bedingungen. Wenn du **eine Meldung einreichst**, akzeptierst du zusätzlich die Pflichten für Einreichungen in Abschnitt 5.",
+              "Der Dienst bietet keine Videobilder, keine Tracking-Werkzeuge, keinen Zugang zu privaten Kameras und keine Tipps, wie man rechtmäßiger Überwachung ausweicht.",
             ],
           },
         ],
       },
       {
-        heading: "3. Permitted use of the Service",
+        heading: "3. Erlaubte Nutzung des Dienstes",
         blocks: [
           {
             type: "list",
             ordered: true,
             items: [
-              "**Consultation:** browse the map, the record directory and individual record pages; search and read the public dataset.",
-              "**Exports:** download public data via the JSON/CSV/GeoJSON exports and the public API, and reuse it, subject to the ODbL 1.0 licence (section 7) and to the abuse limits in section 4.",
-              "**Reports:** submit observations of visible public surveillance infrastructure. A report from a verified account is **published immediately** and is part of the public dataset from submission (section 5).",
-              "**Lawful purposes:** the data may be used for research, journalism, civic advocacy, and any purpose consistent with these terms and with the ODbL 1.0 licence. Browsing the public data never requires an account. Submitting a report or a correction requires a verified contributor account (section 3.5; ADR 0020), and every submission is attributed to it through a **pseudonymous internal ID** — never a real-name requirement.",
-              "**Authentication methods (multi-method, ADR 0020).** Contributor accounts support **three methods**, and you choose: **(a) email + password** — the baseline, with **email verification required for write access** (single-use link, 24 h; until you verify, your session is read-only); **(b) passkeys (WebAuthn)** — optional, passwordless; **(c) OIDC via GitHub or Google** — optional, opt-in. The rules:",
+              "**Einsicht:** die Karte, das Verzeichnis der Einträge und einzelne Eintragsseiten durchsuchen; den öffentlichen Datensatz durchsuchen und lesen.",
+              "**Exporte:** öffentliche Daten über die Exporte in JSON/CSV/GeoJSON und die öffentliche API herunterladen und weiterverwenden, vorbehaltlich der Lizenz ODbL 1.0 (Abschnitt 7) und der Missbrauchsgrenzen in Abschnitt 4.",
+              "**Meldungen:** Beobachtungen sichtbarer öffentlicher Überwachungsinfrastruktur einreichen. Eine Meldung von einem verifizierten Konto wird **sofort veröffentlicht** und ist ab der Einreichung Teil des öffentlichen Datensatzes (Abschnitt 5).",
+              "**Rechtmäßige Zwecke:** Die Daten dürfen für Forschung, Journalismus, zivilgesellschaftliches Engagement und alle Zwecke verwendet werden, die mit diesen Bedingungen und der Lizenz ODbL 1.0 vereinbar sind. Für das Durchsuchen der öffentlichen Daten ist nie ein Konto erforderlich. Für das Einreichen einer Meldung oder Korrektur ist ein verifiziertes Konto erforderlich (Abschnitt 3.5; ADR 0020), und jede Einreichung wird ihm über eine **pseudonyme interne ID** zugeordnet — eine Pflicht zum Klarnamen besteht nie.",
+              "**Authentifizierungsmethoden (mehrere Methoden, ADR 0020).** Konten von Beitragenden unterstützen **drei Methoden**, und du wählst: **(a) E-Mail + Passwort** — die Grundlage, wobei für **Schreibzugriff eine E-Mail-Bestätigung erforderlich ist** (einmalig verwendbarer Link, 24 h; bis zur Bestätigung ist deine Sitzung schreibgeschützt); **(b) Passkeys (WebAuthn)** — optional, ohne Passwort; **(c) OIDC über GitHub oder Google** — optional, nur auf eigenen Wunsch. Die Regeln:",
             ],
           },
           {
             type: "list",
             items: [
-              "**Email verification.** After registration you must verify the email address before you can submit, edit or verify records; until then your session is read-only. Verification and password-reset emails are sent through Cloudflare Email Routing with no tracking content. One email address = one account; keep it accessible if you lose your password.",
-              "**Passkeys.** If you enroll a passkey, the site stores only public-key material; the private key stays on your device. **Vendor note:** *synced* passkeys are backed up through the OS vendor's cloud (Apple/Google/Microsoft) at your choice — the vendor learns you have an account here, the site shares nothing with them, and you control sync. Keep the 10 recovery codes issued at enrollment in a safe place; without them, a lost device may mean losing access to the passkey method (the email+password path remains).",
-              "**OIDC via GitHub/Google — tracking disclosure.** Signing in with GitHub or Google means **GitHub or Google observes that you sign in to this Service, and your IP address**, at each login; the provider's own terms and privacy policy apply at sign-in. We **do not import your email** from the provider (subject id, display name and verified flag only) and we never merge accounts automatically on an email match — a conflict requires a manual, verified merge. This method is **opt-in and disclosed** (risk matrix on the login page); the buttons are shown only when the operator has activated the provider (credentials configured on this deployment).",
-              "You may add, change or remove methods from your account page at any time; deleting your account deletes the data of every method (privacy notice § 7 R15, § 8).",
+              "**E-Mail-Bestätigung.** Nach der Registrierung musst du die E-Mail-Adresse bestätigen, bevor du Einträge einreichen, bearbeiten oder bestätigen kannst; bis dahin ist deine Sitzung schreibgeschützt. E-Mails zur Bestätigung und zum Zurücksetzen des Passworts werden über Cloudflare Email Routing ohne Tracking-Inhalte versendet. Eine E-Mail-Adresse = ein Konto; halte sie erreichbar, falls du dein Passwort verlierst.",
+              "**Passkeys.** Wenn du einen Passkey registrierst, speichert die Website nur Material des öffentlichen Schlüssels; der private Schlüssel bleibt auf deinem Gerät. **Hinweis zu Anbietern:** *Synchronisierte* Passkeys werden nach deiner Wahl über die Cloud des Betriebssystemanbieters (Apple/Google/Microsoft) gesichert — der Anbieter erfährt, dass du hier ein Konto hast, die Website teilt nichts mit ihm, und du kontrollierst die Synchronisierung. Bewahre die 10 bei der Registrierung ausgegebenen Wiederherstellungscodes sicher auf; ohne sie kann ein verlorenes Gerät bedeuten, dass du den Zugang über die Passkey-Methode verlierst (der Weg über E-Mail + Passwort bleibt bestehen).",
+              "**OIDC über GitHub/Google — Hinweis zum Tracking.** Wenn du dich mit GitHub oder Google anmeldest, **sieht GitHub bzw. Google bei jeder Anmeldung, dass du dich bei diesem Dienst anmeldest, sowie deine IP-Adresse**; bei der Anmeldung gelten die Nutzungsbedingungen und die Datenschutzrichtlinie des Anbieters. Wir **importieren deine E-Mail nicht** vom Anbieter (nur Subject-ID, Anzeigename und Verifizierungskennzeichen) und führen Konten nie automatisch anhand einer übereinstimmenden E-Mail zusammen — ein Konflikt erfordert eine manuelle, verifizierte Zusammenführung. Diese Methode ist **freiwillig und offengelegt** (Risikomatrix auf der Anmeldeseite); die Schaltflächen werden nur angezeigt, wenn der Betreiber den Anbieter aktiviert hat (Zugangsdaten auf dieser Installation konfiguriert).",
+              "Du kannst Methoden jederzeit auf deiner Kontoseite hinzufügen, ändern oder entfernen; die Löschung deines Kontos löscht die Daten aller Methoden (Datenschutzerklärung § 7 R15, § 8).",
             ],
           },
         ],
       },
       {
-        heading: "4. What you may not do",
+        heading: "4. Was du nicht tun darfst",
         blocks: [
           {
             type: "paragraph",
-            text: "**Prohibited content.** The exclusions of the publication rules apply to everything you send, including reports and notes. In particular, do not submit:",
+            text: "**Verbotene Inhalte.** Die Ausschlüsse der Veröffentlichungsregeln gelten für alles, was du sendest, einschließlich Meldungen und Notizen. Reiche insbesondere Folgendes nicht ein:",
           },
           {
             type: "list",
             items: [
-              "residential or private cameras, including doorbells and cameras facing a private home;",
-              "live video, stream URLs, credentials, network information, or control interfaces;",
-              "detailed field-of-view or operational capability that could create a safety risk;",
-              "sensitive facilities or locations where publication could materially increase risk;",
-              "unverifiable allegations about people or organisations;",
-              "content you are not entitled to share.",
+              "Kameras an Wohnhäusern oder private Kameras, einschließlich Türklingeln und Kameras, die auf ein Privathaus gerichtet sind;",
+              "Live-Videos, Stream-URLs, Zugangsdaten, Netzwerkinformationen oder Steuerungsoberflächen;",
+              "detailliertes Sichtfeld oder betriebliche Fähigkeiten, die ein Sicherheitsrisiko schaffen könnten;",
+              "sensible Einrichtungen oder Orte, bei denen eine Veröffentlichung das Risiko erheblich erhöhen könnte;",
+              "nicht überprüfbare Behauptungen über Personen oder Organisationen;",
+              "Inhalte, die du nicht teilen darfst.",
             ],
           },
           {
             type: "paragraph",
-            text: "**No unnecessary personal data.** Reports and notes must not contain personal data that does not serve the public record (data minimisation).",
+            text: "**Keine unnötigen personenbezogenen Daten.** Meldungen und Notizen dürfen keine personenbezogenen Daten enthalten, die nicht dem öffentlichen Eintrag dienen (Datenminimierung).",
           },
           {
             type: "paragraph",
-            text: "**No abuse.** Do not exceed the applicable rate limits, do not scrape the Service beyond reasonable personal use, do not attempt to access non-public records (withdrawn records, correction requests), and do not circumvent access controls or use the Service to harass or facilitate harm.",
+            text: "**Kein Missbrauch.** Überschreite nicht die geltenden Ratenbegrenzungen, scrape den Dienst nicht über eine angemessene persönliche Nutzung hinaus, versuche nicht, auf nicht öffentliche Einträge zuzugreifen (zurückgezogene Einträge, Korrekturanträge), umgehe keine Zugriffskontrollen und nutze den Dienst nicht, um andere zu belästigen oder Schaden zu ermöglichen.",
           },
           {
             type: "paragraph",
-            text: "**No commercial resale of the Service itself.** Reuse of the *data* under ODbL 1.0 (including commercial reuse) remains permitted; this clause concerns reselling the Service as a product.",
+            text: "**Kein kommerzieller Weiterverkauf des Dienstes selbst.** Die Weiterverwendung der *Daten* unter ODbL 1.0 (einschließlich kommerzieller Weiterverwendung) bleibt erlaubt; diese Klausel betrifft den Weiterverkauf des Dienstes als Produkt.",
           },
         ],
       },
       {
-        heading: "5. Reports and publication",
+        heading: "5. Meldungen und Veröffentlichung",
         blocks: [
           {
             type: "list",
             ordered: true,
             items: [
-              "**Immediate publication.** A report from a verified contributor is published immediately: it enters the public dataset as soon as it is submitted. There is no review queue and no waiting. The community keeps the directory accurate: records are confirmed, flagged as no longer present, marked useful, or withdrawn through automatic thresholds (ADR 0021). A record can be hidden or removed at any time by enough community signals, or by a legal-emergency decision; withdrawn records stay reachable by direct link with a banner and a public event history, and can be restored by enough confirmations.",
-              "**What you keep and what you grant.** You retain whatever rights you have in the content you submit. By submitting, you grant the project a non-exclusive, worldwide, royalty-free licence to store, review and publish the report as part of the open database, made available under **ODbL 1.0**, with attribution to contributors per the ODbL notice. Publication happens at submission, not after an approval step.",
-              "**Your warranties.** By submitting you confirm that: the content is accurate to the best of your knowledge; you are entitled to share it; it complies with section 4; and you meet the minimum age for using the Service in your jurisdiction (in Italy, 14 years).",
-              "**Community accuracy.** Records republished from official public sources follow their own legal regime, checked per record; community reports are kept accurate by the community's confirmations and flags under the automatic thresholds, not against official registers.",
+              "**Sofortige Veröffentlichung.** Eine Meldung von einer verifizierten beitragenden Person wird sofort veröffentlicht: Sie wird Teil des öffentlichen Datensatzes, sobald sie eingereicht ist. Es gibt keine Prüfwarteschlange und keine Wartezeit. Die Community hält das Verzeichnis aktuell: Einträge werden bestätigt, als nicht mehr vorhanden gemeldet, als nützlich markiert oder über automatische Schwellen zurückgezogen (ADR 0021). Ein Eintrag kann jederzeit durch ausreichend viele Community-Signale oder durch eine Entscheidung im rechtlichen Notfall ausgeblendet oder entfernt werden; zurückgezogene Einträge bleiben über einen direkten Link mit einem Hinweisbanner und einer öffentlichen Ereignishistorie erreichbar und können durch ausreichend viele Bestätigungen wiederhergestellt werden.",
+              "**Was du behältst und was du einräumst.** Du behältst alle Rechte, die du an den eingereichten Inhalten hast. Mit der Einreichung räumst du dem Projekt eine nicht ausschließliche, weltweite, unentgeltliche Lizenz ein, die Meldung als Teil der offenen Datenbank zu speichern, zu prüfen und zu veröffentlichen, die unter **ODbL 1.0** bereitgestellt wird, mit Namensnennung der Beitragenden gemäß dem ODbL-Hinweis. Die Veröffentlichung erfolgt bei der Einreichung, nicht nach einem Genehmigungsschritt.",
+              "**Deine Zusicherungen.** Mit der Einreichung bestätigst du, dass: die Inhalte nach bestem Wissen zutreffend sind; du berechtigt bist, sie zu teilen; sie Abschnitt 4 entsprechen; und du das Mindestalter für die Nutzung des Dienstes in deiner Rechtsordnung erreicht hast (in Italien 14 Jahre).",
+              "**Genauigkeit durch die Community.** Aus offiziellen öffentlichen Quellen übernommene Einträge folgen ihrem eigenen Rechtsrahmen und werden einzeln geprüft; Meldungen der Community werden durch Bestätigungen und Meldungen der Community nach den automatischen Schwellen aktuell gehalten, nicht durch Abgleich mit offiziellen Registern.",
             ],
           },
         ],
       },
       {
-        heading: "6. Community actions, corrections, legal emergencies",
+        heading: "6. Community-Aktionen, Korrekturen, rechtliche Notfälle",
         blocks: [
           {
             type: "list",
             ordered: true,
             items: [
-              "**Community actions.** Any verified account can mark a record useful, confirm it is still present, flag it as no longer present, or raise a problem or privacy concern. One account, one active action per record. Automatic thresholds — including a deliberately low privacy threshold — decide when a record is hidden or removed; every transition is recorded in the record's public history without attribution to any profile.",
-              "**Corrections.** Any person may request a correction or removal via the private correction form (home page, \"Report a problem / correction\" section) or [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org). Requests are private, reviewed by a person, and never change the map automatically. Response targets: first response within **48 hours**, substantive response within **14 days**; legal-emergency hides are immediate.",
-              "**Legal emergencies.** The only human write power left is the administrator's legal-emergency hide or removal, used when the law requires it and reviewed retrospectively. Administrators cannot restore or un-hide unilaterally: the community consensus of section 5 is the only reversal path.",
-              "Data-subject rights (access, rectification, erasure, restriction, objection, portability) are described in the [privacy notice](/privacy) and exercised through the same contact.",
+              "**Community-Aktionen.** Jedes verifizierte Konto kann einen Eintrag als nützlich markieren, bestätigen, dass er noch vorhanden ist, ihn als nicht mehr vorhanden melden oder ein Problem bzw. ein Datenschutzanliegen melden. Ein Konto, eine aktive Aktion pro Eintrag. Automatische Schwellen — darunter eine bewusst niedrige Datenschutzschwelle — entscheiden, wann ein Eintrag ausgeblendet oder entfernt wird; jeder Übergang wird ohne Zuordnung zu einem Profil in der öffentlichen Historie des Eintrags festgehalten.",
+              "**Korrekturen.** Jede Person kann über das private Korrekturformular (Startseite, Abschnitt „Problem melden / Korrektur“) oder über [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) eine Korrektur oder Entfernung beantragen. Anträge sind privat, werden von einem Menschen geprüft und ändern die Karte nie automatisch. Antwortziele: erste Antwort innerhalb von **48 Stunden**, inhaltliche Antwort innerhalb von **14 Tagen**; Ausblendungen bei rechtlichen Notfällen erfolgen sofort.",
+              "**Rechtliche Notfälle.** Die einzige verbleibende menschliche Schreibbefugnis ist das Ausblenden oder Entfernen durch eine Administratorin oder einen Administrator im rechtlichen Notfall, das eingesetzt wird, wenn das Gesetz es verlangt, und nachträglich überprüft wird. Administratoren können Einträge nicht eigenmächtig wiederherstellen oder wieder einblenden: Der Community-Konsens nach Abschnitt 5 ist der einzige Weg zur Rücknahme.",
+              "Die Rechte betroffener Personen (Auskunft, Berichtigung, Löschung, Einschränkung, Widerspruch, Datenübertragbarkeit) sind in der [Datenschutzerklärung](/privacy) beschrieben und werden über denselben Kontakt ausgeübt.",
             ],
           },
         ],
       },
       {
-        heading: "7. Licences",
+        heading: "7. Lizenzen",
         blocks: [
           {
             type: "list",
             ordered: true,
             items: [
-              "**Data:** the public database and its exports are licensed under **[ODbL 1.0](https://opendatacommons.org/licenses/odbl/)** — reuse is permitted, including commercially, provided you attribute the database and, if you create a derivative database, you share it under ODbL 1.0. Exports carry the ODbL notice. Illustrative demo records are part of the licensed database.",
-              "**Software:** the application source code is licensed under **[AGPL-3.0-or-later](https://www.gnu.org/licenses/agpl-3.0.html)**.",
-              "**Documentation:** project documentation is proposed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).",
-              "**OpenStreetMap:** map background data is used under the OSM/ODbL terms; OSM attribution requirements apply.",
+              "**Daten:** Die öffentliche Datenbank und ihre Exporte sind unter **[ODbL 1.0](https://opendatacommons.org/licenses/odbl/)** lizenziert — die Weiterverwendung ist erlaubt, auch kommerziell, sofern du die Datenbank nennst und eine abgeleitete Datenbank, falls du eine erstellst, unter ODbL 1.0 weitergibst. Exporte enthalten den ODbL-Hinweis. Beispielhafte Demo-Einträge sind Teil der lizenzierten Datenbank.",
+              "**Software:** Der Quellcode der Anwendung ist unter **[AGPL-3.0-or-later](https://www.gnu.org/licenses/agpl-3.0.html)** lizenziert.",
+              "**Dokumentation:** Die Projektdokumentation wird unter [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) vorgeschlagen.",
+              "**OpenStreetMap:** Die Daten des Kartenhintergrunds werden gemäß den OSM/ODbL-Bedingungen verwendet; es gelten die Namensnennungspflichten von OSM.",
             ],
           },
         ],
       },
       {
-        heading: "8. Accuracy disclaimer",
+        heading: "8. Haftungsausschluss zur Genauigkeit",
         blocks: [
           {
             type: "list",
             ordered: true,
             items: [
-              "OpenSurveillanceDB is a **civic, community-maintained dataset — not an official record and not a statement of legal fact.** Records may be incomplete, outdated, or inaccurate despite community maintenance; publication is immediate, not conservative.",
-              "Do not rely on the dataset for safety-critical or official decisions. Verify against official sources (for example the relevant public administration) before acting on it. The Service provides information about visible infrastructure only — it is not a directory of every camera, and absence of a record proves nothing.",
-              "Records from official sources are marked with their source and verification date; community records carry no such guarantee.",
-              "Published coordinates are rounded to **~4 decimal places (~10 m)** — zone-level precision. The exact location is never published and stays in the database.",
+              "OpenSurveillanceDB ist ein **zivilgesellschaftlicher, von der Community gepflegter Datensatz — kein amtliches Verzeichnis und keine Feststellung rechtlicher Tatsachen.** Einträge können trotz der Pflege durch die Community unvollständig, veraltet oder ungenau sein; die Veröffentlichung erfolgt sofort, nicht zurückhaltend.",
+              "Verlasse dich bei sicherheitskritischen oder amtlichen Entscheidungen nicht auf den Datensatz. Überprüfe die Angaben anhand offizieller Quellen (zum Beispiel der zuständigen öffentlichen Verwaltung), bevor du danach handelst. Der Dienst bietet nur Informationen über sichtbare Infrastruktur — er ist kein Verzeichnis aller Kameras, und das Fehlen eines Eintrags beweist nichts.",
+              "Einträge aus offiziellen Quellen sind mit ihrer Quelle und ihrem Prüfdatum gekennzeichnet; Einträge der Community bieten keine solche Gewähr.",
+              "Veröffentlichte Koordinaten werden auf **ca. 4 Nachkommastellen (ca. 10 m)** gerundet — Genauigkeit auf Zonenebene. Der genaue Standort wird nie veröffentlicht und bleibt in der Datenbank.",
             ],
           },
         ],
       },
       {
-        heading: "9. Privacy",
+        heading: "9. Datenschutz",
         blocks: [
           {
             type: "paragraph",
-            text: "Your use of the Service is governed by the [privacy notice](/privacy). Key points: no tracking, no behavioural advertising; reports are public as soon as they are published and private correction requests stay private; your GDPR rights are exercisable via [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) within the statutory timelines (Art. 12(3) GDPR).",
+            text: "Deine Nutzung des Dienstes unterliegt der [Datenschutzerklärung](/privacy). Die wichtigsten Punkte: kein Tracking, keine verhaltensbasierte Werbung; Meldungen sind öffentlich, sobald sie veröffentlicht werden, und private Korrekturanträge bleiben privat; deine Rechte nach der DSGVO kannst du über [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) innerhalb der gesetzlichen Fristen ausüben (Art. 12 Abs. 3 DSGVO).",
           },
         ],
       },
       {
-        heading: "10. Availability and limitation of liability",
+        heading: "10. Verfügbarkeit und Haftungsbeschränkung",
         blocks: [
           {
             type: "list",
             ordered: true,
             items: [
-              "The Service is provided **\"as is\" and \"as available\"**, without warranties of accuracy, completeness, availability, or fitness for a particular purpose.",
-              "To the maximum extent permitted by law, the project and its contributors are **not liable** for any damages — including indirect, incidental, or consequential loss — arising from the use of, or reliance on, the Service or its data. In particular, the project is not liable for decisions made on the basis of the dataset.",
-              "Nothing in these terms excludes or limits liability that cannot be excluded or limited by law (for example fraud, death or personal injury caused by negligence, mandatory consumer-protection rights).",
-              "The Service is not intended for emergency or safety-critical use; it does not replace official information channels.",
+              "Der Dienst wird **„wie besehen“ und „wie verfügbar“** bereitgestellt, ohne Gewähr für Richtigkeit, Vollständigkeit, Verfügbarkeit oder Eignung für einen bestimmten Zweck.",
+              "Soweit gesetzlich zulässig, **haften** das Projekt und seine Beitragenden **nicht** für Schäden — einschließlich indirekter, zufälliger oder Folgeschäden —, die aus der Nutzung des Dienstes oder seiner Daten oder dem Vertrauen darauf entstehen. Insbesondere haftet das Projekt nicht für Entscheidungen, die auf Grundlage des Datensatzes getroffen werden.",
+              "Nichts in diesen Bedingungen schließt eine Haftung aus oder beschränkt sie, die gesetzlich nicht ausgeschlossen oder beschränkt werden kann (zum Beispiel bei Betrug, bei durch Fahrlässigkeit verursachtem Tod oder Personenschaden oder bei zwingenden Verbraucherschutzrechten).",
+              "Der Dienst ist nicht für Notfälle oder sicherheitskritische Zwecke bestimmt; er ersetzt keine offiziellen Informationskanäle.",
             ],
           },
         ],
       },
       {
-        heading: "11. Suspension and removal",
+        heading: "11. Sperrung und Entfernung",
         blocks: [
           {
             type: "list",
             ordered: true,
             items: [
-              "We may suspend or limit access, or remove content, where necessary to enforce these terms, to protect users or data subjects, or under the publication rules — aiming to notify the affected person where proportionate and possible.",
-              "Contributors may request deletion of their reports via [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org); published records stay public while the community keeps confirming them, and follow the correction and withdrawal paths of section 6.",
+              "Wir können den Zugang sperren oder einschränken oder Inhalte entfernen, wenn dies erforderlich ist, um diese Bedingungen durchzusetzen, Nutzende oder betroffene Personen zu schützen, oder gemäß den Veröffentlichungsregeln — wobei wir anstreben, die betroffene Person zu benachrichtigen, soweit dies verhältnismäßig und möglich ist.",
+              "Beitragende können die Löschung ihrer Meldungen über [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) beantragen; veröffentlichte Einträge bleiben öffentlich, solange die Community sie weiter bestätigt, und folgen den Korrektur- und Rückzugswegen nach Abschnitt 6.",
             ],
           },
         ],
       },
       {
-        heading: "12. Applicable law and jurisdiction",
+        heading: "12. Anwendbares Recht und Gerichtsstand",
         blocks: [
           {
             type: "list",
             ordered: true,
             items: [
-              "These terms are governed by **EU law and, where applicable, Italian law** — in particular the GDPR and D.Lgs. 196/2003 (Codice Privacy, as amended by D.Lgs. 101/2018).",
-              "**Disputes:** the courts of the place where the controller is established (Italy) have jurisdiction, **without prejudice** to the right of consumers residing in the EU to bring proceedings in the courts of their own country of residence and to the protection of their mandatory national provisions.",
-              "**Complaints:** you may complain to the competent supervisory authority — in Italy, the [Garante per la protezione dei dati personali](https://www.garanteprivacy.it).",
+              "Diese Bedingungen unterliegen dem **Recht der EU und, soweit anwendbar, italienischem Recht** — insbesondere der DSGVO und dem D.Lgs. 196/2003 (Codice Privacy, in der durch das D.Lgs. 101/2018 geänderten Fassung).",
+              "**Streitigkeiten:** Zuständig sind die Gerichte am Ort der Niederlassung des Verantwortlichen (Italien), **unbeschadet** des Rechts von Verbraucherinnen und Verbrauchern mit Wohnsitz in der EU, vor den Gerichten ihres eigenen Wohnsitzstaates zu klagen, und des Schutzes durch die zwingenden Vorschriften ihres nationalen Rechts.",
+              "**Beschwerden:** Du kannst dich bei der zuständigen Aufsichtsbehörde beschweren — in Italien beim [Garante per la protezione dei dati personali](https://www.garanteprivacy.it).",
             ],
           },
         ],
       },
       {
-        heading: "13. Changes to these terms",
+        heading: "13. Änderungen dieser Bedingungen",
         blocks: [
           {
             type: "list",
             ordered: true,
             items: [
-              "These terms are versioned and stored in the repository. **Material changes** (purpose, licensing, data publication, governance) require a documented public proposal and a reasonable comment period.",
-              "Non-material changes take effect on publication with a notice. Continued use of the Service after the effective date constitutes acceptance; where the law requires consent, it will be obtained separately.",
+              "Diese Bedingungen sind versioniert und im Repository gespeichert. **Wesentliche Änderungen** (Zweck, Lizenzierung, Veröffentlichung von Daten, Governance) erfordern einen dokumentierten öffentlichen Vorschlag und eine angemessene Frist für Kommentare.",
+              "Unwesentliche Änderungen treten mit ihrer Veröffentlichung und einem Hinweis in Kraft. Die weitere Nutzung des Dienstes nach dem Inkrafttreten gilt als Zustimmung; wo das Gesetz eine Einwilligung verlangt, wird diese gesondert eingeholt.",
             ],
           },
         ],
       },
       {
-        heading: "14. Contact",
+        heading: "14. Kontakt",
         blocks: [
           {
             type: "list",
             items: [
-              "**Privacy, corrections, rights:** [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) (dedicated mailbox).",
-              "Legal emergencies and abuse reports use the same channel (immediate hide).",
+              "**Datenschutz, Korrekturen, Rechte:** [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org) (eigenes Postfach).",
+              "Rechtliche Notfälle und Missbrauchsmeldungen nutzen denselben Kanal (sofortiges Ausblenden).",
             ],
           },
         ],
@@ -508,72 +510,72 @@ export const deLegal: LegalContent = {
   },
 
   licenses: {
-    eyebrow: "Legal · Licences",
-    title: "Licences",
+    eyebrow: "Rechtliches · Lizenzen",
+    title: "Lizenzen",
     intro:
-      "How the OpenSurveillanceDB software, documentation and data are licensed, and what that means for reuse.",
+      "Wie Software, Dokumentation und Daten von OpenSurveillanceDB lizenziert sind und was das für die Weiterverwendung bedeutet.",
     versionNote:
-      "Updated 31 July 2026 (data licence decision — ADR 0008) and 5 August 2026 (imported public datasets). The repository copy (docs/OPEN_SOURCE.md) remains canonical.",
+      "Aktualisiert am 31. Juli 2026 (Entscheidung zur Datenlizenz — ADR 0008) und am 5. August 2026 (importierte öffentliche Datensätze). Die Kopie im Repository (docs/OPEN_SOURCE.md) bleibt maßgeblich.",
     sections: [
       {
         heading: "1. Software",
         blocks: [
           {
             type: "paragraph",
-            text: "The application source code is licensed as **AGPL-3.0-or-later**. This keeps modified network-service versions available to the community. See the [LICENSE](https://github.com/Syax89/open-surveillance-db/blob/main/LICENSE) file.",
+            text: "Der Quellcode der Anwendung ist unter **AGPL-3.0-or-later** lizenziert. So bleiben veränderte Versionen, die als Netzwerkdienst betrieben werden, für die Community verfügbar. Siehe die Datei [LICENSE](https://github.com/Syax89/open-surveillance-db/blob/main/LICENSE).",
           },
         ],
       },
       {
-        heading: "2. Documentation",
+        heading: "2. Dokumentation",
         blocks: [
           {
             type: "paragraph",
-            text: "Unless a document says otherwise, project documentation is proposed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). Contributors retain credit for their contributions under the repository's normal history.",
+            text: "Sofern ein Dokument nichts anderes angibt, wird die Projektdokumentation unter [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) vorgeschlagen. Beitragende werden für ihre Beiträge über die normale Historie des Repositorys genannt.",
           },
         ],
       },
       {
-        heading: "3. Database and exports",
+        heading: "3. Datenbank und Exporte",
         blocks: [
           {
             type: "paragraph",
-            text: "The public database and every export format are licensed under **[ODbL 1.0](https://opendatacommons.org/licenses/odbl/)**, with clear attribution and share-alike notices (decision of 31 July 2026, [ADR 0008](https://github.com/Syax89/open-surveillance-db/blob/main/docs/decisions/0008-data-licence-precision-retention-contact.md)). Reuse is permitted, including commercially, provided you attribute the database and, if you create a derivative database, you share it under ODbL 1.0.",
+            text: "Die öffentliche Datenbank und alle Exportformate sind unter **[ODbL 1.0](https://opendatacommons.org/licenses/odbl/)** lizenziert, mit klaren Hinweisen zur Namensnennung und zur Weitergabe unter gleichen Bedingungen (Entscheidung vom 31. Juli 2026, [ADR 0008](https://github.com/Syax89/open-surveillance-db/blob/main/docs/decisions/0008-data-licence-precision-retention-contact.md)). Die Weiterverwendung ist erlaubt, auch kommerziell, sofern du die Datenbank nennst und eine abgeleitete Datenbank, falls du eine erstellst, unter ODbL 1.0 weitergibst.",
           },
           {
             type: "note",
-            text: "Imported sources keep their own licence and attribution; the ODbL licence applies to the project's own compilation (see section 6).",
+            text: "Importierte Quellen behalten ihre eigene Lizenz und Namensnennung; die ODbL-Lizenz gilt für die eigene Zusammenstellung des Projekts (siehe Abschnitt 6).",
           },
         ],
       },
       {
-        heading: "4. OpenStreetMap data",
+        heading: "4. OpenStreetMap-Daten",
         blocks: [
           {
             type: "paragraph",
-            text: "OpenStreetMap data is available under the [Open Database License](https://www.openstreetmap.org/copyright). Using an OSM map background does not automatically make every project record an OSM contribution. If data is imported from OSM, derived from it, or combined into a derivative database, the project must document the relationship, provide required attribution, and comply with ODbL obligations.",
+            text: "OpenStreetMap-Daten sind unter der [Open Database License](https://www.openstreetmap.org/copyright) verfügbar. Die Verwendung eines OSM-Kartenhintergrunds macht nicht automatisch jeden Eintrag des Projekts zu einem OSM-Beitrag. Werden Daten aus OSM importiert, davon abgeleitet oder zu einer abgeleiteten Datenbank kombiniert, muss das Projekt die Beziehung dokumentieren, die erforderliche Namensnennung angeben und die Pflichten der ODbL einhalten.",
           },
         ],
       },
       {
-        heading: "5. Contributor promise",
+        heading: "5. Zusicherung der Beitragenden",
         blocks: [
           {
             type: "paragraph",
-            text: "Contributors must submit only material they are entitled to share. They grant the project the rights needed to publish accepted code, documentation and data under the relevant project licence. ",
+            text: "Beitragende dürfen nur Material einreichen, das sie teilen dürfen. Sie räumen dem Projekt die Rechte ein, die nötig sind, um angenommenen Code, Dokumentation und Daten unter der jeweiligen Projektlizenz zu veröffentlichen. ",
           },
         ],
       },
       {
-        heading: "6. Imported public datasets",
+        heading: "6. Importierte öffentliche Datensätze",
         blocks: [
           {
             type: "paragraph",
-            text: "The project may integrate public datasets released by public administrations and open-data projects (for example city camera inventories or OpenStreetMap surveillance features). Every integrated source keeps its own licence and attribution: the database licence above applies to the project's own compilation, it never replaces the licence of an individual source. The [Data sources](/fonti) page lists each imported dataset with its source, licence, import date, record count and the required attribution text.",
+            text: "Das Projekt kann öffentliche Datensätze integrieren, die von öffentlichen Verwaltungen und Open-Data-Projekten veröffentlicht werden (zum Beispiel städtische Kamerainventare oder Überwachungsobjekte aus OpenStreetMap). Jede integrierte Quelle behält ihre eigene Lizenz und Namensnennung: Die oben genannte Datenbanklizenz gilt für die eigene Zusammenstellung des Projekts und ersetzt nie die Lizenz einer einzelnen Quelle. Die Seite [Datenquellen](/fonti) führt jeden importierten Datensatz mit Quelle, Lizenz, Importdatum, Anzahl der Einträge und dem erforderlichen Text zur Namensnennung auf.",
           },
           {
             type: "note",
-            text: "Records imported from a source are marked with their provenance on the record page. They are subject to the same community verification as any other record and are never exempt from review.",
+            text: "Aus einer Quelle importierte Einträge sind auf der Eintragsseite mit ihrer Herkunft gekennzeichnet. Sie unterliegen derselben Überprüfung durch die Community wie jeder andere Eintrag und sind nie von der Prüfung ausgenommen.",
           },
         ],
       },
@@ -581,103 +583,103 @@ export const deLegal: LegalContent = {
   },
 
   accessibility: {
-    eyebrow: "Information · Accessibility",
-    title: "Accessibility statement",
+    eyebrow: "Informationen · Barrierefreiheit",
+    title: "Erklärung zur Barrierefreiheit",
     intro:
-      "OpenSurveillanceDB is a public-interest civic database. This statement describes our accessibility commitment, our current compliance status, and how you can report a barrier.",
+      "OpenSurveillanceDB ist eine zivilgesellschaftliche Datenbank im öffentlichen Interesse. Diese Erklärung beschreibt unsere Verpflichtung zur Barrierefreiheit, den aktuellen Stand der Konformität und wie du eine Barriere melden kannst.",
     versionNote:
-      "Version 0.2 — 8 August 2026. In force (personal open-source project). The repository copy (docs/ACCESSIBILITY_STATEMENT.md) remains canonical.",
+      "Version 0.2 — 8. August 2026. In Kraft (persönliches Open-Source-Projekt). Die Kopie im Repository (docs/ACCESSIBILITY_STATEMENT.md) bleibt maßgeblich.",
     sections: [
       {
-        heading: "1. Commitment",
+        heading: "1. Verpflichtung",
         blocks: [
           {
             type: "paragraph",
-            text: "The core journeys — browse, search, submit, and correct/remove — must be usable with a keyboard, with assistive technology, and on small screens, in the pilot language and in English. The product target is **WCAG 2.2 AA** for the public website, with manual testing by disabled users before the pilot is widened.",
+            text: "Die zentralen Abläufe — stöbern, suchen, einreichen und korrigieren/entfernen — müssen mit der Tastatur, mit assistiven Technologien und auf kleinen Bildschirmen nutzbar sein, in der Pilotsprache und auf Englisch. Ziel für die öffentliche Website ist **WCAG 2.2 AA**, mit manuellen Tests durch Menschen mit Behinderungen, bevor der Pilotbetrieb ausgeweitet wird.",
           },
         ],
       },
       {
-        heading: "2. Compliance status",
+        heading: "2. Stand der Konformität",
         blocks: [
           {
             type: "paragraph",
-            text: "**Partially compliant.** The project implements a meaningful accessibility baseline and runs **automated accessibility checks (Lighthouse ≥ 0.95) on every pull request**; a full WCAG 2.2 A/AA manual conformance audit by users of assistive technology remains planned. Known limitations are listed below.",
+            text: "**Teilweise konform.** Das Projekt setzt eine solide Grundausstattung an Barrierefreiheit um und führt **bei jedem Pull Request automatisierte Barrierefreiheitsprüfungen (Lighthouse ≥ 0,95)** durch; eine vollständige manuelle Konformitätsprüfung nach WCAG 2.2 A/AA durch Nutzende assistiver Technologien ist weiterhin geplant. Bekannte Einschränkungen sind unten aufgeführt.",
           },
         ],
       },
       {
-        heading: "3. What is already implemented",
+        heading: "3. Was bereits umgesetzt ist",
         blocks: [
           {
             type: "list",
             items: [
-              "A skip link and main-content target on every page.",
-              "Visible keyboard focus states and a logical focus order.",
-              "Support for `prefers-reduced-motion` (animations reduced when requested).",
-              "A searchable text directory and record-detail pages that work **without map interaction**; map and directory present the same public fields.",
-              "Report-location selection by an explicit device-location request (when browser permission is granted), map click **or** validated manual coordinates; map/manual alternatives remain available.",
-              "An English/Italian interface with a device-local language preference; the language choice does not affect API data.",
-              "A bilingual in-app guide at [/guide](/guide) explaining data states and the publication workflow.",
-              "Status information is never conveyed by colour alone (text and icon labels are used).",
+              "Ein Sprunglink und ein Ziel für den Hauptinhalt auf jeder Seite.",
+              "Sichtbare Tastaturfokus-Zustände und eine logische Fokusreihenfolge.",
+              "Unterstützung für `prefers-reduced-motion` (Animationen werden auf Wunsch reduziert).",
+              "Ein durchsuchbares Textverzeichnis und Detailseiten der Einträge, die **ohne Interaktion mit der Karte** funktionieren; Karte und Verzeichnis zeigen dieselben öffentlichen Felder.",
+              "Auswahl des Meldestandorts über eine ausdrückliche Anfrage des Gerätestandorts (wenn die Browserberechtigung erteilt ist), per Klick auf die Karte **oder** über validierte manuelle Koordinaten; die Alternativen Karte/manuelle Eingabe bleiben verfügbar.",
+              "Eine englisch-/italienischsprachige Oberfläche mit einer lokal auf dem Gerät gespeicherten Spracheinstellung; die Sprachwahl hat keinen Einfluss auf die API-Daten.",
+              "Eine zweisprachige Anleitung in der App unter [/guide](/guide), die die Datenzustände und den Veröffentlichungsablauf erklärt.",
+              "Statusinformationen werden nie allein durch Farbe vermittelt (es werden Text- und Symbolbeschriftungen verwendet).",
             ],
           },
         ],
       },
       {
-        heading: "4. Known limitations",
+        heading: "4. Bekannte Einschränkungen",
         blocks: [
           {
             type: "list",
             items: [
-              "**Map tasks are keyboard-operable.** Map markers are focusable and respond to Enter/Space (popup open/close); the text-list alternative covers browsing and searching records without the map.",
-              "**No manual conformance audit yet.** A full manual audit with screen readers, 200% zoom, contrast checking and small-screen devices has not been run; automated checks run on every pull request and the manual audit is planned.",
-              "**Some user-visible strings are still defined inline** in components while the interface-string externalisation and pilot-language review are in progress.",
-              "**The dedicated feedback page (/feedback) is not offered yet.** Barriers are reported through the channels in section 5.",
+              "**Kartenfunktionen sind per Tastatur bedienbar.** Kartenmarkierungen sind fokussierbar und reagieren auf Eingabe/Leertaste (Popup öffnen/schließen); die alternative Textliste deckt das Durchsuchen und Suchen von Einträgen ohne Karte ab.",
+              "**Noch keine manuelle Konformitätsprüfung.** Eine vollständige manuelle Prüfung mit Screenreadern, 200 % Zoom, Kontrastprüfung und Geräten mit kleinen Bildschirmen wurde noch nicht durchgeführt; automatisierte Prüfungen laufen bei jedem Pull Request, und die manuelle Prüfung ist geplant.",
+              "**Einige sichtbare Texte sind noch direkt** in Komponenten definiert, während die Auslagerung der Oberflächentexte und die Überprüfung der Pilotsprache noch laufen.",
+              "**Die eigene Feedback-Seite (/feedback) wird noch nicht angeboten.** Barrieren werden über die Kanäle in Abschnitt 5 gemeldet.",
             ],
           },
         ],
       },
       {
-        heading: "5. Reporting a barrier",
+        heading: "5. Eine Barriere melden",
         blocks: [
           {
             type: "paragraph",
-            text: "The project provides **non-sensitive usability-feedback channels** so that anyone can report an interface barrier **without creating an account and without providing personal data**. The channels ask only for:",
+            text: "Das Projekt bietet **Kanäle für nicht sensibles Feedback zur Benutzbarkeit**, damit alle eine Barriere in der Oberfläche melden können, **ohne ein Konto anzulegen und ohne personenbezogene Daten anzugeben**. Die Kanäle fragen nur nach:",
           },
           {
             type: "list",
             items: [
-              "the type of barrier (navigation/keyboard, screen reader, colour/contrast, zoom/layout, other);",
-              "a plain-language description of what happened;",
-              "an optional URL of the page where the barrier occurred;",
-              "an optional contact address, **only if** you want a reply (never required, never used for anything else, and deleted once the exchange is closed).",
+              "der Art der Barriere (Navigation/Tastatur, Screenreader, Farbe/Kontrast, Zoom/Layout, Sonstiges);",
+              "einer Beschreibung des Vorfalls in einfacher Sprache;",
+              "optional der URL der Seite, auf der die Barriere aufgetreten ist;",
+              "optional einer Kontaktadresse, **nur wenn** du eine Antwort möchtest (nie erforderlich, nie für etwas anderes verwendet und nach Abschluss des Austauschs gelöscht).",
             ],
           },
           {
             type: "paragraph",
-            text: "Report accessibility barriers through one of these channels:",
+            text: "Melde Barrieren über einen dieser Kanäle:",
           },
           {
             type: "list",
             items: [
-              "open an issue on the project repository (public, non-sensitive content only — do not include personal data or private locations);",
-              "use the [correction form](/) on the public page for issues related to a specific record;",
-              "write to the privacy contact named in the [privacy notice](/privacy): [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org).",
+              "öffne ein Issue im Repository des Projekts (nur öffentliche, nicht sensible Inhalte — gib keine personenbezogenen Daten oder privaten Orte an);",
+              "nutze das [Korrekturformular](/) auf der öffentlichen Seite bei Problemen mit einem bestimmten Eintrag;",
+              "schreibe an den in der [Datenschutzerklärung](/privacy) genannten Datenschutzkontakt: [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org).",
             ],
           },
           {
             type: "paragraph",
-            text: "**Response commitment:** feedback is handled with the same targets as correction and takedown requests — an acknowledgement within **48 hours** and a substantive response within **14 days**, in the language of the message when possible.",
+            text: "**Zusage zur Antwort:** Feedback wird mit denselben Zielen bearbeitet wie Korrektur- und Löschanträge — eine Eingangsbestätigung innerhalb von **48 Stunden** und eine inhaltliche Antwort innerhalb von **14 Tagen**, nach Möglichkeit in der Sprache der Nachricht.",
           },
         ],
       },
       {
-        heading: "6. Review schedule",
+        heading: "6. Überprüfungsplan",
         blocks: [
           {
             type: "paragraph",
-            text: "This statement is reviewed after every release that changes the interface or the accessibility behaviour; at least quarterly once the service is running; and before any public launch, with the final conformance results and known exceptions recorded here.",
+            text: "Diese Erklärung wird nach jeder Veröffentlichung überprüft, die die Oberfläche oder das Verhalten zur Barrierefreiheit ändert; mindestens vierteljährlich, sobald der Dienst in Betrieb ist; und vor jedem öffentlichen Start, wobei die endgültigen Ergebnisse der Konformitätsprüfung und bekannte Ausnahmen hier festgehalten werden.",
           },
         ],
       },

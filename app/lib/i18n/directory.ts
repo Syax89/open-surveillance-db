@@ -152,6 +152,8 @@ export const en = {
   // ("Development seed"/"Demo data" — test contract, see DATA_DICTIONARY);
   // the presentation shows these localized labels instead.
   demoSource: "Illustrative seed",
+  /** Display name of the raw source value "Community report". */
+  communityReportSource: "Community report",
   demoUpdated: "Demo data",
   location: "Location",
   unknown: "Unknown",
@@ -309,6 +311,7 @@ export const it: Translation<typeof en> = {
   // ("Development seed"/"Demo data" — contratto di test, vedi DATA_DICTIONARY);
   // la presentazione mostra invece queste etichette localizzate.
   demoSource: "Seed illustrativo",
+  communityReportSource: "Segnalazione della community",
   demoUpdated: "Dato dimostrativo",
   location: "Posizione",
   unknown: "Sconosciuto",

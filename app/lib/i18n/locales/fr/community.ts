@@ -169,7 +169,7 @@ export const fr: Translation<typeof en> = {
   remove: "Retirer",
   deleteContributionTitle: "Supprimer cette contribution ?",
   deleteContributionBody:
-    "La fiche sera retirée de l’annuaire public. Cette action est irréversible.",
+    "La fiche sera retirée du répertoire public. Cette action est irréversible.",
   deleteContribution: "Supprimer la contribution",
 
   // --- Community actions (ADR 0021 §3, FASE 3 UI): five-action surface on
@@ -185,7 +185,7 @@ export const fr: Translation<typeof en> = {
     gone: "Disparue",
     problem: "Signaler",
     privacy: "Vie privée",
-    likeHelp: "Indiquer que cette fiche est utile à l’annuaire.",
+    likeHelp: "Indiquer que cette fiche est utile au répertoire.",
     confirmHelp: "Je confirme que cette caméra est toujours présente à l’emplacement indiqué.",
     goneHelp: "Je pense que cette caméra n’est plus là.",
     problemHelp: "Quelque chose ne va pas dans cette fiche (détails, position, description).",

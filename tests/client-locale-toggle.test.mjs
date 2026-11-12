@@ -104,7 +104,7 @@ test("locale: switching back to EN restores English and lang=en", async () => {
 
 test("locale: an invalid stored value falls back to English", async () => {
   const { screen } = rtl;
-  window.localStorage.setItem("opensurveillancedb-locale", "fr");
+  window.localStorage.setItem("opensurveillancedb-locale", "xx");
 
   await renderWithLocale(
     React.createElement(React.Fragment, null,
@@ -129,7 +129,10 @@ test("locale: language selection group is labelled for AT", async () => {
   );
 
   const group = screen.getByLabelText("Language selection");
-  assert.equal(group.className, "locale-toggle");
+  assert.equal(group.className, "locale-menu");
+  assert.equal(group.getAttribute("role"), "group");
+  // The menu lives in the compact disclosure (6 languages, 2026-11).
+  assert.ok(group.closest("details.locale-toggle"));
 });
 
 test("locale: switching on /contribuisci refreshes its server-rendered content", async () => {

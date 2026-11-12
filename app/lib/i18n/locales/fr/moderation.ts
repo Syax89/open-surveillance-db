@@ -71,7 +71,7 @@ export const fr: Translation<typeof en> = {
   privateCorrections: "Demandes de correction privées",
   noCorrectionsTitle: "Aucune demande de correction en attente.",
   noCorrectionsText:
-    "Les demandes privées restent hors de l’annuaire public et de l’export des données.",
+    "Les demandes privées restent hors du répertoire public et de l’export des données.",
   privateCorrection: "Correction privée",
   editing: "Modification",
   editRequests: "Demandes de modification de la communauté",

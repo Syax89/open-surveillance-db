@@ -8,6 +8,7 @@ import type { en } from "../../common";
 export const de: Translation<typeof en> = {
   skipLink: "Zum Hauptinhalt springen",
   languageSelection: "Sprachauswahl",
+  darkTheme: "Dunkles Design",
   // Root-layout metadata (SSR/SEO): the fallback <title>/<description>
   // for every route without its own generateMetadata (home, records, auth
   // pages). Localized via the locale cookie — see ADR 0015.

@@ -177,7 +177,7 @@ test("auth plain links keep the focus underline; .button CTAs keep their own col
   );
   assert.match(
     css,
-    /\.button-primary\s*\{\s*color:\s*var\(--white\)/,
+    /\.button-primary\s*\{\s*color:\s*var\(--on-accent\)/,
     "the primary CTA keeps its white text on the accent background",
   );
 });

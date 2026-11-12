@@ -7,24 +7,24 @@ import type { en } from "../../directory";
 
 export const fr: Translation<typeof en> = {
   // Page-level chrome (/directory).
-  pageTitle: "Annuaire public",
+  pageTitle: "Répertoire public",
   pageIntro:
     "Recherchez, filtrez et triez les fiches publiques sans la carte. Un résultat n’est jamais la preuve qu’une zone est exempte de surveillance.",
   // F2 (QA#6): SSR Suspense fallback for the client tool body.
-  loading: "Chargement de l’annuaire…",
-  navigation: "Navigation de l’annuaire",
+  loading: "Chargement du répertoire…",
+  navigation: "Navigation du répertoire",
   homeAria: "Accueil OpenSurveillanceDB",
   useMapInstead: "Utiliser plutôt la carte",
   // Directory section (extracted from the home page bundle in F1).
-  accessibleDirectory: "Annuaire accessible",
+  accessibleDirectory: "Répertoire accessible",
   recordsTitle: "Parcourir les fiches publiques sans la carte",
   recordsIntro:
     "La recherche porte sur les mêmes fiches publiques que celles affichées sur la carte. Un résultat n’est jamais la preuve qu’une zone est exempte de surveillance.",
   // Catalog mode (t_127492f1): the sr-only heading of the results region —
   // keeps the h1 → h2 → h3 ladder on /directory now that the place-search
   // block is a collapsible panel instead of the section heading.
-  resultsRegion: "Résultats de l’annuaire",
-  searchDirectory: "Rechercher dans l’annuaire public",
+  resultsRegion: "Résultats du répertoire",
+  searchDirectory: "Rechercher dans le répertoire public",
   searchPlaceholder: "Nom, type, adresse ou lieu",
   searchHelp:
     "La recherche se fait pendant la saisie ; appuyez sur Entrée pour chercher autour d’un lieu.",
@@ -147,6 +147,7 @@ export const fr: Translation<typeof en> = {
   // ("Development seed"/"Demo data" — test contract, see DATA_DICTIONARY);
   // the presentation shows these localized labels instead.
   demoSource: "Données d’exemple",
+  communityReportSource: "Signalement communautaire",
   demoUpdated: "Données de démonstration",
   location: "Emplacement",
   unknown: "Inconnu",
@@ -156,7 +157,7 @@ export const fr: Translation<typeof en> = {
   // transient API error (rate limit, network) must NEVER masquerade as "0
   // public records found". The directory shows this truthful error state
   // with a retry action instead of the empty state.
-  loadErrorTitle: "Impossible de charger l’annuaire.",
+  loadErrorTitle: "Impossible de charger le répertoire.",
   loadErrorBody: "Les fiches publiques sont toujours là : il s’agit d’un problème temporaire de chargement. Réessayez, ou explorez la carte.",
   loadErrorRetry: "Réessayer",
 };

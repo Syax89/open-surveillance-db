@@ -23,10 +23,10 @@
  * is client-side only), so the bundle is their only honest coverage point.
  */
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { importI18nModule } from "./helpers/i18n-module.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const i18nDir = path.join(root, "app", "lib", "i18n");
@@ -37,26 +37,7 @@ const i18nDir = path.join(root, "app", "lib", "i18n");
  * navigation-pages.test.mjs — no build required.
  */
 async function transpileAndImport(tsSourcePath) {
-  const { mkdtemp, writeFile, rm } = await import("node:fs/promises");
-  const os = await import("node:os");
-  const { pathToFileURL } = await import("node:url");
-  const ts = (await import("typescript")).default;
-  const source = await readFile(tsSourcePath, "utf8");
-  const output = ts.transpileModule(source, {
-    compilerOptions: {
-      module: ts.ModuleKind.ES2022,
-      target: ts.ScriptTarget.ES2022,
-    },
-    fileName: tsSourcePath,
-  }).outputText;
-  const dir = await mkdtemp(path.join(os.tmpdir(), "osdb-i18n-"));
-  const out = path.join(dir, "bundle.mjs");
-  await writeFile(out, output);
-  try {
-    return await import(`${pathToFileURL(out).href}?t=${Date.now()}`);
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
+  return importI18nModule(tsSourcePath);
 }
 
 /** Every leaf string value of a bundle (plural formatters called with 1). */
