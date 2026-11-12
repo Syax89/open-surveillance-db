@@ -661,6 +661,16 @@ changes accumulate under `[Unreleased]`.
 
 ### Fixed
 
+- **Phone layout overflows (2026-11):** on `/segnala` the "Date observed"
+  input overflowed its fieldset on a 390px screen — the ≤480px one-column
+  rule for the report metadata and coordinate fields sat before the base
+  two-column rules in the cascade and never applied; on `/api-docs` the
+  endpoint cards were 25–120px wider than the phone (a bare `1fr` track grew
+  to the longest code line) and their right edge was clipped by the global
+  `overflow-x:clip`. Both now fit; a Playwright sweep of 14 pages at 320px
+  and 390px finds no clipped content outside the intentional horizontal
+  scrollers (A–Z index).
+
 - **Directory — natural "alphabetical" order (2026-11-11):** titles now sort
   numeric-aware ("Telecamera 1, 2, 10, 100" instead of "1, 10, 100, 2") in
   the directory and in `GET /api/cameras?sort=alphabetical`. D1 cannot

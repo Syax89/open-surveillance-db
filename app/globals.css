@@ -561,7 +561,10 @@ button { cursor:pointer; }
 .api-limit-value code { color:inherit; }
 .api-attribution { margin:24px 0 0; padding:14px 18px; border:1px dashed var(--line); border-radius:var(--radius-md); color:var(--ink-2); font-size:var(--text-sm); line-height:1.5; }
 @media (max-width: 760px) {
-  .api-card-grid, .api-limit-grid { grid-template-columns:1fr; }
+  /* minmax(0,1fr): a bare 1fr track grows to its longest nowrap code line,
+     pushing the cards ~25-120px past a phone screen (clipped content). */
+  .api-card-grid, .api-limit-grid { grid-template-columns:minmax(0,1fr); }
+  .api-card { min-width:0; }
   .api-section-head { flex-direction:column; align-items:start; gap:var(--space-3); }
 }
 
@@ -696,6 +699,10 @@ button { cursor:pointer; }
 .edit-coordinate-fields { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 .edit-coordinate-error { color:var(--danger); font-size:var(--text-sm); }
 .report-metadata-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+/* Phones: one field per row. The ≤480px rule in the header block above never
+   applied — it comes BEFORE these base rules in the cascade — so the date
+   input overflowed its fieldset on a 390px screen. */
+@media (max-width:480px) { .coordinate-fields, .report-metadata-fields { grid-template-columns:minmax(0,1fr); } }
 .correction-section { width:var(--container-standard); margin:0 auto; display:grid; grid-template-columns:.8fr 1.1fr; gap:105px; padding:0 0 100px; }
 .correction-section>div>p:not(.eyebrow) { color:var(--intro-ink); font-size:var(--text-xl); line-height:1.6; }
 .correction-form { display:grid; gap:18px; padding:30px; border:1px solid var(--form-border); border-radius:var(--radius-lg); background:var(--form-bg); }
