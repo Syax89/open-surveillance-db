@@ -893,7 +893,7 @@ export function buildModerationEventStatement(
  * applied. A double-moderation race (UPDATE matched 0 rows) leaves the
  * EXISTS check on the pre-decision status and no event is recorded.
  */
-function buildGuardedEventStatement(
+export function buildGuardedEventStatement(
   d1: ModerationD1,
   event: ModerationEventInput,
   guardTable: string,

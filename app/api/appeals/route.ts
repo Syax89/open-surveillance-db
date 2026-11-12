@@ -84,7 +84,8 @@ async function appealLimit(request: Request) {
  * Identity headers are stripped at the edge on every path, so this route
  * resolves the caller from the `osdb_session` cookie only.
  *
- * Standing and abuse control: the reason must state why the appellant is
+ * Standing and abuse control: the appellant must own an attributed record
+ * (uniform 404 otherwise, see fileAppeal); the reason must state why they are
  * affected (their submission or direct knowledge of the record); anonymous
  * submissions have no attribution, so any contributor may appeal a decision
  * on one. The per-IP bucket bounds bursts; fileAppeal enforces a
@@ -186,7 +187,13 @@ export async function POST(request: Request) {
       case "ok":
         return Response.json({ appeal: result.appeal, event: result.event }, { status: 201 });
       case "decision_not_found":
-        return Response.json({ error: "The moderation decision does not exist." }, { status: 404 });
+        // One uniform answer for a missing decision, a decision of another
+        // record, and a decision on a record the caller has no standing on:
+        // filing must never become an oracle on other people's moderation.
+        return Response.json(
+          { error: "No appealable decision was found for one of your records." },
+          { status: 404 },
+        );
       case "decision_not_final":
         return Response.json(
           { error: "Only a final moderation decision that changed the record can be appealed." },

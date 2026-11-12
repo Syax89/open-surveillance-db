@@ -1002,7 +1002,11 @@ test("E2E: nearby and coordinate search return only published records", async ()
 // ---------------------------------------------------------------------------
 
 test("E2E: a contributor appeals a rejection; an independent senior moderator upholds it and the record returns to the queue", async () => {
-  const record = await submitPendingCamera();
+  // Standing (security audit): the appellant must own the record, so the
+  // record is attributed to the demo contributor's account.
+  const contributorHeaders = await contributorSessionHeaders();
+  const owner = await env.DB.prepare("SELECT contributor_id AS contributorId FROM users WHERE id = 6").first();
+  const record = await submitPendingCamera({ contributorId: owner.contributorId });
   await moderateCamera(record.id, "reject", REASON.insufficient, REVIEWERS.intake);
 
   // The rejection is a final decision: the contributor contests it.
@@ -1010,7 +1014,6 @@ test("E2E: a contributor appeals a rejection; an independent senior moderator up
   const decisionEvent = events[0];
   assert.equal(decisionEvent.action, "reject");
 
-  const contributorHeaders = await contributorSessionHeaders();
   const fileResponse = await appealsRoute.POST(apiRequest("/api/appeals", {
     method: "POST",
     headers: contributorHeaders,

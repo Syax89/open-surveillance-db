@@ -147,7 +147,7 @@ test("only one pending appeal per decision; unknown appellant is rejected", asyn
   assert.equal(stranger.kind, "appellant_not_found");
 });
 
-test("fileAppeal on another contributor's attributed submission stays allowed (documented relevance rule, P3 appeal-ownership)", async () => {
+test("fileAppeal requires standing on an attributed submission; no oracle for non-owners (security audit)", async () => {
   // ADR 0013 attribution: the camera was submitted by contributor id 77
   // (contributors table, seeded directly with an explicit id — the migration
   // has no seed rows).
@@ -177,20 +177,120 @@ test("fileAppeal on another contributor's attributed submission stays allowed (d
   });
   const decision = (await auditEvents())[0];
 
-  // Standing cannot be verified for attributed submissions without a product
-  // decision (option 1 of the audit: hard 403 + "not my submission" reason
-  // code, pending maintainer decision). Under the documented rule (option 2) the appeal is
-  // filed and moderation evaluates the stated relevance; the per-appellant
-  // threshold and the route's minimum reason length bound abuse.
+  // Standing is enforced (audit option 1): the demo contributor (users 6)
+  // does not own contributor 77's record, so filing answers EXACTLY like a
+  // missing decision — no 400/201 oracle on someone else's moderation.
+  const appeal = (decisionEventId, entityId = record.id) => appeals.fileAppeal({
+    entity: "camera",
+    entityId,
+    decisionEventId,
+    appellantId: CONTRIBUTOR_USER_ID,
+    reason: "I recorded this camera myself and can confirm it is on a public street.",
+  });
+  assert.deepEqual(await appeal(decision.id), { kind: "decision_not_found" });
+  assert.deepEqual(await appeal(999999), { kind: "decision_not_found" });
+  const otherRecord = await submitPending();
+  assert.deepEqual(await appeal(decision.id, otherRecord.id), { kind: "decision_not_found" }, "entity mismatch is uniform too");
+  const filed = await env.DB.prepare("SELECT COUNT(*) AS n FROM moderation_appeals").first();
+  assert.equal(Number(filed.n), 0);
+
+  // The owner (users 6 linked to contributor 77) has standing and sees the
+  // contested decision's details.
+  await env.DB.prepare("UPDATE users SET contributor_id = 77 WHERE id = ?").bind(CONTRIBUTOR_USER_ID).run();
+  const result = await appeal(decision.id);
+  assert.equal(result.kind, "ok");
+  assert.equal(result.appeal.appellantId, CONTRIBUTOR_USER_ID);
+  assert.equal(result.appeal.decisionAction, "reject");
+  assert.equal(result.event.newStatus, "rejected");
+});
+
+test("fileAppeal on an unattributed submission stays open but never echoes the decision details", async () => {
+  const record = await submitPending();
+  await moderation.moderateCamera(record.id, "reject", "insufficient-evidence", null, undefined, { actorId: INTAKE.id });
+  const decision = (await auditEvents())[0];
   const result = await appeals.fileAppeal({
     entity: "camera",
     entityId: record.id,
     decisionEventId: decision.id,
     appellantId: CONTRIBUTOR_USER_ID,
-    reason: "I recorded this camera myself and can confirm it is on a public street.",
+    reason: "I have direct knowledge of this street and the camera.",
   });
   assert.equal(result.kind, "ok");
-  assert.equal(result.appeal.appellantId, CONTRIBUTOR_USER_ID);
+  assert.equal(result.appeal.decisionAction, null);
+  assert.equal(result.appeal.decisionReasonCode, null);
+  assert.equal(result.appeal.deciderName, null);
+  assert.equal(result.event.previousStatus, "");
+  assert.equal(result.event.newStatus, "");
+});
+
+test("decideAppeal refuses a decider who is the appellant (self_review)", async () => {
+  const record = await submitPending();
+  await moderation.moderateCamera(record.id, "reject", "insufficient-evidence", null, undefined, { actorId: INTAKE.id });
+  const decision = (await auditEvents())[0];
+  // The senior moderator's own users identity (id 3) files the appeal.
+  const filed = await appeals.fileAppeal({
+    entity: "camera",
+    entityId: record.id,
+    decisionEventId: decision.id,
+    appellantId: 3,
+    reason: "Filed by the senior moderator's own identity.",
+  });
+  assert.equal(filed.kind, "ok");
+  const self = await appeals.decideAppeal({ id: filed.appeal.id, decision: "uphold", reviewer: SENIOR, note: null });
+  assert.deepEqual(self, { kind: "self_review" });
+  const row = await env.DB.prepare("SELECT status FROM cameras WHERE id = ?").bind(record.id).first();
+  assert.equal(row.status, "rejected");
+});
+
+test("decideAppeal uphold is refused when the record moved away from the contested outcome", async () => {
+  const record = await submitPending();
+  await moderation.moderateCamera(record.id, "reject", "insufficient-evidence", null, undefined, { actorId: INTAKE.id });
+  const decision = (await auditEvents())[0];
+  const filed = await appeals.fileAppeal({
+    entity: "camera",
+    entityId: record.id,
+    decisionEventId: decision.id,
+    appellantId: CONTRIBUTOR_USER_ID,
+    reason: "The camera is on a public street.",
+  });
+  // The record changes status after the appeal was filed (e.g. a later
+  // removal): upholding must not drag it back to the queue.
+  await env.DB.prepare("UPDATE cameras SET status = 'removed' WHERE id = ?").bind(record.id).run();
+  const result = await appeals.decideAppeal({ id: filed.appeal.id, decision: "uphold", reviewer: SENIOR, note: null });
+  assert.deepEqual(result, { kind: "decision_superseded" });
+  const row = await env.DB.prepare("SELECT status FROM cameras WHERE id = ?").bind(record.id).first();
+  assert.equal(row.status, "removed");
+  const appealRow = await env.DB.prepare("SELECT status FROM moderation_appeals WHERE id = ?").bind(filed.appeal.id).first();
+  assert.equal(appealRow.status, "pending", "the appeal stays decidable (e.g. dismiss)");
+  assert.equal((await auditEvents()).filter((event) => event.action === "appeal-uphold").length, 0);
+});
+
+test("decideAppeal uphold losing a race to a concurrent decision writes nothing dependent", async () => {
+  const record = await submitPending();
+  await moderation.moderateCamera(record.id, "reject", "insufficient-evidence", null, undefined, { actorId: INTAKE.id });
+  const decision = (await auditEvents())[0];
+  const filed = await appeals.fileAppeal({
+    entity: "camera",
+    entityId: record.id,
+    decisionEventId: decision.id,
+    appellantId: CONTRIBUTOR_USER_ID,
+    reason: "The camera is on a public street.",
+  });
+  // A concurrent administrator dismissal lands between the pre-reads and
+  // the uphold batch.
+  const original = env.DB.batch.bind(env.DB);
+  env.DB.batch = (statements) => {
+    env.DB.batch = original;
+    env.DB.db.exec(`UPDATE moderation_appeals SET status = 'dismissed', decided_by = ${ADMIN.id}, decided_at = '2026-08-01T00:00:00.000Z' WHERE id = ${filed.appeal.id}`);
+    return original(statements);
+  };
+  const result = await appeals.decideAppeal({ id: filed.appeal.id, decision: "uphold", reviewer: SENIOR, note: null });
+  assert.deepEqual(result, { kind: "not_pending" });
+  const row = await env.DB.prepare("SELECT status FROM cameras WHERE id = ?").bind(record.id).first();
+  assert.equal(row.status, "rejected", "the losing uphold must not reopen the record");
+  const queue = await env.DB.prepare("SELECT COUNT(*) AS n FROM moderation_queue WHERE entity = 'camera' AND entity_id = ? AND state != 'closed'").bind(record.id).first();
+  assert.equal(Number(queue.n), 0, "no queue row is re-inserted");
+  assert.equal((await auditEvents()).filter((event) => event.action === "appeal-uphold").length, 0, "no uphold event");
 });
 
 test("fileAppeal enforces the per-appellant threshold; failed attempts do not count", async () => {
