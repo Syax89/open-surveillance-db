@@ -395,6 +395,18 @@ changes accumulate under `[Unreleased]`.
 
 ### Changed
 
+- **Mobile map chrome + legible clusters (2026-11, owner request):** on
+  phones the search field and a compact "Filters" pill share one row
+  (filters stay closed by default and open below the row); the search field
+  gets a magnifier, its label is visually hidden (still read by screen
+  readers) and the "picking a place clears the filter" caption shows while
+  the field is in use. The map starts ~120px higher on a 390px screen.
+  Map clusters: cells are 64px (was 48) and each badge is clamped 22px
+  inside its cell, so neighbouring badges are always ≥ 44px apart (they used
+  to overlap); `GRID_MAX_ZOOM` is 14 (was 12), so dense city views at z12–13
+  aggregate too — only above 150 visible records. At z13 over a dense area
+  the map shows ~136 readable badges instead of ~600 overlapping dots.
+
 - **Report form and account polish (2026-11):** on wide screens `/segnala`
   splits into two columns (step 1, map + coordinates, on the left across two
   rows; steps 2 and 3 on the right) instead of a 920px block centred under a

@@ -23,7 +23,8 @@ let leaflet;
 const noop = () => {};
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// 200 records (> 150) inside a z13 city view; every 10th is a demo record.
+// 200 records (> 150) inside a z14 street view (>= GRID_MAX_ZOOM: individual
+// markers even when dense); every 10th is a demo record.
 const DENSE = Array.from({ length: 200 }, (_, i) => ({
   id: 7000 + i,
   title: `Dense ${i}`,
@@ -53,7 +54,7 @@ afterEach(async () => {
 
 function element(props) {
   return React.createElement(SurveillanceMap, {
-    selectedId: null, onSelect: noop, onPick: noop, directoryHref: "#records", onBoundsChange: noop, cameras: DENSE, ...props,
+    selectedId: null, onSelect: noop, onPick: noop, directoryHref: "#records", onBoundsChange: noop, cameras: DENSE, initialView: { lat: 41.9, lng: 12.5, zoom: 14 }, ...props,
   });
 }
 
@@ -68,7 +69,7 @@ async function renderDense(props = {}) {
   return view;
 }
 
-test("a dense z13 view draws the individual markers as circleMarkers on ONE shared canvas renderer", async () => {
+test("a dense z14 view draws the individual markers as circleMarkers on ONE shared canvas renderer", async () => {
   await renderDense();
   const markers = await leafletMarkers();
   const dots = dotsOf(markers);
