@@ -395,6 +395,12 @@ changes accumulate under `[Unreleased]`.
 
 ### Changed
 
+- **Design review pass 2 (2026-11):** the mobile/tablet "Menu" button sits
+  next to the language toggle with a hamburger glyph that becomes a close
+  mark while open; the EN/IT toggle keeps its 44px targets with a lighter
+  frame and a soft active state; the four home tool cards share one row from
+  1100px and no longer touch the next section's rule.
+
 - **Design review pass (2026-11, desktop + mobile):** public counts use a
   cached `Intl.NumberFormat` (`app/lib/format-number.ts`: "6,240"); the hero
   search field is opaque so the decorative dot grid no longer shows through;
@@ -615,6 +621,13 @@ changes accumulate under `[Unreleased]`.
   bucket deletion was performed, only the code that read them is gone.
 
 ### Fixed
+
+- **Moderation: a decision no longer collapses the queues loaded with "Load
+  more".** The post-decision reload used to reset every queue to its first
+  page, so a moderator working on page 2+ lost their place after each
+  decision. Expanded queues now keep their extra rows (minus the decided
+  item) and their cursor; counts still come from the server. Test:
+  `tests/client-moderation-queue-paging.test.mjs`.
 
 - **Import — inserts and provenance events atomic (2026-11-11):** each
   import chunk now writes the camera INSERTs and their `imported` lifecycle

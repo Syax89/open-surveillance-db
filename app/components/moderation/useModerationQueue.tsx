@@ -8,7 +8,7 @@ import { communityByLocale } from "../../lib/i18n/community";
 import { moderationByLocale } from "../../lib/i18n/moderation";
 import { LOCALE_BCP47 } from "../../lib/i18n/types";
 import { readCsrfToken } from "../../lib/csrf";
-import { useBoundedQueues } from "./useBoundedQueues";
+import { list, useBoundedQueues } from "./useBoundedQueues";
 import type { CameraInQueue, CorrectionInQueue, DecisionFormApi, EditRequestInQueue, ModerationAction, ModerationEvent, PublishedCursor, QueueEntity, QueueItem, QueuePayload, ReasonCode, Reviewer } from "./types";
 export function useModerationQueue() {
   const { locale } = useLocale();
@@ -31,7 +31,7 @@ export function useModerationQueue() {
   // Current page cursor (ref so a decision refresh targets the page shown NOW) + request generation + synchronous in-flight gate.
   const publishedCursorRef = useRef<PublishedCursor | null>(null); const generationRef = useRef(0);
   const controllerRef = useRef<AbortController | null>(null); const inFlightRef = useRef(false);
-  const bounded = useBoundedQueues({ generationRef, busyRef: inFlightRef, setters: { setCameras, setReviewCameras, setCorrections, setEditRequests, setQueueItems } }); const { invalidate: invalidateBounded, reset: resetBounded } = bounded; // one page per queue + totals; "load more" appends
+  const bounded = useBoundedQueues({ generationRef, busyRef: inFlightRef, setters: { setCameras, setReviewCameras, setCorrections, setEditRequests, setQueueItems } }); const { invalidate: invalidateBounded, reset: resetBounded, refreshPlan } = bounded; // one page per queue + totals; "load more" appends
 
   function readableDate(value?: string) {
     if (!value) return t.timeUnavailable; const date = new Date(value);
@@ -45,7 +45,7 @@ export function useModerationQueue() {
   function readableStatus(status?: string) { return status && status in t.statusLabels ? t.statusLabels[status as keyof typeof t.statusLabels] : status ?? t.recorded; }
   function readableOutcome(outcome?: string) { return outcome && outcome in t.outcomeLabels ? t.outcomeLabels[outcome as keyof typeof t.outcomeLabels] : outcome ?? t.unavailable; }
 
-  const loadQueue = useCallback(() => {
+  const loadQueue = useCallback((decided?: { entity: QueueEntity; id: number }) => { const { keep, keepTail, keepItems } = refreshPlan(decided); // a decision refresh keeps expanded queues' extra pages
     // Flip the busy flag here so EVERY trigger (mount, locale-driven effect re-run, decision refresh, page nav) is truthful.
     setPublishedLoading(true); const generation = (generationRef.current += 1); controllerRef.current?.abort();
     const controller = new AbortController(); controllerRef.current = controller; invalidateBounded(); // a full reload resets every bounded queue to page 1
@@ -57,11 +57,11 @@ export function useModerationQueue() {
         const data = await response.json() as QueuePayload;
         if (generation !== generationRef.current) return;
         if (!response.ok) throw new Error(data.error || t.loadError);
-        setCameras(Array.isArray(data.cameraReports) ? data.cameraReports : []); setPublishedCameras(Array.isArray(data.publishedCameras) ? data.publishedCameras : []);
-        setPublishedNextCursor(data.publishedNextCursor ?? null); setReviewCameras(Array.isArray(data.reviewCameras) ? data.reviewCameras : []);
-        setCorrections(Array.isArray(data.correctionRequests) ? data.correctionRequests : []); setEditRequests(Array.isArray(data.cameraEditRequests) ? data.cameraEditRequests : []);
+        setCameras(keepTail("pending", "camera", list(data.cameraReports))); setPublishedCameras(Array.isArray(data.publishedCameras) ? data.publishedCameras : []);
+        setPublishedNextCursor(data.publishedNextCursor ?? null); setReviewCameras(keepTail("review", "camera", list(data.reviewCameras)));
+        setCorrections(keepTail("corrections", "correction", list(data.correctionRequests))); setEditRequests(keepTail("edits", "camera_edit", list(data.cameraEditRequests)));
         setRecentEvents(Array.isArray(data.recentEvents) ? data.recentEvents : []); setReviewers(Array.isArray(data.reviewers) ? data.reviewers : []);
-        setQueueItems(Array.isArray(data.queueItems) ? data.queueItems : []); setQueueError(""); resetBounded(data);
+        setQueueItems(keepItems(list(data.queueItems))); setQueueError(""); resetBounded(data, keep);
       })
       .catch((reason: unknown) => {
         if (generation !== generationRef.current) return; if (reason instanceof Error && reason.name !== "AbortError") setQueueError(reason.message);
@@ -69,7 +69,7 @@ export function useModerationQueue() {
       .finally(() => {
         if (generation !== generationRef.current) return; inFlightRef.current = false; setLoading(false); setPublishedLoading(false);
       });
-  }, [t.loadError, invalidateBounded, resetBounded]);
+  }, [t.loadError, invalidateBounded, resetBounded, refreshPlan]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- loadQueue also runs from event handlers; the busy flag must flip synchronously before the async fetch and settles in loadQueue's finally.
@@ -136,7 +136,7 @@ export function useModerationQueue() {
       setOutcomes((items) => { const next = { ...items }; delete next[key]; return next; }); setCameraIds((items) => { const next = { ...items }; delete next[key]; return next; });
       setMetadataPublication((items) => { const next = { ...items }; delete next[key]; return next; });
       setMessage(`${entity === "camera" ? t.cameraReport : entity === "camera_edit" ? t.editRequest : t.correctionRequest} #${id} ${t.decisionSaved}: ${actionLabel(action)}. ${t.reason}: ${readableReason(reasonCode)}.`);
-      setPublishedLoading(true); loadQueue();
+      setPublishedLoading(true); loadQueue({ entity, id });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : t.saveError);
     } finally { setProcessing(null); }
