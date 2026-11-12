@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import { getRequestExecutionContext } from "vinext/shims/request-context";
 import { localeFromCookieHeader } from "../../../../lib/i18n/types";
 import {
   createVerificationToken,
@@ -38,6 +39,17 @@ import { releaseEmailReservation, reserveAuthEmail, sendAuthEmail } from "../../
  * budget (an ambiguous provider outcome keeps the short reservation to avoid
  * a duplicate-mail burst — see db/mailer.ts).
  *
+ * Timing (anti-enumeration): the only work done in the request path for
+ * every valid address is the contributor lookup. For a known account the
+ * reservation + token mint + provider send run AFTER the response, inside
+ * the Worker's `ctx.waitUntil` (vinext exposes the request ExecutionContext
+ * through `getRequestExecutionContext`), so a known and an unknown address
+ * answer the same 200 in the same time. The reservation/release semantics
+ * are unchanged — they simply run in the background task, whose failures
+ * are logged, never surfaced (the response was already the generic 200).
+ * Without an ExecutionContext (plain-Node dev server, tests) the send runs
+ * inline as before.
+ *
  * The link goes to the client-side reset page (Fase E2 UI), which calls
  * POST /api/auth/reset-password/confirm with the token + new password.
  */
@@ -66,52 +78,22 @@ export async function POST(request: Request) {
     const contributor = await findContributorByEmail(email);
     if (!contributor) return ok();
 
-    const now = new Date().toISOString();
-    // ATOMIC budget admission BEFORE minting: the reservation INSERT lands
-    // only while the in-window count is below the limit (INSERT ... SELECT
-    // ... WHERE ... < ? RETURNING id — one statement, no race). Only a
-    // request that holds a reservation mints, so a losing concurrent
-    // request cannot revoke the winning reset link.
-    const reservation = await reserveAuthEmail(contributor.id, "reset", now, env);
-    if (!reservation.ok) {
-      // Budget exhausted: still answer the generic success (anti-enumeration).
-      // A 429 here would be reachable only for registered addresses (unknown
-      // emails always get 200 { sent: true }), turning the route into a binary
-      // existence oracle. No token is minted and no mail is sent — the budget
-      // still caps real emails at the canonical limit per window.
+    const locale = localeFromCookieHeader(request.headers.get("Cookie"));
+    const ctx = getRequestExecutionContext();
+    if (ctx) {
+      // Production (Workers): answer now, send after the response (timing
+      // anti-enumeration, see the doc comment).
+      ctx.waitUntil(
+        sendResetEmail(contributor, locale).catch((error: unknown) => {
+          console.error("POST /api/auth/reset-password/request background send failed", error);
+        }),
+      );
       return ok();
     }
-
-    try {
-      const { rawToken } = await createVerificationToken(contributor.id, "reset", now);
-      // Mail result is deliberately swallowed: the reset endpoint is public
-      // and must answer `{ sent: true }` even if the provider rejects — the
-      // response can never reveal whether the address is registered.
-      // sendAuthEmail released the exact reservation on a deterministic
-      // pre-delivery failure, so the budget is not burned by failed sends.
-      await sendAuthEmail({
-        locale: localeFromCookieHeader(request.headers.get("Cookie")),
-        reservationId: reservation.reservationId,
-        contributorId: contributor.id,
-        to: contributor.email,
-        kind: "reset",
-        rawToken,
-      });
-      return ok();
-    } catch (error) {
-      // Token mint or render threw after the reservation: roll the exact
-      // reservation back so the failed attempt does not burn the budget.
-      // Scoped to this contributor + kind, so it can never touch another
-      // account's send row.
-      await releaseEmailReservation(reservation.reservationId, contributor.id, "reset");
-      if (error instanceof BodyReadError) {
-        // Malformed body: same generic success — the reset request is public
-        // and must not reveal anything about the address.
-        return ok();
-      }
-      console.error("POST /api/auth/reset-password/request failed", error);
-      return Response.json({ error: "Unable to request a password reset" }, { status: 503, headers: NO_STORE_HEADERS });
-    }
+    const outcome = await sendResetEmail(contributor, locale);
+    return outcome === "failed"
+      ? Response.json({ error: "Unable to request a password reset" }, { status: 503, headers: NO_STORE_HEADERS })
+      : ok();
   } catch (error) {
     if (error instanceof BodyReadError) {
       // Malformed body: same generic success — the reset request is public
@@ -120,6 +102,59 @@ export async function POST(request: Request) {
     }
     console.error("POST /api/auth/reset-password/request failed", error);
     return Response.json({ error: "Unable to request a password reset" }, { status: 503, headers: NO_STORE_HEADERS });
+  }
+}
+
+/**
+ * Reserve the mail budget, mint the reset token and send it. Returns
+ * "failed" only when the mint/render threw after the reservation (which is
+ * then released); every other outcome — budget exhausted, provider
+ * rejection — is "done" (the response stays the generic 200).
+ */
+async function sendResetEmail(
+  contributor: { id: number; email: string },
+  locale: ReturnType<typeof localeFromCookieHeader>,
+): Promise<"done" | "failed"> {
+  const now = new Date().toISOString();
+  // ATOMIC budget admission BEFORE minting: the reservation INSERT lands
+  // only while the in-window count is below the limit (INSERT ... SELECT
+  // ... WHERE ... < ? RETURNING id — one statement, no race). Only a
+  // request that holds a reservation mints, so a losing concurrent
+  // request cannot revoke the winning reset link.
+  const reservation = await reserveAuthEmail(contributor.id, "reset", now, env);
+  if (!reservation.ok) {
+    // Budget exhausted: still answer the generic success (anti-enumeration).
+    // A 429 here would be reachable only for registered addresses (unknown
+    // emails always get 200 { sent: true }), turning the route into a binary
+    // existence oracle. No token is minted and no mail is sent — the budget
+    // still caps real emails at the canonical limit per window.
+    return "done";
+  }
+
+  try {
+    const { rawToken } = await createVerificationToken(contributor.id, "reset", now);
+    // Mail result is deliberately swallowed: the reset endpoint is public
+    // and must answer `{ sent: true }` even if the provider rejects — the
+    // response can never reveal whether the address is registered.
+    // sendAuthEmail released the exact reservation on a deterministic
+    // pre-delivery failure, so the budget is not burned by failed sends.
+    await sendAuthEmail({
+      locale,
+      reservationId: reservation.reservationId,
+      contributorId: contributor.id,
+      to: contributor.email,
+      kind: "reset",
+      rawToken,
+    });
+    return "done";
+  } catch (error) {
+    // Token mint or render threw after the reservation: roll the exact
+    // reservation back so the failed attempt does not burn the budget.
+    // Scoped to this contributor + kind, so it can never touch another
+    // account's send row.
+    await releaseEmailReservation(reservation.reservationId, contributor.id, "reset");
+    console.error("POST /api/auth/reset-password/request failed", error);
+    return "failed";
   }
 }
 
