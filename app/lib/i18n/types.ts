@@ -46,8 +46,12 @@ export type Translation<T> = {
  * lingua" (1 bundle file + 1 registry line + tsc parity).
  */
 export const SUPPORTED_LOCALES = [
-  { code: "en", label: "EN", bcp47: "en-GB" },
-  { code: "it", label: "IT", bcp47: "it-IT" },
+  { code: "en", label: "EN", bcp47: "en-GB", name: "English" },
+  { code: "it", label: "IT", bcp47: "it-IT", name: "Italiano" },
+  { code: "fr", label: "FR", bcp47: "fr-FR", name: "Français" },
+  { code: "de", label: "DE", bcp47: "de-DE", name: "Deutsch" },
+  { code: "es", label: "ES", bcp47: "es-ES", name: "Español" },
+  { code: "pt", label: "PT", bcp47: "pt-PT", name: "Português" },
 ] as const;
 
 /** The pilot language — always the first registry entry (ADR 0007). */
@@ -81,6 +85,23 @@ export function isLocale(value: string | null | undefined): value is Locale {
  */
 export function resolveLocale(value: string | null | undefined): Locale {
   return isLocale(value) ? value : DEFAULT_LOCALE;
+}
+
+/**
+ * The locale a request's preference cookie names, or null when the visitor
+ * never chose one (no cookie / unknown value). Server routes use it to
+ * address a message in the visitor's language without storing anything.
+ */
+export function localeFromCookieHeader(header: string | null | undefined): Locale | null {
+  const match = (header ?? "").split(";").map((part) => part.trim()).find((part) => part.startsWith(`${LOCALE_COOKIE}=`));
+  if (!match) return null;
+  let value: string;
+  try {
+    value = decodeURIComponent(match.slice(LOCALE_COOKIE.length + 1));
+  } catch {
+    return null;
+  }
+  return isLocale(value) ? value : null;
 }
 
 /**

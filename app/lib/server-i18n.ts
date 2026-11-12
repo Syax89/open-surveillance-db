@@ -20,6 +20,7 @@
 import { cookies } from "next/headers";
 import { LOCALE_COOKIE, messages, resolveLocale } from "./i18n";
 import type { Locale, MessageBundle } from "./i18n";
+import { THEME_COOKIE, resolveTheme, type Theme } from "./theme";
 
 export async function getServerLocale(): Promise<Locale> {
   try {
@@ -36,4 +37,14 @@ export async function getServerLocale(): Promise<Locale> {
 
 export async function getServerMessages(): Promise<MessageBundle> {
   return messages[await getServerLocale()];
+}
+
+/** The visitor's chosen colour theme (cookie), or null to follow the system. */
+export async function getServerTheme(): Promise<Theme | null> {
+  try {
+    const store = await cookies();
+    return resolveTheme(store.get(THEME_COOKIE)?.value);
+  } catch {
+    return null;
+  }
 }

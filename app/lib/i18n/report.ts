@@ -6,6 +6,10 @@
  * (see `./types.ts`), so a missing or extra key fails `tsc --noEmit`.
  */
 import type { Locale, Translation } from "./types";
+import { fr } from "./locales/fr/report";
+import { de } from "./locales/de/report";
+import { es } from "./locales/es/report";
+import { pt } from "./locales/pt/report";
 
 export const en = {
   // Page-level chrome (/segnala).
@@ -275,4 +279,4 @@ export const it: Translation<typeof en> = {
  * `useDomainMessages`, app/lib/use-messages.ts) instead of the aggregated
  * `messages` map, which would ship EVERY domain in BOTH locales.
  */
-export const reportByLocale: Record<Locale, Translation<typeof en>> = { en, it };
+export const reportByLocale: Record<Locale, Translation<typeof en>> = { en, it, fr, de, es, pt };

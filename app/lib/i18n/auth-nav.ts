@@ -12,6 +12,10 @@
  * is type-checked against it via `Translation<typeof en>` (ADR 0007).
  */
 import type { Locale, Translation } from "./types";
+import { fr } from "./locales/fr/auth-nav";
+import { de } from "./locales/de/auth-nav";
+import { es } from "./locales/es/auth-nav";
+import { pt } from "./locales/pt/auth-nav";
 
 export const en = {
   accountAria: "Your account",
@@ -28,4 +32,4 @@ export const it: Translation<typeof en> = {
 };
 
 /** Both locales of this fragment — what AuthNavLinks imports. */
-export const authNavByLocale: Record<Locale, Translation<typeof en>> = { en, it };
+export const authNavByLocale: Record<Locale, Translation<typeof en>> = { en, it, fr, de, es, pt };

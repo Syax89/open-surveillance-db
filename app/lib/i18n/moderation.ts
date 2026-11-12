@@ -6,6 +6,10 @@
  * (see `./types.ts`), so a missing or extra key fails `tsc --noEmit`.
  */
 import type { Locale, Translation } from "./types";
+import { fr } from "./locales/fr/moderation";
+import { de } from "./locales/de/moderation";
+import { es } from "./locales/es/moderation";
+import { pt } from "./locales/pt/moderation";
 
 export const en = {
   navigation: "Moderation navigation",
@@ -463,4 +467,4 @@ export const it: Translation<typeof en> = {
  * `useDomainMessages`, app/lib/use-messages.ts) instead of the aggregated
  * `messages` map, which would ship EVERY domain in BOTH locales.
  */
-export const moderationByLocale: Record<Locale, Translation<typeof en>> = { en, it };
+export const moderationByLocale: Record<Locale, Translation<typeof en>> = { en, it, fr, de, es, pt };

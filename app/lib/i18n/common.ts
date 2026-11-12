@@ -6,10 +6,15 @@
  * (see `./types.ts`), so a missing or extra key fails `tsc --noEmit`.
  */
 import type { Locale, Translation } from "./types";
+import { fr } from "./locales/fr/common";
+import { de } from "./locales/de/common";
+import { es } from "./locales/es/common";
+import { pt } from "./locales/pt/common";
 
 export const en = {
   skipLink: "Skip to main content",
   languageSelection: "Language selection",
+  darkTheme: "Dark theme",
   // Root-layout metadata (SSR/SEO): the fallback <title>/<description>
   // for every route without its own generateMetadata (home, records, auth
   // pages). Localized via the locale cookie — see ADR 0015.
@@ -43,6 +48,7 @@ export const en = {
 export const it: Translation<typeof en> = {
   skipLink: "Vai al contenuto principale",
   languageSelection: "Selezione lingua",
+  darkTheme: "Tema scuro",
   // Metadata del layout di root (SSR/SEO): <title>/<description> di
   // fallback per le route senza generateMetadata propria (home, records,
   // pagine di autenticazione). Localizzati via cookie di locale — ADR 0015.
@@ -75,4 +81,4 @@ export const it: Translation<typeof en> = {
  * `useDomainMessages`, app/lib/use-messages.ts) instead of the aggregated
  * `messages` map, which would ship EVERY domain in BOTH locales.
  */
-export const commonByLocale: Record<Locale, Translation<typeof en>> = { en, it };
+export const commonByLocale: Record<Locale, Translation<typeof en>> = { en, it, fr, de, es, pt };

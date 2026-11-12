@@ -6,6 +6,10 @@
  * (see `./types.ts`), so a missing or extra key fails `tsc --noEmit`.
  */
 import type { Locale, Translation } from "./types";
+import { fr } from "./locales/fr/status";
+import { de } from "./locales/de/status";
+import { es } from "./locales/es/status";
+import { pt } from "./locales/pt/status";
 
 export const en = {
   // ADR 0021: after migration 0039 the public domain status is "active"
@@ -50,4 +54,4 @@ export const it: Translation<typeof en> = {
  * `useDomainMessages`, app/lib/use-messages.ts) instead of the aggregated
  * `messages` map, which would ship EVERY domain in BOTH locales.
  */
-export const statusByLocale: Record<Locale, Translation<typeof en>> = { en, it };
+export const statusByLocale: Record<Locale, Translation<typeof en>> = { en, it, fr, de, es, pt };

@@ -62,6 +62,7 @@
 
 import { env } from "cloudflare:workers";
 import { getD1 } from "./cameras";
+import type { Locale } from "../app/lib/i18n/types";
 import {
   buildAuthActionUrl,
   renderAuthEmail,
@@ -327,6 +328,8 @@ export type SendAuthEmailInput = {
   displayName?: string | null;
   siteName?: string;
   siteUrl?: string;
+  /** Requester's interface language (locale cookie), if they chose one. */
+  locale?: Locale | null;
 };
 
 export type SendAuthEmailResult =
@@ -422,6 +425,7 @@ export async function sendAuthEmail(input: SendAuthEmailInput): Promise<SendAuth
       displayName: input.displayName,
       siteName: input.siteName ?? "OpenSurveillanceDB",
       siteUrl: input.siteUrl ?? "https://opensurveillancedb.org",
+      locale: input.locale ?? null,
     };
     const rendered = renderAuthEmail(input.kind, context);
 

@@ -9,6 +9,10 @@
  * same <ErrorPage /> shell; only the status-specific copy differs.
  */
 import type { Locale, Translation } from "./types";
+import { fr } from "./locales/fr/errors";
+import { de } from "./locales/de/errors";
+import { es } from "./locales/es/errors";
+import { pt } from "./locales/pt/errors";
 
 export const en = {
   navigation: "Site navigation",
@@ -73,4 +77,4 @@ export const it: Translation<typeof en> = {
  * `useDomainMessages`, app/lib/use-messages.ts) instead of the aggregated
  * `messages` map, which would ship EVERY domain in BOTH locales.
  */
-export const errorsByLocale: Record<Locale, Translation<typeof en>> = { en, it };
+export const errorsByLocale: Record<Locale, Translation<typeof en>> = { en, it, fr, de, es, pt };

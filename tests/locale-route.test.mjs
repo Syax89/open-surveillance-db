@@ -110,7 +110,7 @@ test("locale deep-link rejects open-redirect and header-injection targets", asyn
 });
 
 test("locale deep-link falls back to the pilot language for unknown lang values", async () => {
-  const result = await dispatch("/api/locale?lang=fr&next=/guide");
+  const result = await dispatch("/api/locale?lang=xx&next=/guide");
 
   assert.equal(result.status, 302);
   assert.equal(result.location, "/guide");

@@ -6,6 +6,10 @@
  * (see `./types.ts`), so a missing or extra key fails `tsc --noEmit`.
  */
 import type { Locale, Translation } from "./types";
+import { fr } from "./locales/fr/directory";
+import { de } from "./locales/de/directory";
+import { es } from "./locales/es/directory";
+import { pt } from "./locales/pt/directory";
 
 export const en = {
   // Page-level chrome (/directory).
@@ -148,6 +152,8 @@ export const en = {
   // ("Development seed"/"Demo data" — test contract, see DATA_DICTIONARY);
   // the presentation shows these localized labels instead.
   demoSource: "Illustrative seed",
+  /** Display name of the raw source value "Community report". */
+  communityReportSource: "Community report",
   demoUpdated: "Demo data",
   location: "Location",
   unknown: "Unknown",
@@ -305,6 +311,7 @@ export const it: Translation<typeof en> = {
   // ("Development seed"/"Demo data" — contratto di test, vedi DATA_DICTIONARY);
   // la presentazione mostra invece queste etichette localizzate.
   demoSource: "Seed illustrativo",
+  communityReportSource: "Segnalazione della community",
   demoUpdated: "Dato dimostrativo",
   location: "Posizione",
   unknown: "Sconosciuto",
@@ -324,4 +331,4 @@ export const it: Translation<typeof en> = {
  * `useDomainMessages`, app/lib/use-messages.ts) instead of the aggregated
  * `messages` map, which would ship EVERY domain in BOTH locales.
  */
-export const directoryByLocale: Record<Locale, Translation<typeof en>> = { en, it };
+export const directoryByLocale: Record<Locale, Translation<typeof en>> = { en, it, fr, de, es, pt };

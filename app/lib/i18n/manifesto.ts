@@ -6,6 +6,10 @@
  * (see `./types.ts`), so a missing or extra key fails `tsc --noEmit`.
  */
 import type { Locale, Translation } from "./types";
+import { fr } from "./locales/fr/manifesto";
+import { de } from "./locales/de/manifesto";
+import { es } from "./locales/es/manifesto";
+import { pt } from "./locales/pt/manifesto";
 
 export const en = {
   navigation: "Manifesto navigation",
@@ -186,4 +190,4 @@ export const it: Translation<typeof en> = {
  * `useDomainMessages`, app/lib/use-messages.ts) instead of the aggregated
  * `messages` map, which would ship EVERY domain in BOTH locales.
  */
-export const manifestoByLocale: Record<Locale, Translation<typeof en>> = { en, it };
+export const manifestoByLocale: Record<Locale, Translation<typeof en>> = { en, it, fr, de, es, pt };

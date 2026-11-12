@@ -155,11 +155,15 @@ async function buildWorkerTree() {
   // which transpileModule erases — no further rewriting needed.
   const i18nDir = path.join(tree, "app", "lib", "i18n");
   await mkdir(i18nDir, { recursive: true });
-  for (const name of ["common", "errors", "types"]) {
+  // common/errors import their per-locale translations from
+  // ./locales/<code>/<name> (2026-11): compile those too and add the .mjs.
+  const localeNames = ["fr", "de", "es", "pt"].flatMap((code) => [`locales/${code}/common`, `locales/${code}/errors`]);
+  for (const name of ["common", "errors", "types", ...localeNames]) {
     const compiled = ts.transpileModule(
       await readFile(path.join(root, "app", "lib", "i18n", `${name}.ts`), "utf8"),
       { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler } },
-    ).outputText;
+    ).outputText.replace(/from\s*["'](\.\/locales\/[\w/-]+)["']/g, 'from "$1.mjs"');
+    await mkdir(path.dirname(path.join(i18nDir, `${name}.mjs`)), { recursive: true });
     await writeFile(path.join(i18nDir, `${name}.mjs`), compiled);
   }
 

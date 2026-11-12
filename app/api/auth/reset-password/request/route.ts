@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import { localeFromCookieHeader } from "../../../../lib/i18n/types";
 import {
   createVerificationToken,
   findContributorByEmail,
@@ -89,6 +90,7 @@ export async function POST(request: Request) {
       // sendAuthEmail released the exact reservation on a deterministic
       // pre-delivery failure, so the budget is not burned by failed sends.
       await sendAuthEmail({
+        locale: localeFromCookieHeader(request.headers.get("Cookie")),
         reservationId: reservation.reservationId,
         contributorId: contributor.id,
         to: contributor.email,
