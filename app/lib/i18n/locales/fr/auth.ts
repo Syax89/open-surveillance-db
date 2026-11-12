@@ -59,7 +59,11 @@ export const fr: Translation<typeof en> = {
   loggedOutTitle: "Vous êtes déconnecté",
   loggedOutBody: "Votre session est terminée. Vous pouvez fermer cette fenêtre ou vous reconnecter.",
   errorInvalidCredentials: "Identifiants invalides.",
-  errorEmailTaken: "Un compte existe déjà avec cette adresse e-mail.",
+  // Register confirmation: shown after EVERY accepted submit, new address or
+  // not — the API answers the same for both (no account enumeration).
+  registerCheckEmailTitle: "Consultez vos e-mails",
+  registerCheckEmailBody:
+    "Si cette adresse peut être utilisée, nous vous avons envoyé un e-mail indiquant l’étape suivante. Consultez votre boîte de réception (et vos spams).",
   errorGeneric: "Une erreur est survenue. Veuillez réessayer.",
   errorCrossOrigin: "Requête intersite refusée.",
   // Static copy on /login (t_6dc1c96f — CEO feedback 2026-08-03): login is

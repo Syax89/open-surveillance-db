@@ -20,4 +20,11 @@ export const es: EmailCopy = {
     button: "Restablecer la contraseña",
     ignore: "Si no has solicitado restablecer la contraseña, puedes ignorar este correo: tu contraseña no cambiará.",
   },
+  accountExists: {
+    intro:
+      "Alguien ha intentado crear una cuenta en {SITE} con esta dirección de correo electrónico. Si has sido tú, ya tienes una cuenta: inicia sesión o restablece tu contraseña si la has olvidado.",
+    button: "Iniciar sesión",
+    secondaryButton: "Restablecer la contraseña",
+    ignore: "Si no has sido tú, puedes ignorar este correo: no ha cambiado nada.",
+  },
 };

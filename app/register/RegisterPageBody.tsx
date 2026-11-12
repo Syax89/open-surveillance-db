@@ -2,22 +2,23 @@
 
 import { useState, useEffect, type FormEvent } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useDomainMessages } from "../lib/use-domain-messages";
 import { authByLocale } from "../lib/i18n/auth";
 import { PublicNav } from "../components/PublicNav";
 import { passwordRuleFailures } from "../lib/password-policy";
-import { hardNavigate } from "../lib/navigate";
 import { Art13Notice } from "../components/Art13Notice";
 
 export function RegisterPageBody() {
   const t = useDomainMessages(authByLocale);
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // Set once the API accepted the submit. The API answers the SAME 202 for a
+  // new and an already-registered address (no account enumeration), so the
+  // page always shows the same "check your email" confirmation.
+  const [submitted, setSubmitted] = useState(false);
   // Per-field client validation state (finding QA-2026-08-01-2, closed in
   // F-QA t_7b716c97): aria-invalid marks the exact failing field. Server
   // errors keep the role="alert" announcement without blaming one field.
@@ -75,14 +76,14 @@ export function RegisterPageBody() {
         }),
       });
       if (response.ok) {
-        // Hard navigation (2026-08-08): same vinext dev freeze as login —
-        // router.push + refresh leaves the UI on the register page; a full
-        // reload guarantees the fresh session cookies reach the SSR pass.
-        hardNavigate("/account");
+        // No session is opened at registration any more: the next step (the
+        // verification link, or a notice if the address already has an
+        // account) is in the mailbox, never on this page.
+        setPassword("");
+        setSubmitted(true);
         return;
       }
-      if (response.status === 409) setError(t.errorEmailTaken);
-      else if (response.status === 429) setError(t.errorGeneric);
+      if (response.status === 429) setError(t.errorGeneric);
       else if (response.status === 403) setError(t.errorCrossOrigin);
       else setError(t.errorGeneric);
     } catch {
@@ -110,7 +111,7 @@ export function RegisterPageBody() {
           path. Email conflicts still redirect to /login?merge=… for the
           password proof (shared backend, unchanged).
         */}
-        {socialAvailable ? (
+        {socialAvailable && !submitted ? (
           <div className="oidc-panel">
             <div className="oidc-buttons">
               {oidcProviders?.includes("github") ? (
@@ -131,80 +132,87 @@ export function RegisterPageBody() {
           </div>
         ) : null}
 
-        <form className="auth-form" onSubmit={onSubmit} noValidate>
-          <label className="auth-field">
-            <span>{t.email}</span>
-            <input
-              type="email"
-              name="email"
-              autoComplete="email"
-              required
-              aria-invalid={fieldErrors.email || undefined}
-              value={email}
-              onChange={(event) => {
-                setEmail(event.target.value);
-                if (fieldErrors.email) setFieldErrors((f) => ({ ...f, email: undefined }));
-              }}
-            />
-          </label>
-          <label className="auth-field">
-            <span>{t.displayName}</span>
-            <input
-              type="text"
-              name="displayName"
-              autoComplete="nickname"
-              minLength={2}
-              maxLength={60}
-              aria-invalid={fieldErrors.displayName || undefined}
-              value={displayName}
-              onChange={(event) => {
-                setDisplayName(event.target.value);
-                if (fieldErrors.displayName) setFieldErrors((f) => ({ ...f, displayName: undefined }));
-              }}
-            />
-          </label>
-          <label className="auth-field">
-            <span>{t.password}</span>
-            <input
-              type="password"
-              name="password"
-              autoComplete="new-password"
-              required
-              minLength={10}
-              aria-invalid={fieldErrors.password || undefined}
-              aria-describedby="password-requirements"
-              value={password}
-              onChange={(event) => {
-                setPassword(event.target.value);
-                if (fieldErrors.password) setFieldErrors((f) => ({ ...f, password: undefined }));
-              }}
-            />
-            <div
-              className="password-requirements"
-              id="password-requirements"
-              data-invalid={fieldErrors.password || undefined}
-            >
-              <span className="password-requirements-label">{t.passwordRequirements}</span>
-              <ul className="password-requirements-list">
-                <li>{t.passwordRuleLength}</li>
-                <li>{t.passwordRuleUppercase}</li>
-                <li>{t.passwordRuleLowercase}</li>
-                <li>{t.passwordRuleDigit}</li>
-                <li>{t.passwordRuleSpecial}</li>
-              </ul>
-            </div>
-          </label>
-          {error ? <p className="auth-error" role="alert">{error}</p> : null}
-          <button className="button button-primary" type="submit" disabled={submitting}>
-            {submitting ? t.loading : t.register}
-          </button>
-          <p className="auth-legal-links">
-            <Link href="/privacy" prefetch={false}>{t.privacyNotice}</Link>
-            <span aria-hidden="true"> · </span>
-            <Link href="/termini" prefetch={false}>{t.termsOfUse}</Link>
-          </p>
-          <Art13Notice id="register-art13-note" label={t.privacyDetails}>{t.registerArt13} <Link href="/privacy" prefetch={false}>{t.privacyNotice}</Link>. {t.registerArt13Rights} <a href="mailto:privacy@opensurveillancedb.org">{t.privacyContact}</a>.</Art13Notice>
-        </form>
+        {submitted ? (
+          <div role="status">
+            <h2>{t.registerCheckEmailTitle}</h2>
+            <p className="record-detail-summary">{t.registerCheckEmailBody}</p>
+          </div>
+        ) : (
+          <form className="auth-form" onSubmit={onSubmit} noValidate>
+            <label className="auth-field">
+              <span>{t.email}</span>
+              <input
+                type="email"
+                name="email"
+                autoComplete="email"
+                required
+                aria-invalid={fieldErrors.email || undefined}
+                value={email}
+                onChange={(event) => {
+                  setEmail(event.target.value);
+                  if (fieldErrors.email) setFieldErrors((f) => ({ ...f, email: undefined }));
+                }}
+              />
+            </label>
+            <label className="auth-field">
+              <span>{t.displayName}</span>
+              <input
+                type="text"
+                name="displayName"
+                autoComplete="nickname"
+                minLength={2}
+                maxLength={60}
+                aria-invalid={fieldErrors.displayName || undefined}
+                value={displayName}
+                onChange={(event) => {
+                  setDisplayName(event.target.value);
+                  if (fieldErrors.displayName) setFieldErrors((f) => ({ ...f, displayName: undefined }));
+                }}
+              />
+            </label>
+            <label className="auth-field">
+              <span>{t.password}</span>
+              <input
+                type="password"
+                name="password"
+                autoComplete="new-password"
+                required
+                minLength={10}
+                aria-invalid={fieldErrors.password || undefined}
+                aria-describedby="password-requirements"
+                value={password}
+                onChange={(event) => {
+                  setPassword(event.target.value);
+                  if (fieldErrors.password) setFieldErrors((f) => ({ ...f, password: undefined }));
+                }}
+              />
+              <div
+                className="password-requirements"
+                id="password-requirements"
+                data-invalid={fieldErrors.password || undefined}
+              >
+                <span className="password-requirements-label">{t.passwordRequirements}</span>
+                <ul className="password-requirements-list">
+                  <li>{t.passwordRuleLength}</li>
+                  <li>{t.passwordRuleUppercase}</li>
+                  <li>{t.passwordRuleLowercase}</li>
+                  <li>{t.passwordRuleDigit}</li>
+                  <li>{t.passwordRuleSpecial}</li>
+                </ul>
+              </div>
+            </label>
+            {error ? <p className="auth-error" role="alert">{error}</p> : null}
+            <button className="button button-primary" type="submit" disabled={submitting}>
+              {submitting ? t.loading : t.register}
+            </button>
+            <p className="auth-legal-links">
+              <Link href="/privacy" prefetch={false}>{t.privacyNotice}</Link>
+              <span aria-hidden="true"> · </span>
+              <Link href="/termini" prefetch={false}>{t.termsOfUse}</Link>
+            </p>
+            <Art13Notice id="register-art13-note" label={t.privacyDetails}>{t.registerArt13} <Link href="/privacy" prefetch={false}>{t.privacyNotice}</Link>. {t.registerArt13Rights} <a href="mailto:privacy@opensurveillancedb.org">{t.privacyContact}</a>.</Art13Notice>
+          </form>
+        )}
 
         <p className="auth-switch">
           {t.haveAccount}{" "}

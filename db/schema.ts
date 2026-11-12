@@ -900,7 +900,8 @@ export const cameraEditRequests = sqliteTable(
  * content, NO recipient address (the address already lives on
  * `contributors.email`) and NO IP — a leak of this table reveals nothing
  * beyond "account X was emailed for kind Y at time T". `kind` is
- * 'verify' | 'reset'; the rate-limit window counts rows newer than
+ * 'verify' | 'reset' | 'account_exists' (the register anti-enumeration
+ * notice, additionally capped at 3 per 24 h); the rate-limit window counts rows newer than
  * now - 5 min for the contributor. Rows cascade-delete with the account
  * (ADR 0013 erasure) and age out via retention R18 (24 h).
  * Declared here so drizzle-kit generate never re-emits it (convention
