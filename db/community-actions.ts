@@ -85,16 +85,25 @@ function settingsNumber(settings: Record<string, unknown>, key: string, fallback
  * Sum-weighted + distinct contributor counts grouped by action_type for a
  * single camera. Used internally by evaluateCommunityThresholds.
  */
-async function cameraActionStats(cameraId: number): Promise<Map<string, { sum: number; distinctCount: number }>> {
+async function cameraActionStats(
+  cameraId: number,
+  since: string | null,
+): Promise<Map<string, { sum: number; distinctCount: number }>> {
   const d1 = await getD1();
+  // `since` (the record's last status change) bounds the evaluation to the
+  // actions expressed AFTER the current state was entered: an action cast
+  // (or switched — updated_at moves on a switch) before the transition is
+  // stale and must never decide the next one. Without the bound, confirms
+  // from before a removal restored the record on the very next action of
+  // ANY type (audit finding: one `like` undid a takedown).
   const rows = await d1
     .prepare(
       `SELECT action_type AS actionType, COALESCE(SUM(weight), 0) AS sum, COUNT(DISTINCT contributor_id) AS distinctCount
        FROM camera_community_actions
-       WHERE camera_id = ?
+       WHERE camera_id = ? AND (? IS NULL OR updated_at >= ?)
        GROUP BY action_type`,
     )
-    .bind(cameraId)
+    .bind(cameraId, since, since)
     .all<{ actionType: string; sum: number; distinctCount: number }>();
   const map = new Map<string, { sum: number; distinctCount: number }>();
   for (const row of rows.results) {
@@ -102,6 +111,31 @@ async function cameraActionStats(cameraId: number): Promise<Map<string, { sum: n
   }
   return map;
 }
+
+type StatusChange = { action: string; actor: string | null; newStatus: string; createdAt: string };
+
+/** Latest status transition recorded for a camera (see evaluateCommunityThresholds). */
+async function lastStatusChange(cameraId: number): Promise<StatusChange | null> {
+  const d1 = await getD1();
+  return d1
+    .prepare(
+      `SELECT action, actor, new_status AS newStatus, created_at AS createdAt
+         FROM moderation_events
+        WHERE entity = 'camera' AND entity_id = ? AND previous_status != new_status AND recused = 0
+        ORDER BY id DESC
+        LIMIT 1`,
+    )
+    .bind(cameraId)
+    .first<StatusChange>();
+}
+
+/** A transition written by evaluateCommunityThresholds itself (actor `community:<id>`, action `community-*`). */
+function isCommunityTransition(change: StatusChange): boolean {
+  return change.action.startsWith("community-") && (change.actor ?? "").startsWith("community:");
+}
+
+/** Statuses on which community actions are part of the ADR 0021 design (§2, §6.3). */
+const COMMUNITY_ACTIONABLE_STATUSES: ReadonlySet<string> = new Set(["active", "hidden", "removed"]);
 
 /**
  * Transaccional threshold evaluation (ADR 0021 §2, §4, §6).
@@ -164,7 +198,26 @@ export async function evaluateCommunityThresholds(input: {
   if (!camera) return;
 
   const currentStatus = camera.status;
-  const stats = await cameraActionStats(input.cameraId);
+
+  // Cause of the current state. moderation_events is the complete,
+  // append-only trail of every status transition (community thresholds,
+  // moderator decisions, correction outcomes, appeals, the 0039 migration):
+  // the latest real transition (previous != new, not a recusal) tells WHO
+  // put the record in its current state and WHEN.
+  const lastChange = await lastStatusChange(input.cameraId);
+
+  // Only community-made withdrawals are community-reversible. A record a
+  // moderator hid/removed (legal or privacy takedown), a correction outcome
+  // removed, or the migration carried over from a moderator rejection is
+  // never restored by the community — nor pushed to another state (hidden →
+  // removed would re-label a moderator decision as a community one and
+  // launder it into a restorable state). Unknown cause (no transition event,
+  // or one that does not match the current status) fails closed.
+  if (currentStatus === "hidden" || currentStatus === "removed") {
+    if (!lastChange || lastChange.newStatus !== currentStatus || !isCommunityTransition(lastChange)) return;
+  }
+
+  const stats = await cameraActionStats(input.cameraId, lastChange?.createdAt ?? null);
 
   const getStats = (type: string) => stats.get(type) ?? { sum: 0, distinctCount: 0 };
 
@@ -365,12 +418,17 @@ export async function setCommunityAction(input: {
   const effectiveEnv = input.env ?? env;
   const nowMs = Date.parse(input.now);
 
-  // 1. Camera lookup: must exist and not be demo
+  // 1. Camera lookup: must exist and be in a community-actionable state
+  // (active, or hidden/removed — reachable by direct link for the reversal
+  // signals, ADR 0021 §6.3). Anything else (demo, legacy pending / rejected
+  // / needs_review / stale, an appeal-reopened pending record) is outside
+  // the community flow and answers exactly like a missing id: no counts, no
+  // status oracle, and never a path to publish a record no one approved.
   const camera = await d1
     .prepare("SELECT id, contributor_id AS contributorId, status FROM cameras WHERE id = ?")
     .bind(input.cameraId)
     .first<{ id: number; contributorId: number | null; status: string }>();
-  if (!camera || camera.status === "demo") return { kind: "camera_not_found" };
+  if (!camera || !COMMUNITY_ACTIONABLE_STATUSES.has(camera.status)) return { kind: "camera_not_found" };
 
   // 2. Self-action gate: like/confirm on own record
   if (camera.contributorId === input.contributorId && (actionType === "like" || actionType === "confirm")) {
