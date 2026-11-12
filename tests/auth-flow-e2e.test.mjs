@@ -880,15 +880,23 @@ test("E2E: a contested privacy correction is escalated and handled by a senior m
 
   // A senior moderator handles the appeal: mark the record stale while it is
   // reassessed (DATA_TRUST SLA) — the record leaves the public listing.
-  const resolve = await moderateCorrection({
+  // A `removal` report is urgent by server-side derivation (two-person
+  // review, ADR 0009 §4): the senior's decision is the first-review intent
+  // (202) and a different approver completes it.
+  const decision = {
     entity: "correction",
     id: referenceId,
     action: "approve",
     reasonCode: REASON.privacy,
     note: "Appeal upheld — reassessing the record.",
     outcome: "marked-stale",
-    actorId: REVIEWERS.senior,
-  });
+  };
+  const firstReview = await moderateCorrection({ ...decision, actorId: REVIEWERS.senior });
+  assert.equal(firstReview.status, 202);
+  const firstReviewBody = await responseBody(firstReview);
+  assert.equal(firstReviewBody.queue.sensitivity, "urgent");
+  assert.equal(firstReviewBody.queue.state, "second_review");
+  const resolve = await moderateCorrection({ ...decision, actorId: REVIEWERS.record });
   assert.equal(resolve.status, 200);
   const resolved = await responseBody(resolve);
   assert.equal(resolved.item.status, "reviewed");
@@ -899,14 +907,16 @@ test("E2E: a contested privacy correction is escalated and handled by a senior m
   const row = await env.DB.prepare("SELECT status FROM cameras WHERE id = ?").bind(record.id).first();
   assert.equal(row.status, "needs_review");
 
-  // Audit trail: approve (camera) → escalate (correction) → approve
-  // (correction) → marked-stale (camera). The blocked attempt writes nothing.
+  // Audit trail: approve (camera) → escalate (correction) → first-review
+  // intent → approve (correction) → marked-stale (camera). The blocked
+  // attempt writes nothing.
   const events = await auditEvents();
   assert.deepEqual(
     events.map((event) => [event.entity, event.action, event.new_status]),
     [
       ["camera", "approve", "active"],
       ["correction", "escalate", "pending"],
+      ["correction", "approve", "pending"],
       ["correction", "approve", "reviewed"],
       ["camera", "marked-stale", "needs_review"],
     ],
@@ -992,7 +1002,11 @@ test("E2E: nearby and coordinate search return only published records", async ()
 // ---------------------------------------------------------------------------
 
 test("E2E: a contributor appeals a rejection; an independent senior moderator upholds it and the record returns to the queue", async () => {
-  const record = await submitPendingCamera();
+  // Standing (security audit): the appellant must own the record, so the
+  // record is attributed to the demo contributor's account.
+  const contributorHeaders = await contributorSessionHeaders();
+  const owner = await env.DB.prepare("SELECT contributor_id AS contributorId FROM users WHERE id = 6").first();
+  const record = await submitPendingCamera({ contributorId: owner.contributorId });
   await moderateCamera(record.id, "reject", REASON.insufficient, REVIEWERS.intake);
 
   // The rejection is a final decision: the contributor contests it.
@@ -1000,7 +1014,6 @@ test("E2E: a contributor appeals a rejection; an independent senior moderator up
   const decisionEvent = events[0];
   assert.equal(decisionEvent.action, "reject");
 
-  const contributorHeaders = await contributorSessionHeaders();
   const fileResponse = await appealsRoute.POST(apiRequest("/api/appeals", {
     method: "POST",
     headers: contributorHeaders,

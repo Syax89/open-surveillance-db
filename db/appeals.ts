@@ -3,7 +3,7 @@ import type { D1PreparedStatement } from "cloudflare:workers";
 import { getD1 } from "./cameras";
 import { getUserById } from "./users";
 import {
-  buildModerationEventStatement,
+  buildGuardedEventStatement,
   type ModerationD1,
   type ModerationEntity,
   type ModerationEvent,
@@ -76,6 +76,11 @@ export type DecideAppealResult =
   | { kind: "ok"; appeal: ModerationAppeal; event: ModerationEvent }
   | { kind: "not_found" }
   | { kind: "not_pending" }
+  // The decider is the appellant (reviewers.user_id = appellant_id).
+  | { kind: "self_review" }
+  // Uphold only: the record no longer carries the status the contested
+  // decision produced (it changed since), so there is nothing to reverse.
+  | { kind: "decision_superseded" }
   | { kind: "reviewer_not_found" }
   | { kind: "reviewer_inactive" }
   | { kind: "forbidden" }
@@ -160,12 +165,51 @@ function buildAppealFiledEventStatement(
 }
 
 /**
+ * Standing (security audit): the appellant's contributor account
+ * (users.contributor_id) must own the appealed entity — the camera's
+ * submitter or the correction's reporter. An entity with no attribution
+ * (anonymous / imported submission) cannot be checked for standing and stays
+ * appealable by any contributor by design, but such a non-owner never
+ * receives the contested decision's details back (see redactForNonOwner).
+ */
+async function appealStanding(
+  d1: ModerationD1,
+  entity: ModerationEntity,
+  entityId: number,
+  appellantId: number,
+): Promise<"owner" | "unattributed" | "none"> {
+  const table = entity === "camera" ? "cameras" : entity === "correction" ? "correction_requests" : null;
+  if (!table) return "none";
+  const row = await d1
+    .prepare(
+      `SELECT e.contributor_id AS ownerId, (SELECT contributor_id FROM users WHERE id = ?) AS appellantContributorId FROM ${table} e WHERE e.id = ?`,
+    )
+    .bind(appellantId, entityId)
+    .first<{ ownerId: number | null; appellantContributorId: number | null }>();
+  if (!row) return "none";
+  if (row.ownerId === null) return "unattributed";
+  return row.appellantContributorId !== null && row.appellantContributorId === row.ownerId ? "owner" : "none";
+}
+
+/** Strip the contested decision's details from what a non-owner gets back. */
+function redactForNonOwner(appeal: ModerationAppeal, event: ModerationEvent): { appeal: ModerationAppeal; event: ModerationEvent } {
+  return {
+    appeal: { ...appeal, decisionAction: null, decisionReasonCode: null, deciderName: null },
+    event: { ...event, previousStatus: "", newStatus: "", note: null },
+  };
+}
+
+/**
  * File an appeal against a recorded moderation decision. The decision must
  * exist and must be a final decision (it changed the entity status): intent
  * events (recusals, escalations, second-review steps) cannot be appealed.
  *
+ * A missing decision, a decision that does not belong to the named entity,
+ * and an appellant without standing all answer the SAME `decision_not_found`
+ * (no oracle on other people's moderation decisions).
+ *
  * Standing and abuse control (DATA_TRUST.md "Corrections, removals, and
- * appeals"): any contributor may appeal a decision, but an appeal must state
+ * appeals"): only the owner of an attributed submission may appeal, and an appeal must state
  * why the appellant is affected (their submission or direct knowledge of the
  * record — the route enforces a minimum reason length, moderation evaluates
  * relevance). Anonymous submissions have no attribution, so appeals on them
@@ -188,12 +232,12 @@ export async function fileAppeal(input: {
     )
     .bind(input.decisionEventId)
     .first<{ id: number; entity: string; entityId: number; previousStatus: string; newStatus: string; action: string }>();
-  if (!decision) return { kind: "decision_not_found" };
-  if (
-    decision.entity !== input.entity ||
-    decision.entityId !== input.entityId ||
-    decision.previousStatus === decision.newStatus
-  ) {
+  if (!decision || decision.entity !== input.entity || decision.entityId !== input.entityId) {
+    return { kind: "decision_not_found" };
+  }
+  const standing = await appealStanding(d1, input.entity, input.entityId, input.appellantId);
+  if (standing === "none") return { kind: "decision_not_found" };
+  if (decision.previousStatus === decision.newStatus) {
     return { kind: "decision_not_final" };
   }
 
@@ -269,6 +313,7 @@ export async function fileAppeal(input: {
 
   const appeal = await loadAppeal(d1, created.id);
   if (!appeal) throw new Error("Appeal could not be loaded");
+  if (standing !== "owner") return { kind: "ok", ...redactForNonOwner(appeal, event) };
   return { kind: "ok", appeal, event };
 }
 
@@ -303,10 +348,10 @@ export async function decideAppeal(input: {
 
   const appeal = await d1
     .prepare(
-      "SELECT id, entity, entity_id AS entityId, decision_event_id AS decisionEventId, status FROM moderation_appeals WHERE id = ?",
+      "SELECT id, entity, entity_id AS entityId, decision_event_id AS decisionEventId, appellant_id AS appellantId, status FROM moderation_appeals WHERE id = ?",
     )
     .bind(input.id)
-    .first<{ id: number; entity: ModerationEntity; entityId: number; decisionEventId: number; status: AppealStatus }>();
+    .first<{ id: number; entity: ModerationEntity; entityId: number; decisionEventId: number; appellantId: number; status: AppealStatus }>();
   if (!appeal) return { kind: "not_found" };
 
   if (input.reviewer.active !== 1) return { kind: "reviewer_inactive" };
@@ -329,9 +374,30 @@ export async function decideAppeal(input: {
     return { kind: "original_reviewer" };
   }
 
+  // Self-review: the decider's identity (reviewers.user_id) must not be the
+  // appellant — nobody decides their own appeal.
+  const deciderUser = await d1
+    .prepare("SELECT user_id AS userId FROM reviewers WHERE id = ?")
+    .bind(input.reviewer.id)
+    .first<{ userId: number | null }>();
+  if (deciderUser?.userId != null && deciderUser.userId === appeal.appellantId) {
+    return { kind: "self_review" };
+  }
+
   const now = new Date().toISOString();
   const status: AppealStatus =
     input.decision === "uphold" ? "upheld" : input.decision === "dismiss" ? "dismissed" : "escalated";
+
+  const entityTable = appeal.entity === "camera" ? "cameras" : "correction_requests";
+  // Every dependent statement of the batch is guarded on THIS decision having
+  // landed: the appeal row carries this status, this decider and this exact
+  // decided_at. A concurrent decider that won the race leaves the guard false,
+  // so nothing else in our batch writes (no entity change, no queue row, no
+  // audit event).
+  const appealDecidedHere =
+    "SELECT 1 FROM moderation_appeals WHERE id = ? AND status = ? AND decided_by = ? AND decided_at = ?";
+  const appealDecidedHereBinds = [input.id, status, input.reviewer.id, now] as const;
+  const eventGuard = { sql: "AND decided_by = ? AND decided_at = ?", binds: [input.reviewer.id, now] };
 
   const appealUpdate = d1
     .prepare(
@@ -342,9 +408,21 @@ export async function decideAppeal(input: {
       // decision already taken (double decision event, queue reopened twice).
       // Guarding the UPDATE closes the race at the SQL level; changes=0 maps
       // to not_pending below, exactly like db/moderation.ts moderateCamera.
-      "UPDATE moderation_appeals SET status = ?, decided_by = ?, decision_note = ?, decided_at = ? WHERE id = ? AND status IN ('pending', 'escalated') RETURNING id",
+      // An uphold additionally requires the record to still carry the status
+      // the contested decision produced: if it changed since (another
+      // decision, a community transition), there is nothing to reverse.
+      `UPDATE moderation_appeals SET status = ?, decided_by = ?, decision_note = ?, decided_at = ? WHERE id = ? AND status IN ('pending', 'escalated')${
+        input.decision === "uphold" ? ` AND EXISTS (SELECT 1 FROM ${entityTable} WHERE id = ? AND status = ?)` : ""
+      } RETURNING id`,
     )
-    .bind(status, input.reviewer.id, input.note, now, input.id);
+    .bind(
+      status,
+      input.reviewer.id,
+      input.note,
+      now,
+      input.id,
+      ...(input.decision === "uphold" ? [appeal.entityId, decision.newStatus] : []),
+    );
 
   if (input.decision === "uphold") {
     // ONE batch: appeal UPDATE, entity back to pending, reopen queue, the
@@ -354,35 +432,54 @@ export async function decideAppeal(input: {
     const results = (await d1.batch([
       appealUpdate,
       appeal.entity === "camera"
-        ? d1.prepare("UPDATE cameras SET status = 'pending', updated = ? WHERE id = ?").bind(now, appeal.entityId)
-        : d1.prepare("UPDATE correction_requests SET status = 'pending' WHERE id = ?").bind(appeal.entityId),
+        ? d1
+            .prepare(`UPDATE cameras SET status = 'pending', updated = ? WHERE id = ? AND status = ? AND EXISTS (${appealDecidedHere})`)
+            .bind(now, appeal.entityId, decision.newStatus, ...appealDecidedHereBinds)
+        : d1
+            .prepare(`UPDATE correction_requests SET status = 'pending' WHERE id = ? AND status = ? AND EXISTS (${appealDecidedHere})`)
+            .bind(appeal.entityId, decision.newStatus, ...appealDecidedHereBinds),
       d1
         .prepare(
           `INSERT INTO moderation_queue (entity, entity_id, state, assignee_id, sensitivity, requires_second_review, second_reviewer_id, escalation_reason, created_at, updated_at)
-           VALUES (?, ?, 'queued', NULL, 'standard', 0, NULL, NULL, ?, ?)
+           SELECT ?, ?, 'queued', NULL, 'standard', 0, NULL, NULL, ?, ?
+           WHERE EXISTS (${appealDecidedHere})
            ON CONFLICT(entity, entity_id) WHERE state != 'closed' DO NOTHING`,
         )
-        .bind(appeal.entity, appeal.entityId, now, now),
-      buildModerationEventStatement(d1, {
-        entity: appeal.entity,
-        entityId: appeal.entityId,
-        previousStatus: decision.newStatus,
-        newStatus: "pending",
-        action: `appeal-${input.decision}`,
-        reasonCode: "other",
-        note: input.note,
-        reviewer: input.reviewer,
-        appealId: input.id,
-      }),
+        .bind(appeal.entity, appeal.entityId, now, now, ...appealDecidedHereBinds),
+      buildGuardedEventStatement(
+        d1,
+        {
+          entity: appeal.entity,
+          entityId: appeal.entityId,
+          previousStatus: decision.newStatus,
+          newStatus: "pending",
+          action: `appeal-${input.decision}`,
+          reasonCode: "other",
+          note: input.note,
+          reviewer: input.reviewer,
+          appealId: input.id,
+        },
+        "moderation_appeals",
+        input.id,
+        status,
+        eventGuard,
+      ),
       buildLoadAppealStatement(d1, input.id),
     ])) as D1BatchResult[];
 
     const updated = results[0].results?.[0] as { id: number } | undefined;
     if (!updated) {
       // The SELECT above found a pending/escalated appeal, but the guarded
-      // UPDATE touched 0 rows: another decider won the race and the appeal is
-      // no longer decidable. That is not_pending (409), never not_found —
-      // the row still exists, it just changed state under us (QA F3).
+      // UPDATE touched 0 rows: either another decider won the race (the
+      // appeal is no longer decidable → not_pending, QA F3) or the record
+      // moved away from the contested decision's status (→ superseded).
+      const current = await d1
+        .prepare("SELECT status FROM moderation_appeals WHERE id = ?")
+        .bind(input.id)
+        .first<{ status: AppealStatus }>();
+      if (current && (current.status === "pending" || current.status === "escalated")) {
+        return { kind: "decision_superseded" };
+      }
       return { kind: "not_pending" };
     }
     const event = results[3].results?.[0] as ModerationEvent;
@@ -392,20 +489,28 @@ export async function decideAppeal(input: {
     return { kind: "ok", appeal: appealResult, event };
   }
 
-  // dismiss / escalate: ONE batch — appeal UPDATE, decision event, readback.
+  // dismiss / escalate: ONE batch — appeal UPDATE, decision event (guarded
+  // on this decision having landed), readback.
   const results = (await d1.batch([
     appealUpdate,
-    buildModerationEventStatement(d1, {
-      entity: appeal.entity,
-      entityId: appeal.entityId,
-      previousStatus: decision.previousStatus,
-      newStatus: decision.newStatus,
-      action: `appeal-${input.decision}`,
-      reasonCode: "other",
-      note: input.note,
-      reviewer: input.reviewer,
-      appealId: input.id,
-    }),
+    buildGuardedEventStatement(
+      d1,
+      {
+        entity: appeal.entity,
+        entityId: appeal.entityId,
+        previousStatus: decision.previousStatus,
+        newStatus: decision.newStatus,
+        action: `appeal-${input.decision}`,
+        reasonCode: "other",
+        note: input.note,
+        reviewer: input.reviewer,
+        appealId: input.id,
+      },
+      "moderation_appeals",
+      input.id,
+      status,
+      eventGuard,
+    ),
     buildLoadAppealStatement(d1, input.id),
   ])) as D1BatchResult[];
 

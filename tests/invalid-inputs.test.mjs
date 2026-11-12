@@ -239,7 +239,7 @@ test("boundary coordinate values are stored verbatim", async () => {
 test("numeric-string cameraId is coerced to an integer by SQLite affinity", async () => {
   const { env, cameras, corrections } = await realDb();
   await resetDb({ env, cameras });
-  const camera = await cameras.createPendingCamera({
+  const camera = await cameras.createCamera({
     title: "Target",
     kind: "Fixed dome",
     manufacturer: null,

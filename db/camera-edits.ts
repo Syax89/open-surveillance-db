@@ -1,5 +1,6 @@
 import { DOME_KIND, getD1 } from "./cameras";
 import { titleSortKey } from "../app/lib/title-sort-key";
+import { isPublicStatus } from "../app/lib/public-status";
 import { recordModerationEvent } from "./moderation";
 
 /**
@@ -17,7 +18,9 @@ import { recordModerationEvent } from "./moderation";
  *     `moderation_queue` row (entity `camera_edit`). A moderator applies or
  *     discards the diff later (db/moderation.ts moderateCameraEdit); the
  *     public record keeps the moderator's signature until then.
- *   - `removed` / `rejected` (terminal) -> `status_blocked` (409).
+ *   - `removed` / `rejected` (terminal) -> `status_blocked` (409) for the
+ *     owner. For anyone else every non-public status answers `not_found`
+ *     (404), exactly like a missing id (no status/existence oracle).
  *
  * Only the whitelist columns are ever touched (title, kind, address, notes,
  * manufacturer, observedOn, direction, description, latitude, longitude —
@@ -190,11 +193,11 @@ export async function getCameraEditView(
 
   const isOwner = camera.contributorId === contributorId;
   if (!isOwner) {
-    // Published records are public (403, ownership rule); anything else is
-    // indistinguishable from a missing id (404 fail-closed).
-    if ((PUBLISHED_EDITABLE_STATUSES as readonly string[]).includes(camera.status)) {
-      return { kind: "not_owner" };
-    }
+    // Public records (PUBLIC_CAMERA_STATUSES) exist openly: 403, ownership
+    // rule. Every non-public status (pending, needs_review, stale, hidden,
+    // removed, rejected…) is indistinguishable from a missing id (404
+    // fail-closed, no status/existence oracle).
+    if (isPublicStatus(camera.status)) return { kind: "not_owner" };
     return { kind: "not_found" };
   }
 
@@ -463,6 +466,14 @@ export async function applyCameraEdit(input: {
   const d1 = await getD1();
   const camera = await loadCameraForEdit(d1, input.cameraId);
   if (!camera) return { kind: "camera_not_found" };
+
+  // No status/existence oracle (security audit): for anyone but the owner a
+  // non-public record (pending, needs_review, stale, hidden, removed,
+  // rejected…) answers exactly like a missing id. Only public records may
+  // tell a non-owner "not yours" (403) or "not editable" (demo, 409).
+  if (camera.contributorId !== input.contributorId && !isPublicStatus(camera.status)) {
+    return { kind: "not_found" };
+  }
 
   if (camera.status === "pending") {
     // Pending records are never public: the owner is the ONLY caller who may

@@ -92,6 +92,26 @@ async function setCommunityAction(cameraId, contributorId, actionType, now = NOW
   });
 }
 
+// Records the moderation_events transition that put a camera in its current
+// state. evaluateCommunityThresholds reads the latest one to learn WHO caused
+// the state (only community-made hides/removals are community-reversible) and
+// WHEN (only actions after it count). The default is a community transition.
+async function seedTransition(cameraId, { from = "active", to, action, actor, createdAt = "2026-07-01T00:00:00.000Z", reviewerId = null } = {}) {
+  const resolvedAction = action ?? `community-${to === "hidden" ? "problem" : "gone"}-${to}`;
+  const resolvedActor = actor ?? "community:1";
+  await db
+    .prepare(
+      `INSERT INTO moderation_events (entity, entity_id, previous_status, new_status, action, reason_code, note, actor, reviewer_id, actor_role, recused, escalated, second_reviewer_id, created_at)
+       VALUES ('camera', ?, ?, ?, ?, 'other', NULL, ?, ?, NULL, 0, 0, NULL, ?)`,
+    )
+    .bind(cameraId, from, to, resolvedAction, resolvedActor, reviewerId, createdAt)
+    .run();
+}
+
+async function cameraStatus(cameraId) {
+  return (await db.prepare("SELECT status FROM cameras WHERE id = ?").bind(cameraId).first()).status;
+}
+
 // Upsert a community_settings knob (the seed 0037 already inserted every
 // ADR 0021 default, so a bare INSERT would hit the UNIQUE constraint).
 async function upsertSetting(key, value, updatedAt = NOW) {
@@ -297,6 +317,7 @@ test("privacy threshold: 1 action triggers immediate hidden reason=privacy", asy
 
 test("restore removed → active: 3 confirm actions restore the record", async () => {
   const cameraId = await insertCamera({ status: "removed" });
+  await seedTransition(cameraId, { to: "removed" });
   for (let i = 0; i < 3; i += 1) {
     const contributorId = await makeVerifiedContributor();
     const result = await setCommunityAction(cameraId, contributorId, "confirm");
@@ -325,6 +346,7 @@ test("restore removed → active: 3 confirm actions restore the record", async (
 
 test("restore hidden(problem) → active: 5 confirm distinct", async () => {
   const cameraId = await insertCamera({ status: "hidden" });
+  await seedTransition(cameraId, { to: "hidden" });
   await db
     .prepare(
       "INSERT INTO camera_lifecycle_events (camera_id, event_type, detail, created_at) VALUES (?, 'hidden', ?, ?)",
@@ -348,6 +370,7 @@ test("restore hidden(problem) → active: 5 confirm distinct", async () => {
 test("cooldown privacy: restore blocked within 7 days, allowed after", async () => {
   const hiddenAt = "2026-08-01T12:00:00.000Z";
   const cameraId = await insertCamera({ status: "hidden" });
+  await seedTransition(cameraId, { to: "hidden", action: "community-privacy-hidden", createdAt: hiddenAt });
   await db
     .prepare(
       "INSERT INTO camera_lifecycle_events (camera_id, event_type, detail, created_at) VALUES (?, 'hidden', ?, ?)",
@@ -371,6 +394,115 @@ test("cooldown privacy: restore blocked within 7 days, allowed after", async () 
   camera = await db.prepare("SELECT status FROM cameras WHERE id = ?").bind(cameraId).first();
   assert.equal(camera.status, "active", "after cooldown, additional confirm must restore");
 });
+
+// ---------------------------------------------------------------------------
+// 11b. Security (audit): community actions never undo a moderator/correction
+//      decision, never act on non-community statuses, and only count actions
+//      cast after the record's last status change.
+// ---------------------------------------------------------------------------
+
+test("a moderator removal is never community-restored, even with old confirms + a fresh like", async () => {
+  const cameraId = await insertCamera({ status: "active" });
+  // Three confirms from BEFORE the takedown.
+  for (let i = 0; i < 3; i += 1) {
+    const contributorId = await makeVerifiedContributor();
+    await db
+      .prepare("INSERT INTO camera_community_actions (camera_id, contributor_id, action_type, weight, created_at, updated_at) VALUES (?, ?, 'confirm', 1, ?, ?)")
+      .bind(cameraId, contributorId, "2026-07-01T00:00:00.000Z", "2026-07-01T00:00:00.000Z")
+      .run();
+  }
+  // Moderator legal/privacy hide (db/moderation.ts: hide → removed).
+  await db.prepare("UPDATE cameras SET status = 'removed' WHERE id = ?").bind(cameraId).run();
+  await seedTransition(cameraId, { from: "active", to: "removed", action: "hide", actor: "Demo Privacy Lead", createdAt: "2026-07-15T00:00:00.000Z" });
+
+  const liker = await makeVerifiedContributor();
+  assert.equal((await setCommunityAction(cameraId, liker, "like")).kind, "ok");
+  assert.equal(await cameraStatus(cameraId), "removed", "one like must not undo a takedown");
+
+  // Even a full fresh contrary consensus does not restore a moderator removal.
+  for (let i = 0; i < 4; i += 1) {
+    await setCommunityAction(cameraId, await makeVerifiedContributor(), "confirm");
+  }
+  assert.equal(await cameraStatus(cameraId), "removed", "fresh confirms must not restore a moderator removal");
+  const restored = await db.prepare("SELECT COUNT(*) AS n FROM camera_lifecycle_events WHERE camera_id = ? AND event_type = 'restored'").bind(cameraId).first();
+  assert.equal(Number(restored.n), 0);
+});
+
+test("a correction-outcome removal is never community-restored", async () => {
+  const cameraId = await insertCamera({ status: "removed" });
+  await seedTransition(cameraId, { from: "active", to: "removed", action: "removed", actor: "Local moderator" });
+  for (let i = 0; i < 3; i += 1) {
+    await setCommunityAction(cameraId, await makeVerifiedContributor(), "confirm");
+  }
+  assert.equal(await cameraStatus(cameraId), "removed");
+});
+
+test("a removal of unknown cause (no transition event) fails closed", async () => {
+  const cameraId = await insertCamera({ status: "removed" });
+  for (let i = 0; i < 3; i += 1) {
+    await setCommunityAction(cameraId, await makeVerifiedContributor(), "confirm");
+  }
+  assert.equal(await cameraStatus(cameraId), "removed");
+});
+
+test("a moderator-made hidden state cannot be laundered via gone → removed → restore", async () => {
+  const cameraId = await insertCamera({ status: "hidden" });
+  await seedTransition(cameraId, { from: "active", to: "hidden", action: "hide", actor: "Demo Administrator" });
+  for (let i = 0; i < 3; i += 1) {
+    await setCommunityAction(cameraId, await makeVerifiedContributor(), "gone");
+  }
+  assert.equal(await cameraStatus(cameraId), "hidden", "community must not re-label a moderator hide");
+});
+
+test("only actions cast after the last status change count toward the next transition", async () => {
+  const cameraId = await insertCamera({ status: "removed" });
+  // Community removal at T; two confirms from before T are stale.
+  await seedTransition(cameraId, { to: "removed", createdAt: "2026-07-15T00:00:00.000Z" });
+  for (let i = 0; i < 2; i += 1) {
+    const contributorId = await makeVerifiedContributor();
+    await db
+      .prepare("INSERT INTO camera_community_actions (camera_id, contributor_id, action_type, weight, created_at, updated_at) VALUES (?, ?, 'confirm', 1, ?, ?)")
+      .bind(cameraId, contributorId, "2026-07-10T00:00:00.000Z", "2026-07-10T00:00:00.000Z")
+      .run();
+  }
+  // One fresh confirm (and a like) is not a fresh 3/2 consensus.
+  await setCommunityAction(cameraId, await makeVerifiedContributor(), "confirm");
+  await setCommunityAction(cameraId, await makeVerifiedContributor(), "like");
+  assert.equal(await cameraStatus(cameraId), "removed", "stale confirms must not count");
+
+  // Two more fresh confirms complete a real consensus → restored.
+  await setCommunityAction(cameraId, await makeVerifiedContributor(), "confirm");
+  await setCommunityAction(cameraId, await makeVerifiedContributor(), "confirm");
+  assert.equal(await cameraStatus(cameraId), "active");
+});
+
+test("stale problem actions from before a restore do not immediately re-hide it", async () => {
+  const cameraId = await insertCamera({ status: "active" });
+  await seedTransition(cameraId, { from: "removed", to: "active", action: "community-confirm-active", createdAt: "2026-07-15T00:00:00.000Z" });
+  for (let i = 0; i < 3; i += 1) {
+    const contributorId = await makeVerifiedContributor();
+    await db
+      .prepare("INSERT INTO camera_community_actions (camera_id, contributor_id, action_type, weight, created_at, updated_at) VALUES (?, ?, 'problem', 1, ?, ?)")
+      .bind(cameraId, contributorId, "2026-07-10T00:00:00.000Z", "2026-07-10T00:00:00.000Z")
+      .run();
+  }
+  await setCommunityAction(cameraId, await makeVerifiedContributor(), "like");
+  assert.equal(await cameraStatus(cameraId), "active");
+});
+
+for (const status of ["pending", "rejected", "needs_review", "stale", "demo"]) {
+  test(`community actions on a ${status} record answer camera_not_found and change nothing`, async () => {
+    const cameraId = await insertCamera({ status });
+    const contributorId = await makeVerifiedContributor();
+    for (const actionType of ["like", "confirm", "gone"]) {
+      const result = await setCommunityAction(cameraId, contributorId, actionType);
+      assert.deepEqual(result, { kind: "camera_not_found" });
+    }
+    assert.equal(await cameraStatus(cameraId), status);
+    const rows = await db.prepare("SELECT COUNT(*) AS n FROM camera_community_actions WHERE camera_id = ?").bind(cameraId).first();
+    assert.equal(Number(rows.n), 0, "no action row is written");
+  });
+}
 
 // ---------------------------------------------------------------------------
 // 12. concurrency thresholds: race two gone actions → exactly one transition
