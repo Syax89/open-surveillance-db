@@ -360,6 +360,55 @@ test("analytics: valid tile coordinates collapse to one low-cardinality endpoint
   assert.deepEqual(analytics.calls[0].blobs, ["api", "2xx", "/api/tiles/[z]/[x]/[y]", "GET", "200"]);
 });
 
+test("analytics: dynamic API segments are recorded as route patterns, unknown paths as other (security audit 2026-11)", async () => {
+  const { worker } = await loadWorker();
+  const analytics = analyticsMock();
+  const env = testEnv({ ANALYTICS: analytics.binding });
+  const cases = [
+    ["/api/cameras/12345", "/api/cameras/[id]"],
+    ["/api/cameras/12345/edit", "/api/cameras/[id]/edit"],
+    ["/api/cameras/9/events?limit=5", "/api/cameras/[id]/events"],
+    ["/api/cameras/nearby?lat=1&lng=2", "/api/cameras/nearby"],
+    ["/api/appeals/77", "/api/appeals/[id]"],
+    ["/api/auth/keys/key_abc123", "/api/auth/keys/[id]"],
+    ["/api/auth/oidc/github/start", "/api/auth/oidc/[provider]/start"],
+    ["/api/auth/oidc/merge", "/api/auth/oidc/merge"],
+    ["/api/auth/passkey/credentials", "/api/auth/passkey/credentials"],
+    ["/api/auth/passkey/credentials/cred-id-xyz", "other"],
+    ["/api/cameras/nearby/edit", "other"],
+    ["/api/wp-login.php", "other"],
+    ["/api/users/alice@example.test", "other"],
+    ["/api/cameras/", "/api/cameras"],
+  ];
+  for (const [requestPath] of cases) {
+    await worker.fetch(request(requestPath), env, ctx());
+  }
+  assert.deepEqual(
+    analytics.calls.map((point) => point.blobs[2]),
+    cases.map(([, expected]) => expected),
+  );
+});
+
+test("analytics: the route-pattern list covers every app/api route.ts", async () => {
+  const tree = await getTree();
+  const { API_ROUTE_PATTERNS, normalizeApiPath } = await import(pathToFileURL(path.join(tree, "worker", "analytics.mjs")).href);
+  const apiDir = path.join(root, "app", "api");
+  const found = [];
+  const walk = async (dir) => {
+    for (const entry of await readdir(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) await walk(full);
+      else if (entry.name === "route.ts") found.push(`/api/${path.relative(apiDir, dir).split(path.sep).join("/")}`);
+    }
+  };
+  await walk(apiDir);
+  assert.deepEqual([...API_ROUTE_PATTERNS].sort(), found.sort(), "worker/analytics.ts API_ROUTE_PATTERNS must mirror app/api");
+  for (const pattern of found) {
+    const sample = pattern.replace(/\[[^\]]+\]/g, "123");
+    assert.equal(normalizeApiPath(sample), pattern, `${sample} must normalise to ${pattern}`);
+  }
+});
+
 test("analytics: website traffic is logged as web without per-page breakdown", async () => {
   const { worker } = await loadWorker();
   const analytics = analyticsMock();
