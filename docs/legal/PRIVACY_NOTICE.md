@@ -63,7 +63,12 @@ write gate — anonymous → 401, unverified → 403). What each implies:
    (`opensurveillancedb.org`) — the email contains only the tokenised link,
    no tracking pixels or links. Until you verify, your session is **read-only**
    (you cannot submit reports or act on records — community actions). Password
-   reset uses the same mailer with the same single-use discipline.
+   reset uses the same mailer with the same single-use discipline. If the
+   address you register **already has an account**, nothing is created: its
+   owner instead receives a short notice (no token — only links to sign in or
+   reset the password), and the registration page answers exactly the same
+   either way, so it never reveals whether an address has an account (at
+   most 3 such notices per address per day).
 2. **Passkeys (WebAuthn, optional).** You can enroll a passkey on your device
    and log in with biometrics/PIN instead of typing a password. The site
    stores only **public-key material** — the private key never leaves your
@@ -132,7 +137,7 @@ This negative scope strengthens the reasonable expectations of data subjects and
 
 ## 5. Recipients and transfers
 
-- **Cloudflare, Inc.** — hosting, database **and transactional email** (Workers + D1 + **Email Routing** for account verification/password-reset emails). Processor (art. 28) under the Cloudflare Data Processing Addendum (**DPA v6.3, June 2025**) incorporating **EU Standard Contractual Clauses (2021/914)**; Cloudflare is certified under the **EU–US Data Privacy Framework** (additional transfer ground). D1 configured for EU residency (`weur` location hint). **Email Routing** carries only the recipient address and the tokenised verification/reset link, with **zero tracking pixels/links**. See PROCESSOR_REGISTER.md.
+- **Cloudflare, Inc.** — hosting, database **and transactional email** (Workers + D1 + **Email Routing** for account verification/password-reset emails). Processor (art. 28) under the Cloudflare Data Processing Addendum (**DPA v6.3, June 2025**) incorporating **EU Standard Contractual Clauses (2021/914)**; Cloudflare is certified under the **EU–US Data Privacy Framework** (additional transfer ground). D1 configured for EU residency (`weur` location hint). **Email Routing** carries only the recipient address and the tokenised verification/reset link (or, for the account-exists notice, plain sign-in/password-reset links), with **zero tracking pixels/links**. See PROCESSOR_REGISTER.md.
 - **OpenStreetMap Foundation (Nominatim — nominatim.openstreetmap.org, processor PR6).** Geocoding for the report flow and record pages: forward place-name search (`GET /api/geocode`, up to 5 suggestions) and reverse coordinate→address (`GET /api/geocode/reverse`, report-form prefill). Only the query itself is sent — free-text place/address strings and coordinates rounded to ~4 decimals (~11 m); the reply (display address) is stored in the D1 cache (`geocode_reverse_cache`, migration 0041). **No personal data, no account data, no profiling, requestor data never sent or logged.** Usage respects the Nominatim policy: max **1 req/s**, identifying User-Agent, cache-first so a repeated position never re-queries the network (PROCESSOR_REGISTER.md PR6).
 - **GitHub, Inc. / Google LLC (OIDC identity providers — optional, only if you choose that method; buttons shown only when the operator has configured the provider).** If you sign in with GitHub or Google, those providers authenticate you and we receive only the subject id and verified flag (**no email**). **Tracking disclosure:** the provider observes the sign-in and your IP. The provider's own terms and privacy policy apply at sign-in. They are **independent controllers of their own authentication services** — no OpenSurveillanceDB data is sent to them; we only receive the identity attributes listed in § 3. Never published, never logged.
 - **Publication itself:** published records become part of a public dataset licensed ODbL 1.0 and may be downloaded/exported (JSON/CSV/GeoJSON). This is the purpose of the service, disclosed here. Copies already downloaded cannot be recalled; withdrawn records are excluded from future exports.
