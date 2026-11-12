@@ -29,7 +29,10 @@ before(async () => {
   ModerationDashboard = mod.ModerationDashboard;
 });
 
-afterEach(() => rtl?.cleanup());
+afterEach(() => { rtl?.cleanup(); window.location.hash = ""; });
+
+/** Queue tabs (2026-11 redesign): one queue on screen at a time. */
+const openTab = (screen, name) => rtl.fireEvent.click(screen.getByRole("tab", { name: new RegExp(`^${name}`) }));
 
 const queueFixture = {
   cameraReports: [
@@ -82,17 +85,17 @@ test("moderation: renders the queue rows and accessible per-row action labels", 
   await renderWithLocale(React.createElement(ModerationDashboard));
   await waitFor(() => assert.ok(screen.queryByText("Fixture pending camera")));
 
-  assert.ok(screen.getByText("Fixture correction request text"));
-  assert.ok(screen.getByText("reporter@example.test"));
   // Action group labels (aria-label on the wrapper div).
   const cameraActions = screen.getByLabelText("Decision for camera 7");
   assert.ok(cameraActions);
-  const correctionActions = screen.getByLabelText("Decision for correction 3");
-  assert.ok(correctionActions);
   // Buttons are present but disabled until reason + reviewer are chosen.
-  const approve = screen.getAllByRole("button", { name: "Approve" });
-  assert.ok(approve.length >= 2);
-  for (const button of approve) assert.equal(button.disabled, true);
+  for (const button of screen.getAllByRole("button", { name: "Approve" })) assert.equal(button.disabled, true);
+  // The correction queue is its own tab.
+  openTab(screen, "Corrections");
+  assert.ok(screen.getByText("Fixture correction request text"));
+  assert.ok(screen.getByText("reporter@example.test"));
+  assert.ok(screen.getByLabelText("Decision for correction 3"));
+  for (const button of screen.getAllByRole("button", { name: "Approve" })) assert.equal(button.disabled, true);
   // Loading state announced politely, then replaced by the summary.
   await waitFor(() => assert.ok(screen.queryByText("2 items awaiting a local decision")));
 });
@@ -187,7 +190,9 @@ test("moderation: empty queue shows empty states per section", async () => {
 
   await renderWithLocale(React.createElement(ModerationDashboard));
   await waitFor(() => assert.ok(screen.queryByText("No camera reports are waiting.")));
+  openTab(screen, "Corrections");
   assert.ok(screen.getByText("No correction requests are waiting."));
+  openTab(screen, "History");
   assert.ok(screen.getByText("No decisions recorded yet."));
   assert.equal(screen.getAllByRole("heading", { level: 1 }).length, 1);
 });
@@ -274,6 +279,7 @@ test("moderation: camera_edit rows render the old/new diff and decide through ca
     return jsonResponse({ error: "unexpected route" }, { status: 404 });
   });
 
+  window.location.hash = "edits"; // the edit queue is its own tab (2026-11)
   await renderWithLocale(React.createElement(ModerationDashboard));
   await waitFor(() => assert.ok(screen.queryByText("Edit request")));
 
@@ -411,6 +417,7 @@ test("moderation: published pagination requests the exact cursor and shows the m
     return nativeJson(pageOnePayload());
   });
 
+  window.location.hash = "published"; // 2026-11 redesign: one queue tab at a time
   await renderWithLocale(React.createElement(ModerationDashboard));
   await waitFor(() => assert.ok(screen.queryByText("Published 100")));
 
@@ -446,6 +453,7 @@ test("moderation: published pagination is terminal and labelled on the last page
   const { screen, waitFor } = rtl;
   installFetchMock(() => nativeJson({ ...paginationBase, publishedCameras: publishedCamerasPage(100, 3, "Published"), publishedNextCursor: null }));
 
+  window.location.hash = "published"; // 2026-11 redesign: one queue tab at a time
   await renderWithLocale(React.createElement(ModerationDashboard));
   await waitFor(() => assert.ok(screen.queryByText("Published 100")));
 
@@ -466,6 +474,7 @@ test("moderation: a delayed published page keeps aria-busy and never flashes the
     return nativeJson(pageOnePayload());
   });
 
+  window.location.hash = "published"; // 2026-11 redesign: one queue tab at a time
   await renderWithLocale(React.createElement(ModerationDashboard));
   await waitFor(() => assert.ok(screen.queryByText("Published 100")));
 
@@ -501,14 +510,19 @@ test("moderation: a superseded delayed published success cannot overwrite the cu
     return nativeJson({ ...pageOnePayload(), cameraReports: [pendingCamera7] });
   });
 
+  window.location.hash = "published"; // 2026-11 redesign: one queue tab at a time
   await renderWithLocale(React.createElement(ModerationDashboard));
   await waitFor(() => assert.ok(screen.queryByText("Published 100")));
 
   // Start the page-2 body read, then supersede it with a decision refresh.
   await user.click(nextButton(screen));
   await user.selectOptions(screen.getByRole("combobox", { name: /^Acting reviewer/ }), "2");
+  // The pending row lives in the Pending tab (2026-11 redesign): decide there,
+  // then come back to the Published tab to observe the page.
+  await user.click(screen.getByRole("tab", { name: /^Pending/ }));
   await user.selectOptions(screen.getByLabelText("Required reason", { selector: "#camera-7-reason" }), "verified-public-infrastructure");
   await user.click(screen.getByLabelText("Decision for camera 7").querySelector('button[type="button"]'));
+  await user.click(screen.getByRole("tab", { name: /^Published/ }));
   await waitFor(() => assert.ok(screen.queryByText("Fresh 121")));
 
   // Release the stale body read now that the newer page is rendered.
@@ -537,13 +551,18 @@ test("moderation: a superseded delayed published error cannot surface on the cur
     return nativeJson({ ...pageOnePayload(), cameraReports: [pendingCamera7] });
   });
 
+  window.location.hash = "published"; // 2026-11 redesign: one queue tab at a time
   await renderWithLocale(React.createElement(ModerationDashboard));
   await waitFor(() => assert.ok(screen.queryByText("Published 100")));
 
   await user.click(nextButton(screen));
   await user.selectOptions(screen.getByRole("combobox", { name: /^Acting reviewer/ }), "2");
+  // The pending row lives in the Pending tab (2026-11 redesign): decide there,
+  // then come back to the Published tab to observe the page.
+  await user.click(screen.getByRole("tab", { name: /^Pending/ }));
   await user.selectOptions(screen.getByLabelText("Required reason", { selector: "#camera-7-reason" }), "verified-public-infrastructure");
   await user.click(screen.getByLabelText("Decision for camera 7").querySelector('button[type="button"]'));
+  await user.click(screen.getByRole("tab", { name: /^Published/ }));
   await waitFor(() => assert.ok(screen.queryByText("Fresh 121")));
 
   release();
@@ -560,12 +579,17 @@ test("moderation: a rejected decision is not advertised as a page retry", async 
     return nativeJson({ ...paginationBase, cameraReports: [pendingCamera7], publishedCameras: publishedCamerasPage(100, 20, "Published"), publishedNextCursor: null });
   });
 
+  window.location.hash = "published"; // 2026-11 redesign: one queue tab at a time
   await renderWithLocale(React.createElement(ModerationDashboard));
   await waitFor(() => assert.ok(screen.queryByText("Published 100")));
 
   await user.selectOptions(screen.getByRole("combobox", { name: /^Acting reviewer/ }), "2");
+  // The pending row lives in the Pending tab (2026-11 redesign): decide there,
+  // then come back to the Published tab to observe the page.
+  await user.click(screen.getByRole("tab", { name: /^Pending/ }));
   await user.selectOptions(screen.getByLabelText("Required reason", { selector: "#camera-7-reason" }), "verified-public-infrastructure");
   await user.click(screen.getByLabelText("Decision for camera 7").querySelector('button[type="button"]'));
+  await user.click(screen.getByRole("tab", { name: /^Published/ }));
 
   const alert = await screen.findByRole("alert");
   assert.equal(alert.textContent, "fixture server rejection");
@@ -590,6 +614,7 @@ test("moderation: a failed Previous offers a retry of the current cursor and rec
     return nativeJson({ ...pageOnePayload(), cameraReports: [pendingCamera7] });
   });
 
+  window.location.hash = "published"; // 2026-11 redesign: one queue tab at a time
   await renderWithLocale(React.createElement(ModerationDashboard));
   await waitFor(() => assert.ok(screen.queryByText("Published 100")));
 
@@ -623,6 +648,7 @@ test("moderation: a failed first page still offers retry and recovers", async ()
     return nativeJson(pageOnePayload());
   });
 
+  window.location.hash = "published"; // 2026-11 redesign: one queue tab at a time
   await renderWithLocale(React.createElement(ModerationDashboard));
   const alert = await screen.findByRole("alert");
   assert.equal(alert.textContent, "queue broken");
@@ -646,6 +672,7 @@ test("moderation: retry reports aria-busy and disables its controls until the pa
     return retryResponse;
   });
 
+  window.location.hash = "published"; // 2026-11 redesign: one queue tab at a time
   await renderWithLocale(React.createElement(ModerationDashboard));
   assert.equal((await screen.findByRole("alert")).textContent, "queue broken");
 
@@ -683,6 +710,7 @@ test("moderation: a locale-driven queue reload reports published aria-busy until
     return moderationGets === 1 ? nativeJson(pageOnePayload()) : response;
   });
 
+  window.location.hash = "published"; // 2026-11 redesign: one queue tab at a time
   await renderWithLocale(React.createElement(ModerationDashboard));
   await waitFor(() => assert.ok(screen.queryByText("Published 100")));
 
@@ -717,6 +745,7 @@ test("moderation: an empty later page shows no empty-state copy and still goes b
     return nativeJson(pageOnePayload());
   });
 
+  window.location.hash = "published"; // 2026-11 redesign: one queue tab at a time
   await renderWithLocale(React.createElement(ModerationDashboard));
   await waitFor(() => assert.ok(screen.queryByText("Published 100")));
 
@@ -744,6 +773,7 @@ test("moderation: two synchronous Next clicks collapse to a single request", asy
     return nativeJson(pageOnePayload());
   });
 
+  window.location.hash = "published"; // 2026-11 redesign: one queue tab at a time
   await renderWithLocale(React.createElement(ModerationDashboard));
   await waitFor(() => assert.ok(screen.queryByText("Published 100")));
 
@@ -754,4 +784,30 @@ test("moderation: two synchronous Next clicks collapse to a single request", asy
 
   const pageTwoRequests = requests.filter((url) => queryParamsOf(url).get("published_after_id") === "20");
   assert.equal(pageTwoRequests.length, 1, "the synchronous in-flight gate must collapse the double click to one request");
+});
+
+test("moderation queue tabs: one queue at a time, counts on the tabs, arrow keys and the URL hash", async () => {
+  const { screen, waitFor } = rtl;
+  installFetchMock((input) => (input === "/api/moderation" ? jsonResponse(queueFixture) : jsonResponse({ error: "unexpected route" }, { status: 404 })));
+  await renderWithLocale(React.createElement(ModerationDashboard));
+  await waitFor(() => assert.ok(screen.queryByText("Fixture pending camera")));
+
+  const tablist = screen.getByRole("tablist", { name: "Moderation queues" });
+  const tabs = rtl.within(tablist).getAllByRole("tab");
+  assert.deepEqual(tabs.map((tab) => tab.textContent.replace(/\d+$/, "")), ["Pending", "To review", "Corrections", "Edits", "Published", "History"]);
+  const pending = screen.getByRole("tab", { name: /^Pending/ });
+  assert.equal(pending.getAttribute("aria-selected"), "true");
+  assert.equal(pending.tabIndex, 0, "roving tabindex: only the selected tab is focusable");
+  assert.match(pending.textContent, /1$/, "the pending tab shows its queue size");
+  assert.equal(screen.queryByText("Fixture correction request text"), null, "other queues are not on screen");
+
+  pending.focus();
+  rtl.fireEvent.keyDown(pending, { key: "ArrowRight" });
+  const review = screen.getByRole("tab", { name: /^To review/ });
+  assert.equal(review.getAttribute("aria-selected"), "true");
+  assert.equal(document.activeElement, review, "focus follows the arrow key");
+  assert.equal(window.location.hash, "#review", "the selected queue is in the URL");
+  rtl.fireEvent.keyDown(review, { key: "End" });
+  assert.equal(screen.getByRole("tab", { name: /^History/ }).getAttribute("aria-selected"), "true");
+  assert.equal(screen.getByRole("tabpanel").getAttribute("aria-labelledby"), "queue-tab-history");
 });
