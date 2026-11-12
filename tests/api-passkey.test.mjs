@@ -665,6 +665,7 @@ test("credentials GET requires a session", async () => {
   const { GET } = await credentialsRoute();
   const response = await GET(apiRequest("/api/auth/passkey/credentials"));
   assert.equal(response.status, 401);
+  assert.equal(response.headers.get("cache-control"), "no-store");
 });
 
 test("credentials GET lists only the public descriptors", async () => {
@@ -682,6 +683,7 @@ test("credentials GET lists only the public descriptors", async () => {
     { id: 3, credentialId: "cred-1", transports: '["usb"]', createdAt: "2026-08-01T08:00:00.000Z" },
   ]);
   assert.deepEqual(callArgs("listPasskeys")[0], [7]);
+  assert.equal(response.headers.get("cache-control"), "no-store", "personal data is never cached");
 });
 
 test("credentials DELETE requires a session", async () => {
