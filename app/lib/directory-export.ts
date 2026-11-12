@@ -109,7 +109,7 @@ export function camerasToCsv(records: ExportCameraRow[]): string {
   return `${header.join(",")}\n${rows.join("\n")}\n# ${DATA_LICENSE_NOTICE}\n`;
 }
 
-function csvCell(value: string | number | null): string {
+function csvCell(value: string | number | null | undefined): string {
   // Numeric columns (id, latitude, longitude, direction) are written
   // verbatim: a negative coordinate is data, not a formula, and prefixing it
   // with `'` corrupted every western/southern record. The formula guard
@@ -118,7 +118,7 @@ function csvCell(value: string | number | null): string {
   if (typeof value === "number") {
     return Number.isFinite(value) ? `"${String(value)}"` : '""';
   }
-  const text = value === null ? "" : value;
+  const text = value == null ? "" : String(value);
   const safeText = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
   return `"${safeText.replaceAll('"', '""')}"`;
 }
