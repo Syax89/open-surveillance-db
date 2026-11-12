@@ -172,13 +172,13 @@ test("legacy anchor URLs are served 200 HTML — the fragment never reaches the 
 
 test("moderation gate fails closed without credentials", async () => {
   const { response, html } = await renderRoute("/moderation");
-  assert.equal(response.status, 503);
+  assert.equal(response.status, 404);
   // /moderation is a human page route (Accept: text/html by default here):
   // the gate denial renders the shared site shell, not the plain JSON body
   // (worker/index.ts renderGateUnavailablePage) — see tests/worker-edge.test.mjs
   // for the exhaustive status/locale/content-type coverage of that shell.
   assert.match(html, /^<!DOCTYPE html>/);
-  assert.match(html, /<p class="eyebrow"><span><\/span> 503<\/p>/);
+  assert.match(html, /<p class="eyebrow"><span><\/span> 404<\/p>/);
   assert.doesNotMatch(html, /Moderation dashboard|class="moderation-/i);
 });
 
@@ -524,19 +524,19 @@ test("the account page never exposes a real email before login", async () => {
 // These tests pin the edge behaviour on the real artifact, complementing the
 // isolated unit suite in tests/worker-edge.test.mjs.
 
-const GATE_UNAVAILABLE_BODY = { error: "Moderation is unavailable." };
+const GATE_UNAVAILABLE_BODY = { error: "Not found." };
 const MODERATION_PATHS = ["/moderation", "/api/moderation", "/api/moderation/corrections/1"];
 
 test("worker gate fails closed on every moderation path without credentials", async () => {
   for (const route of MODERATION_PATHS) {
     const { response, html } = await renderRoute(route);
-    assert.equal(response.status, 503, `${route} must be 503 without credentials`);
+    assert.equal(response.status, 404, `${route} must be a plain 404 without credentials`);
     assert.equal(response.headers.get("cache-control"), "no-store");
     if (route === "/moderation") {
       // Human page route: shared HTML shell, not the API JSON body (see
       // tests/worker-edge.test.mjs for exhaustive coverage of that shell).
       assert.match(html, /^<!DOCTYPE html>/, route);
-      assert.match(html, /<p class="eyebrow"><span><\/span> 503<\/p>/, route);
+      assert.match(html, /<p class="eyebrow"><span><\/span> 404<\/p>/, route);
     } else {
       assert.deepEqual(JSON.parse(html), GATE_UNAVAILABLE_BODY, `${route} must carry the gate JSON body`);
     }
@@ -547,36 +547,35 @@ test("worker gate rejects a wrong Basic credential with 401 + WWW-Authenticate",
   const env = { MODERATION_USER: "moderator", MODERATION_PASSWORD: "s3cret" };
   const wrong = `Basic ${Buffer.from("moderator:wrong").toString("base64")}`;
   const { response, html } = await renderRoute("/api/moderation", { env, headers: { authorization: wrong } });
-  assert.equal(response.status, 401);
-  assert.equal(response.headers.get("www-authenticate"), 'Basic realm="moderation", charset="UTF-8"');
+  assert.equal(response.status, 404);
+  assert.equal(response.headers.get("www-authenticate"), null);
   assert.equal(response.headers.get("cache-control"), "no-store");
-  assert.equal(html, "Unauthorized");
+  assert.equal(html, '{"error":"Not found."}');
 });
 
 test("worker gate admits a correct Basic credential and forwards to the app handler", async () => {
   const env = { MODERATION_USER: "moderator", MODERATION_PASSWORD: "s3cret" };
   const correct = `Basic ${Buffer.from("moderator:s3cret").toString("base64")}`;
   for (const route of ["/api/moderation", "/api/moderation/corrections/1"]) {
-    const { response } = await renderRoute(route, { env, headers: { authorization: correct } });
+    const { response, html } = await renderRoute(route, { env, headers: { authorization: correct } });
     // The gate passed: the response is the app handler's, never the gate's
-    // (a gate denial would carry WWW-Authenticate and the plain "Unauthorized"
-    // body, or the 503 unavailable JSON). On this DB-less test host the app
-    // answers 401 (its own session auth) or 500 (missing DB binding) — the
-    // exact status is app-level and not part of the worker contract.
+    // (a gate denial is the bare {"error":"Not found."} JSON with no-store).
+    // On this DB-less test host the app answers with its own status (401,
+    // 404 or 500) — the exact status is app-level, not the worker contract.
     assert.equal(response.headers.get("www-authenticate"), null, `${route} must not be a gate denial`);
-    assert.notEqual(response.status, 503, `${route} must not hit the fail-closed gate`);
+    assert.notEqual(html, '{"error":"Not found."}', `${route} must not hit the gate`);
   }
 });
 
 test("worker gate admits a correct Bearer token (token-only config)", async () => {
   const env = { MODERATION_TOKEN: "tok-123" };
   const wrong = await renderRoute("/api/moderation", { env, headers: { authorization: "Bearer tok-124" } });
-  assert.equal(wrong.response.status, 401, "a wrong token must be rejected");
-  assert.equal(wrong.response.headers.get("www-authenticate"), 'Basic realm="moderation", charset="UTF-8"');
+  assert.equal(wrong.response.status, 404, "a wrong token must be rejected");
+  assert.equal(wrong.response.headers.get("www-authenticate"), null);
 
   const correct = await renderRoute("/api/moderation", { env, headers: { authorization: "Bearer tok-123" } });
   assert.equal(correct.response.headers.get("www-authenticate"), null, "a correct token must pass the gate");
-  assert.notEqual(correct.response.status, 503);
+  assert.notEqual(correct.response.status, 404);
 });
 
 test("worker edge adds the full global security header set on every page (t_6148aa6f landed)", async () => {

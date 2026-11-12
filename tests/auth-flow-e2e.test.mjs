@@ -313,9 +313,9 @@ test("auth gate: moderation API fails closed (503) when no credentials are confi
     waitUntil() {},
     passThroughOnException() {},
   });
-  assert.equal(response.status, 503);
+  assert.equal(response.status, 404);
   const body = await responseBody(response);
-  assert.equal(body.error, "Moderation is unavailable.");
+  assert.equal(body.error, "Not found.");
 });
 
 test("auth gate: unauthenticated moderation requests get 401 with WWW-Authenticate", async () => {
@@ -324,8 +324,8 @@ test("auth gate: unauthenticated moderation requests get 401 with WWW-Authentica
   const ctx = { waitUntil() {}, passThroughOnException() {} };
 
   const missing = await worker.fetch(new Request("https://osdb.test/api/moderation"), envWithCreds, ctx);
-  assert.equal(missing.status, 401);
-  assert.match(missing.headers.get("www-authenticate"), /Basic realm="moderation"/);
+  assert.equal(missing.status, 404);
+  assert.equal(missing.headers.get("www-authenticate"), null);
 
   const wrong = await worker.fetch(
     new Request("https://osdb.test/api/moderation", {
@@ -334,13 +334,13 @@ test("auth gate: unauthenticated moderation requests get 401 with WWW-Authentica
     envWithCreds,
     ctx,
   );
-  assert.equal(wrong.status, 401);
+  assert.equal(wrong.status, 404);
 
   // The dashboard path and moderation subpaths are gated too.
   const dashboard = await worker.fetch(new Request("https://osdb.test/moderation"), envWithCreds, ctx);
-  assert.equal(dashboard.status, 401);
+  assert.equal(dashboard.status, 404);
   const subpath = await worker.fetch(new Request("https://osdb.test/api/moderation/queue"), envWithCreds, ctx);
-  assert.equal(subpath.status, 401);
+  assert.equal(subpath.status, 404);
 });
 
 test("auth gate: correct Basic credentials pass through to the handler", async () => {
@@ -380,7 +380,7 @@ test("auth gate: bearer token login works and wrong tokens are rejected", async 
     envWithToken,
     ctx,
   );
-  assert.equal(bad.status, 401);
+  assert.equal(bad.status, 404);
 });
 
 test("auth gate: public routes are not gated — no login needed to read or submit", async () => {
@@ -412,7 +412,7 @@ test("auth gate: identity headers are stripped at the edge — a direct client c
     envWithCreds,
     ctx,
   );
-  assert.equal(spoofed.status, 401, "spoofed identity without a gate must be rejected");
+  assert.equal(spoofed.status, 404, "spoofed identity without a gate must be rejected");
   assert.equal(stub.lastRequest, null, "the handler must not be reached for an unauthenticated gated path");
 
   // 2. Even behind a valid gate, a client-supplied identity is replaced by
@@ -483,14 +483,14 @@ test("auth gate: appeals are split — moderator surfaces gated, contributor fil
   // Fail-closed default: no moderation credentials configured → the
   // moderator-facing appeals surfaces (GET list, PATCH decide) return 503…
   const noCreds = await worker.fetch(new Request("https://osdb.test/api/appeals"), {}, ctx);
-  assert.equal(noCreds.status, 503);
+  assert.equal(noCreds.status, 404);
   const noCredsItem = await worker.fetch(new Request("https://osdb.test/api/appeals/1"), {}, ctx);
-  assert.equal(noCredsItem.status, 503);
+  assert.equal(noCredsItem.status, 404);
 
   // …but POST /api/appeals (contributor filing, session auth at the route
   // layer) must pass through even with zero moderation credentials.
   const filePass = await worker.fetch(new Request("https://osdb.test/api/appeals", { method: "POST" }), {}, ctx);
-  assert.notEqual(filePass.status, 503, "POST /api/appeals must not be caught by the moderation gate");
+  assert.notEqual(filePass.status, 404, "POST /api/appeals must not be caught by the moderation gate");
   assert.equal(filePass.status, 200);
   assert.equal(await filePass.text(), "handler-called");
 
@@ -498,8 +498,8 @@ test("auth gate: appeals are split — moderator surfaces gated, contributor fil
   // the moderator surfaces.
   const envWithCreds = { MODERATION_USER: "moderator", MODERATION_PASSWORD: "s3cret" };
   const unauth = await worker.fetch(new Request("https://osdb.test/api/appeals"), envWithCreds, ctx);
-  assert.equal(unauth.status, 401);
-  assert.match(unauth.headers.get("www-authenticate"), /Basic realm="moderation"/);
+  assert.equal(unauth.status, 404);
+  assert.equal(unauth.headers.get("www-authenticate"), null);
 
   // Correct Basic credentials pass through — the moderator appeals surface
   // stays behind the same transport gate as the moderation queue.
@@ -570,7 +570,7 @@ test("auth gate: an ordinary contributor session (no linked moderator users row)
     {},
     ctx,
   );
-  assert.equal(response.status, 503);
+  assert.equal(response.status, 404);
 });
 
 test("auth gate: a contributor session with a matching moderator email but no users.contributor_id link is denied (audit P0)", async () => {
@@ -603,7 +603,7 @@ test("auth gate: a contributor session with a matching moderator email but no us
     {},
     ctx,
   );
-  assert.equal(noCreds.status, 503, "a matching email must not widen the fail-closed floor");
+  assert.equal(noCreds.status, 404, "a matching email must not widen the fail-closed floor");
 
   // 2. With Basic configured, the session must not stand in for the
   //    credential either: the gate is left to Basic, which is absent → 401,
@@ -614,7 +614,7 @@ test("auth gate: a contributor session with a matching moderator email but no us
     { MODERATION_USER: "moderator", MODERATION_PASSWORD: "s3cret" },
     ctx,
   );
-  assert.equal(denied.status, 401, "a matching email must not pass the gate");
+  assert.equal(denied.status, 404, "a matching email must not pass the gate");
   assert.equal(stub.lastRequest, null, "the handler must not be reached for an unlinked session");
 });
 
