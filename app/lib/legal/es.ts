@@ -287,7 +287,7 @@ export const esLegal: LegalContent = {
     intro:
       "Estas condiciones regulan el uso de OpenSurveillanceDB, la base de datos abierta y mantenida por la comunidad sobre la infraestructura de videovigilancia pública visible. Se aplican a la aplicación web, la API pública, las exportaciones de datos y los servicios relacionados (\"el Servicio\").",
     versionNote:
-      "Versión 0.5 — 8 de agosto de 2026. Alineación con el estado actual (lista para plantilla): resincronizada con los TERMS_OF_USE canónicos v0.8 (docs/TERMS_OF_USE.md sigue siendo la versión canónica). § 3.7, información sobre la autenticación (verificación del correo para el acceso de escritura, passkeys, OIDC — ADR 0020, controlado en el servidor); § 5, publicación inmediata y acciones de la comunidad; § 6, correcciones privadas y poder de emergencia legal; pruebas fotográficas eliminadas (2026-08-08).",
+      "Versión 0.6 — 12 de noviembre de 2026. § 6.3 actualizado: los moderadores revisan las fichas ocultadas por avisos de privacidad de la comunidad; las eliminaciones decididas por un moderador o por el administrador nunca se revierten mediante acciones de la comunidad y solo pueden impugnarse mediante una apelación (TERMS_OF_USE canónicos v0.10).",
     sections: [
       {
         heading: "1. Quiénes somos",
@@ -397,7 +397,7 @@ export const esLegal: LegalContent = {
             items: [
               "**Acciones de la comunidad.** Cualquier cuenta verificada puede marcar una ficha como útil, confirmar que sigue presente, señalar que ya no lo está o plantear un problema o una preocupación de privacidad. Una cuenta, una acción activa por ficha. Unos umbrales automáticos —incluido un umbral de privacidad deliberadamente bajo— deciden cuándo se oculta o elimina una ficha; cada cambio de estado queda registrado en el historial público de la ficha sin atribución a ningún perfil.",
               "**Correcciones.** Cualquier persona puede solicitar una corrección o una eliminación mediante el formulario privado de corrección (página de inicio, sección \"Señalar un problema / corrección\") o en [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org). Las solicitudes son privadas, las revisa una persona y nunca modifican el mapa automáticamente. Plazos de respuesta: primera respuesta en **48 horas**, respuesta de fondo en **14 días**; las ocultaciones por emergencia legal son inmediatas.",
-              "**Emergencias legales.** El único poder de escritura humano que queda es la ocultación o eliminación por emergencia legal por parte del administrador, que se utiliza cuando la ley lo exige y se revisa a posteriori. Los administradores no pueden restaurar ni volver a mostrar fichas de forma unilateral: el consenso de la comunidad de la sección 5 es la única vía de reversión.",
+              "**Emergencias legales y decisiones de moderación.** El administrador puede ocultar o eliminar de inmediato una ficha cuando la ley lo exige (con revisión posterior), y los moderadores revisan las fichas ocultadas por avisos de privacidad de la comunidad, confirmando o anulando la ocultación. Una eliminación decidida por un moderador o por el administrador nunca se revierte mediante acciones de la comunidad: solo puede impugnarse mediante el procedimiento de apelación.",
               "Los derechos de los interesados (acceso, rectificación, supresión, limitación, oposición, portabilidad) se describen en el [aviso de privacidad](/privacy) y se ejercen a través del mismo contacto.",
             ],
           },

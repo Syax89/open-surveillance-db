@@ -2,7 +2,7 @@
 
 - **Status:** in force — personal open-source project (controller: Simone Rondina, syax89 — not a company). The Service is live at the public URL; these terms are the applicable contract.
 - **Owner:** Simone Rondina (project owner / privacy contact)
-- **Version:** 0.9 (2026-08-09) — API keys (ADR 0023, write-auth epic): new § 3.8 (personal, non-transferable, verified-account-only, instant revocation) and § 4.5 (key misuse); § 9 references the hash-only storage and R21; § 15 tracks the legal package.
+- **Version:** 0.10 (2026-11-12) — § 6.3: moderators review community privacy hides; moderator/administrator removals are never reversed by community actions (appeal only). Previous: 0.9 (2026-08-09) — API keys (ADR 0023, write-auth epic): new § 3.8 (personal, non-transferable, verified-account-only, instant revocation) and § 4.5 (key misuse); § 9 references the hash-only storage and R21; § 15 tracks the legal package.
 - **Decisions applied (2026-07-31, CEO — Wave A):** privacy contact `privacy@opensurveillancedb.org` (dedicated, monitored mailbox); published coordinates rounded to **~4 decimal places (~10 m)** (zone-level precision; exact location never published); community-driven publication model (ADR 0021, 2026-08-04).
 - **Scope:** the OpenSurveillanceDB web application, public API, data exports and related services ("the Service").
 - **Legal framework:** Regulation (EU) 2016/679 (GDPR); D.Lgs. 196/2003 (Codice Privacy, IT, as amended by D.Lgs. 101/2018); mandatory consumer-protection provisions of the user's country of residence continue to apply where the user is a consumer.
@@ -70,7 +70,7 @@
 
 1. **Community actions.** Any verified account can mark a record useful, confirm it is still present, flag it as no longer present, or raise a problem or privacy concern. One account, one active action per record. Automatic thresholds — including a deliberately low privacy threshold — decide when a record is hidden or removed; every transition is recorded in the record's public history without attribution to any profile (ADR 0021).
 2. **Corrections.** Any person may request a correction or removal via the private correction form (home page, "Report a problem / correction" section) or `privacy@opensurveillancedb.org`. Requests are private, reviewed by a person, and never change the map automatically. Response targets: first response within **48 hours**, substantive response within **14 days**; legal-emergency hides are immediate.
-3. **Legal emergencies.** The only human write power over the **record lifecycle** is the administrator's legal-emergency hide or removal, used when the law requires it and reviewed retrospectively. Administrators cannot restore or un-hide unilaterally: the community consensus of § 5 is the only reversal path (ADR 0021 § 6/§ 8).
+3. **Legal emergencies and moderator decisions.** The administrator may hide or remove a record immediately when the law requires it (reviewed retrospectively), and moderators review the records hidden by community privacy flags, confirming or reversing the hide. A removal decided by a moderator or the administrator is never reversed by community actions: it can be contested only through the appeal procedure (ADR 0021, amendment 2026-11).
 4. Data-subject rights (access, rectification, erasure, restriction, objection, portability) are described in PRIVACY_NOTICE.md § 7 and exercised through the same contact.
 
 ## 7. Licences

@@ -288,7 +288,7 @@ export const itLegal: LegalContent = {
     intro:
       "Questi termini disciplinano l'uso di OpenSurveillanceDB, il database aperto e gestito dalla comunità delle infrastrutture di sorveglianza pubbliche e visibili. Si applicano all'applicazione web, all'API pubblica, alle esportazioni dei dati e ai servizi correlati (\"il Servizio\").",
     versionNote:
-      "Versione 0.5 — 8 agosto 2026. Allineamento allo stato attuale (template-ready): risincronizzati con la TERMS_OF_USE canonica v0.8 (docs/TERMS_OF_USE.md resta la versione canonica). § 3.7 disclosure di autenticazione (verifica email per l'accesso in scrittura, passkey, OIDC — ADR 0020, server-gated); § 5 pubblicazione immediata e azioni della community; § 6 correzioni private e potere di emergenza legale; rimozione dell'evidenza fotografica (2026-08-08).",
+      "Versione 0.6 — 12 novembre 2026. § 6.3 aggiornato: i moderatori esaminano i record nascosti dalle segnalazioni privacy della community; le rimozioni decise da un moderatore o dall'amministratore non vengono mai annullate dalle azioni della community e si possono contestare solo con un appello (TERMS_OF_USE canonica v0.10).",
     sections: [
       {
         heading: "1. Chi siamo",
@@ -398,7 +398,7 @@ export const itLegal: LegalContent = {
             items: [
               "**Azioni della community.** Ogni account verificato può marcare un record come utile, confermare che è ancora presente, segnalarlo come non più presente o sollevare un problema o una preoccupazione di privacy. Un account, un'azione attiva per record. Soglie automatiche — inclusa una soglia di privacy deliberatamente bassa — decidono quando un record viene nascosto o rimosso; ogni transizione è registrata nella cronologia pubblica del record senza attribuzione a nessun profilo.",
               "**Correzioni.** Chiunque può richiedere una correzione o una rimozione tramite il modulo privato di correzione (home page, sezione \"Segnala un problema / correzione\") o [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org). Le richieste sono private, esaminate da una persona e non modificano mai la mappa automaticamente. Obiettivi di risposta: prima risposta entro **48 ore**, risposta sostanziale entro **14 giorni**; i nascondimenti per emergenza legale sono immediati.",
-              "**Emergenze legali.** L'unico potere di scrittura umano rimasto è il nascondimento o la rimozione per emergenza legale da parte dell'amministratore, usato quando la legge lo richiede e rivisto a posteriori. Gli amministratori non possono ripristinare o rendere visibile un record unilateralmente: il consenso della community della sezione 5 è l'unico percorso di inversione.",
+              "**Emergenze legali e decisioni dei moderatori.** L'amministratore può nascondere o rimuovere subito un record quando la legge lo richiede (con revisione a posteriori), e i moderatori esaminano i record nascosti dalle segnalazioni privacy della community, confermando o annullando il nascondimento. Una rimozione decisa da un moderatore o dall'amministratore non viene mai annullata dalle azioni della community: si può contestare solo con la procedura di appello.",
               "I diritti dell'interessato (accesso, rettifica, cancellazione, limitazione, opposizione, portabilità) sono descritti nell'[informativa sulla privacy](/privacy) e si esercitano tramite lo stesso contatto.",
             ],
           },

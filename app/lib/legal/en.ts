@@ -285,7 +285,7 @@ export const enLegal: LegalContent = {
     intro:
       "These terms govern the use of OpenSurveillanceDB, the open, community-maintained database of visible public surveillance infrastructure. They apply to the web application, the public API, the data exports and related services (\"the Service\").",
     versionNote:
-      "Version 0.5 — 8 August 2026. Current-state alignment (template-ready): re-synchronised with the canonical TERMS_OF_USE v0.8 (docs/TERMS_OF_USE.md remains canonical). § 3.7 authentication disclosure (email verification for write access, passkeys, OIDC — ADR 0020, server-gated); § 5 immediate publication and community actions; § 6 private corrections and the legal-emergency power; image evidence removed (2026-08-08).",
+      "Version 0.6 — 12 November 2026. § 6.3 updated: moderators review records hidden by community privacy flags; removals decided by a moderator or the administrator are never reversed by community actions and can be contested only through an appeal (canonical TERMS_OF_USE v0.10).",
     sections: [
       {
         heading: "1. Who we are",
@@ -395,7 +395,7 @@ export const enLegal: LegalContent = {
             items: [
               "**Community actions.** Any verified account can mark a record useful, confirm it is still present, flag it as no longer present, or raise a problem or privacy concern. One account, one active action per record. Automatic thresholds — including a deliberately low privacy threshold — decide when a record is hidden or removed; every transition is recorded in the record's public history without attribution to any profile.",
               "**Corrections.** Any person may request a correction or removal via the private correction form (home page, \"Report a problem / correction\" section) or [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org). Requests are private, reviewed by a person, and never change the map automatically. Response targets: first response within **48 hours**, substantive response within **14 days**; legal-emergency hides are immediate.",
-              "**Legal emergencies.** The only human write power left is the administrator's legal-emergency hide or removal, used when the law requires it and reviewed retrospectively. Administrators cannot restore or un-hide unilaterally: the community consensus of section 5 is the only reversal path.",
+              "**Legal emergencies and moderator decisions.** The administrator may hide or remove a record immediately when the law requires it (reviewed retrospectively), and moderators review the records hidden by community privacy flags, confirming or reversing the hide. A removal decided by a moderator or the administrator is never reversed by community actions: it can be contested only through the appeal procedure.",
               "Data-subject rights (access, rectification, erasure, restriction, objection, portability) are described in the [privacy notice](/privacy) and exercised through the same contact.",
             ],
           },
