@@ -87,6 +87,14 @@ test("rejects invalid tile coordinates with 400 before any upstream request", as
     { z: "13", x: "8192", y: "0" }, // x beyond 2^13 - 1
     { z: "13", x: "0", y: "8192" }, // y beyond 2^13 - 1
     { z: "13", x: "0", y: "0.pngx" }, // malformed suffix
+    // Security audit 2026-11: Number() accepted these aliases of a valid tile.
+    { z: "13", x: "0x1", y: "0" }, // hex
+    { z: "1e1", x: "0", y: "0" }, // exponent
+    { z: "13", x: "01", y: "0" }, // leading zero
+    { z: "13", x: " 1", y: "0" }, // whitespace
+    { z: "13", x: "1", y: "+1" }, // sign
+    { z: "13", x: "", y: "0" }, // empty
+    { z: "13", x: "1", y: "1.0" }, // decimal point
   ];
   for (const params of invalid) {
     const response = await GET(apiRequest("/api/tiles/13/0/0.png"), {
@@ -170,7 +178,7 @@ test("stores upstream tile responses in the edge cache", async () => {
   const response = await getTile({ z: "13", x: "4250", y: "2900" });
   assert.equal(response.status, 200);
   assert.equal(cacheState.putCalls.length, 1);
-  assert.equal(cacheState.putCalls[0].url, "https://osdb.test/api/tiles/13/4250/2900");
+  assert.equal(cacheState.putCalls[0].url, "https://osdb.test/api/tiles/13/4250/2900.png", "canonical cache key built from the parsed coordinates");
 });
 
 test("returns 502 with no-store when the upstream fails, without caching the error", async () => {
@@ -405,13 +413,10 @@ test("reduces a benign Referer to its origin (no page path/query, no CR/LF injec
   assert.equal(capturedReferer, "https://osdb.test/", "only the origin is forwarded — never the page path or query");
 });
 
-test("passes through a non-image upstream Content-Type unchanged (documented current behavior)", async () => {
-  // The proxy on main does not validate the upstream Content-Type: a
-  // text/html upstream body is served with its own Content-Type and status
-  // 200. This is pinned as documented behavior (QA finding t_ee01cf79-1);
-  // if a future change maps non-image upstreams to 502/415 it must update
-  // this assertion deliberately. The tile is still never cached as an image
-  // error and the map simply fails to render that tile (broken <img>).
+test("rejects a non-image upstream Content-Type with 502 and never caches it (security audit 2026-11)", async () => {
+  // A provider answering 200 with an HTML page must not be served from our
+  // origin as a "tile" (it would be same-origin HTML under the tile path).
+  const cacheState = fakeCache();
   stubFetch(async () =>
     new Response("<html>not a tile</html>", {
       status: 200,
@@ -419,79 +424,79 @@ test("passes through a non-image upstream Content-Type unchanged (documented cur
     }),
   );
   const response = await getTile({ z: "13", x: "4250", y: "2900" });
-  assert.equal(response.status, 200);
-  assert.equal(response.headers.get("content-type"), "text/html; charset=utf-8");
-  assert.equal(await response.text(), "<html>not a tile</html>");
-  assert.equal(response.headers.get("x-tile-cache"), "miss");
+  assert.equal(response.status, 502);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.equal(cacheState.putCalls.length, 0);
 });
 
-test("cache keys are per-URL: x=1 and x=01 never collide, and are not deduplicated either", async () => {
-  // Cache key = the exact request URL. The alias /13/01/2900 has its own
-  // entry, so a hit for one is never served for the other (no wrong-tile
-  // collision). Because the entries differ, the alias also triggers a second
-  // upstream fetch for the same physical tile (documented: no dedup — the
-  // strict 400 validation and the 7-day TTL keep the cost bounded).
+test("forwards only allow-listed upstream headers (security audit 2026-11)", async () => {
+  stubFetch(async () =>
+    upstreamResponse({
+      headers: {
+        "Content-Type": "image/webp",
+        "Cache-Control": "public, max-age=3600",
+        ETag: "\"tile-1\"",
+        "Last-Modified": "Wed, 01 Jan 2026 00:00:00 GMT",
+        Expires: "Thu, 01 Jan 2026 01:00:00 GMT",
+        "Set-Cookie": "tracker=1; path=/",
+        "Access-Control-Allow-Origin": "*",
+        "Content-Security-Policy": "default-src *",
+        Server: "upstream/1.0",
+        "X-Debug-Backend": "render-07",
+      },
+    }),
+  );
+  const response = await getTile({ z: "13", x: "4250", y: "2900" });
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("content-type"), "image/webp");
+  assert.equal(response.headers.get("cache-control"), "public, max-age=3600");
+  assert.equal(response.headers.get("etag"), "\"tile-1\"");
+  assert.equal(response.headers.get("last-modified"), "Wed, 01 Jan 2026 00:00:00 GMT");
+  assert.equal(response.headers.get("expires"), "Thu, 01 Jan 2026 01:00:00 GMT");
+  for (const name of ["set-cookie", "access-control-allow-origin", "content-security-policy", "server", "x-debug-backend"]) {
+    assert.equal(response.headers.get(name), null, `${name} must not be forwarded from the upstream`);
+  }
+});
+
+test("cache key is canonical: query strings and the .png suffix share one entry (security audit 2026-11)", async () => {
   const store = new Map();
-  const state = { matchUrls: [], putUrls: [], hitFor: [], missFor: [] };
+  const state = { matchUrls: [], putUrls: [] };
   globalThis.caches = {
     default: {
       async match(request) {
         const url = String(request.url);
         state.matchUrls.push(url);
         const cached = store.get(url);
-        if (cached) {
-          state.hitFor.push(url);
-          return new Response(cached, { status: 200, headers: { "Content-Type": "image/png", "Cache-Control": "public, max-age=604800" } });
-        }
-        state.missFor.push(url);
-        return null;
+        return cached
+          ? new Response(cached, { status: 200, headers: { "Content-Type": "image/png", "Cache-Control": "public, max-age=604800" } })
+          : null;
       },
       async put(request, response) {
         const url = String(request.url);
         state.putUrls.push(url);
-        store.set(url, response.clone().body);
+        store.set(url, await response.clone().arrayBuffer());
       },
       async delete() {},
     },
   };
   let upstreamCalls = 0;
-  const upstreamUrls = [];
-  stubFetch(async (url) => {
+  stubFetch(async () => {
     upstreamCalls += 1;
-    upstreamUrls.push(String(url));
     return upstreamResponse();
   });
 
   const { GET } = await tilesRoute();
-  const dispatch = async (x) => {
-    const response = await GET(apiRequest(`/api/tiles/13/${x}/2900`), {
-      params: Promise.resolve({ z: "13", x, y: "2900" }),
+  const dispatch = async (requestPath, y) => {
+    const response = await GET(apiRequest(requestPath), {
+      params: Promise.resolve({ z: "13", x: "1", y }),
     });
     return response.headers.get("x-tile-cache");
   };
 
-  assert.equal(await dispatch("1"), "miss");
-  assert.equal(await dispatch("01"), "miss");
-  assert.equal(await dispatch("1"), "hit"); // own entry now cached
-  assert.equal(await dispatch("01"), "hit"); // alias entry cached independently
-
-  assert.equal(upstreamCalls, 2, "each distinct URL fetches the upstream exactly once");
-  assert.deepEqual(upstreamUrls, [
-    "https://tile.openstreetmap.org/13/1/2900.png",
-    "https://tile.openstreetmap.org/13/1/2900.png",
-  ]);
-  assert.deepEqual(state.putUrls, [
-    "https://osdb.test/api/tiles/13/1/2900",
-    "https://osdb.test/api/tiles/13/01/2900",
-  ]);
-  assert.deepEqual(state.missFor, [
-    "https://osdb.test/api/tiles/13/1/2900",
-    "https://osdb.test/api/tiles/13/01/2900",
-  ]);
-  // The critical property: a request for one alias is never served from the
-  // other alias's cache entry.
-  assert.deepEqual(state.hitFor, [
-    "https://osdb.test/api/tiles/13/1/2900",
-    "https://osdb.test/api/tiles/13/01/2900",
-  ]);
+  assert.equal(await dispatch("/api/tiles/13/1/2900.png", "2900.png"), "miss");
+  assert.equal(await dispatch("/api/tiles/13/1/2900.png?cachebust=1", "2900.png"), "hit");
+  assert.equal(await dispatch("/api/tiles/13/1/2900?a=b", "2900"), "hit");
+  assert.equal(upstreamCalls, 1, "one physical tile, one upstream fetch");
+  assert.deepEqual(state.putUrls, ["https://osdb.test/api/tiles/13/1/2900.png"]);
+  assert.ok(state.matchUrls.every((url) => url === "https://osdb.test/api/tiles/13/1/2900.png"));
 });
