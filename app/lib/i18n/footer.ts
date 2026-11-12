@@ -6,6 +6,10 @@
  * (see `./types.ts`), so a missing or extra key fails `tsc --noEmit`.
  */
 import type { Locale, Translation } from "./types";
+import { fr } from "./locales/fr/footer";
+import { de } from "./locales/de/footer";
+import { es } from "./locales/es/footer";
+import { pt } from "./locales/pt/footer";
 
 export const en = {
   landmarkLabel: "Site footer",
@@ -80,4 +84,4 @@ export const it: Translation<typeof en> = {
  * `useDomainMessages`, app/lib/use-messages.ts) instead of the aggregated
  * `messages` map, which would ship EVERY domain in BOTH locales.
  */
-export const footerByLocale: Record<Locale, Translation<typeof en>> = { en, it };
+export const footerByLocale: Record<Locale, Translation<typeof en>> = { en, it, fr, de, es, pt };

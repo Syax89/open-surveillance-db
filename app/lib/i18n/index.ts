@@ -28,6 +28,10 @@
  */
 import { en } from "./bundles/en";
 import { it } from "./bundles/it";
+import { fr } from "./bundles/fr";
+import { de } from "./bundles/de";
+import { es } from "./bundles/es";
+import { pt } from "./bundles/pt";
 import {
   DEFAULT_LOCALE,
   LOCALE_BCP47,
@@ -47,7 +51,7 @@ import {
  * attached here with one import + one line — the registry line in
  * types.ts is what actually announces it to the product.
  */
-const bundleSources = { en, it } as const;
+const bundleSources = { en, it, fr, de, es, pt } as const;
 
 /** Messages keyed exactly by the registry — never by hand. */
 export const messages = Object.fromEntries(

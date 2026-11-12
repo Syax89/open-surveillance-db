@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import { localeFromCookieHeader } from "../../../lib/i18n/types";
 import {
   createContributor,
   createSession,
@@ -187,6 +188,7 @@ export async function POST(request: Request) {
       const { rawToken } = await createVerificationToken(contributor.id, "verify", now);
       try {
         const mail = await sendAuthEmail({
+          locale: localeFromCookieHeader(request.headers.get("Cookie")),
           reservationId: reservation.reservationId,
           contributorId: contributor.id,
           to: contributor.email,

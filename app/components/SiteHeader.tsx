@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { LocaleToggle, useLocale } from "./LocaleProvider";
+import { HeaderPreferences, useLocale } from "./LocaleProvider";
 import { BrandMark } from "./BrandMark";
 // Header lives on EVERY page: import only the `home` domain (F5 qa#5,
 // t_ab0d4c75) instead of the full dictionary via useMessages().
@@ -119,7 +119,7 @@ export function SiteHeader({
         <button className="menu-button" type="button" aria-expanded={menuOpen} aria-controls="main-links" onClick={onMenuToggle}>{t.menu}</button>
       ) : null}
       {children}
-      {toggle === "after" ? <LocaleToggle /> : null}
+      {toggle === "after" ? <HeaderPreferences /> : null}
     </nav>
   );
 }

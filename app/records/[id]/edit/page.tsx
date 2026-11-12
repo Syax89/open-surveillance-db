@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { LocaleToggle } from "../../../components/LocaleProvider";
+import { HeaderPreferences } from "../../../components/LocaleProvider";
 import { useDomainMessages } from "../../../lib/use-domain-messages";
 import { recordByLocale } from "../../../lib/i18n/record";
 import { communityByLocale } from "../../../lib/i18n/community";
@@ -329,7 +329,7 @@ export default function RecordEditPage() {
       <SiteHeader navLabel={t.navigation} toggle="none">
         <div className="nav-record-actions">
           <Link className="text-button" href={`/records/${recordId}`}>{t.backToDirectory}</Link>
-          <LocaleToggle />
+          <HeaderPreferences />
         </div>
       </SiteHeader>
 

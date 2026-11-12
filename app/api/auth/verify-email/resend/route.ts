@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import { localeFromCookieHeader } from "../../../../lib/i18n/types";
 import { createVerificationToken } from "../../../../../db/auth";
 import { resolveOptionalContributor } from "../../../../lib/auth-session";
 import { authLimit } from "../../../../lib/auth-route-helpers";
@@ -75,6 +76,7 @@ export async function POST(request: Request) {
     try {
       const { rawToken } = await createVerificationToken(resolved.contributor.id, "verify", now);
       const mail = await sendAuthEmail({
+        locale: localeFromCookieHeader(request.headers.get("Cookie")),
         reservationId: reservation.reservationId,
         contributorId: resolved.contributor.id,
         to: resolved.contributor.email,

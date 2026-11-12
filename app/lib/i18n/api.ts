@@ -12,6 +12,10 @@
  * cards and the keyed rate-limit note.
  */
 import type { Locale, Translation } from "./types";
+import { fr } from "./locales/fr/api";
+import { de } from "./locales/de/api";
+import { es } from "./locales/es/api";
+import { pt } from "./locales/pt/api";
 
 export const en = {
   navigation: "Main navigation",
@@ -288,4 +292,4 @@ export const it: Translation<typeof en> = {
  * `useDomainMessages`, app/lib/use-messages.ts) instead of the aggregated
  * `messages` map, which would ship EVERY domain in BOTH locales.
  */
-export const apiByLocale: Record<Locale, Translation<typeof en>> = { en, it };
+export const apiByLocale: Record<Locale, Translation<typeof en>> = { en, it, fr, de, es, pt };

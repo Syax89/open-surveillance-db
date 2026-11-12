@@ -1,8 +1,9 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useSyncExternalStore, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { commonByLocale } from "../lib/i18n/common";
+import { ThemeToggle } from "./ThemeToggle";
 // Light import path (F5 qa#5, t_ab0d4c75): registry/cookie constants live
 // in types.ts, NOT in the index barrel that assembles the full two-locale
 // dictionary. Importing them from here would pull ~150 KB of messages
@@ -160,15 +161,63 @@ export function LocaleToggle({ locales = SUPPORTED_LOCALES }: { locales?: readon
     }
   };
 
-  return <div className="locale-toggle" aria-label={common.languageSelection}>
-    {locales.map(({ code, label }) => (
-      <button
-        key={code}
-        type="button"
-        className={locale === code ? "is-active" : ""}
-        aria-pressed={locale === code}
-        onClick={() => changeLocale(code)}
-      >{label}</button>
-    ))}
-  </div>;
+  const menuRef = useRef<HTMLDetailsElement>(null);
+  // Close the menu on Escape or on a pointerdown outside it (same contract
+  // as the mobile nav sheet in PublicNav).
+  useEffect(() => {
+    const close = (event: Event) => {
+      const menu = menuRef.current;
+      if (!menu?.open) return;
+      if (event instanceof KeyboardEvent) {
+        if (event.key !== "Escape") return;
+        menu.open = false;
+        menu.querySelector("summary")?.focus();
+        return;
+      }
+      if (!menu.contains(event.target as Node)) menu.open = false;
+    };
+    document.addEventListener("keydown", close);
+    document.addEventListener("pointerdown", close);
+    return () => {
+      document.removeEventListener("keydown", close);
+      document.removeEventListener("pointerdown", close);
+    };
+  }, []);
+
+  const current = locales.find(({ code }) => code === locale) ?? locales[0];
+  const nameOf = (info: LocaleInfo) => (info as { name?: string }).name || info.label;
+
+  // Six languages no longer fit as a segmented control in the header: a
+  // compact disclosure ("🌐 EN ▾") opens the list. The summary shows the
+  // current code through CSS (data-current) so the only text nodes named
+  // "EN"/"IT"… are the real language buttons (aria-pressed, lang).
+  return <details className="locale-toggle" ref={menuRef}>
+    <summary aria-label={`${common.languageSelection} (${nameOf(current)})`} data-current={current.label}>
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="1.8" /><path d="M3 12h18M12 3c2.6 2.6 3.8 5.6 3.8 9s-1.2 6.4-3.8 9M12 3C9.4 5.6 8.2 8.6 8.2 12s1.2 6.4 3.8 9" fill="none" stroke="currentColor" strokeWidth="1.8" /></svg>
+    </summary>
+    <div className="locale-menu" role="group" aria-label={common.languageSelection}>
+      {locales.map((info) => (
+        <button
+          key={info.code}
+          type="button"
+          lang={(info as { bcp47?: string }).bcp47 ?? info.code}
+          className={locale === info.code ? "is-active" : ""}
+          aria-pressed={locale === info.code}
+          data-name={nameOf(info)}
+          onClick={() => {
+            if (menuRef.current) menuRef.current.open = false;
+            changeLocale(info.code);
+          }}
+        >{info.label}</button>
+      ))}
+    </div>
+  </details>;
+}
+
+/**
+ * Header preference controls: theme switch + language menu, side by side.
+ * One component so every header (public, moderation, edit) gets both.
+ */
+export function HeaderPreferences() {
+  return <div className="header-preferences"><ThemeToggle /><LocaleToggle /></div>;
 }

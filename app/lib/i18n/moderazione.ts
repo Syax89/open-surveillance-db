@@ -13,6 +13,10 @@
  * (page.tsx renders them positionally); values rewritten.
  */
 import type { Locale, Translation } from "./types";
+import { fr } from "./locales/fr/moderazione";
+import { de } from "./locales/de/moderazione";
+import { es } from "./locales/es/moderazione";
+import { pt } from "./locales/pt/moderazione";
 
 export const en = {
   navigation: "Publication navigation",
@@ -143,4 +147,4 @@ export const it: Translation<typeof en> = {
  * `useDomainMessages`, app/lib/use-messages.ts) instead of the aggregated
  * `messages` map, which would ship EVERY domain in BOTH locales.
  */
-export const moderazioneByLocale: Record<Locale, Translation<typeof en>> = { en, it };
+export const moderazioneByLocale: Record<Locale, Translation<typeof en>> = { en, it, fr, de, es, pt };

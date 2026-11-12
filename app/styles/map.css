@@ -31,10 +31,10 @@
 .live-map { width:100%; height:540px; background:var(--map-canvas); }
 .map-fallback { display:grid; place-content:center; gap:var(--space-3); height:100%; min-height:540px; padding:var(--space-8); text-align:center; background:var(--map-fallback-bg); color:var(--ink-2); font-size:var(--text-base); line-height:1.5; }
 .map-fallback-title { font-size:var(--text-2xl); font-weight:800; color:var(--heading); }
-.map-legend { position:absolute; z-index:800; left:12px; bottom:12px; max-width:min(330px, calc(100% - 24px)); border:1px solid rgba(202,215,205,.9); border-radius:var(--radius-md); background:rgba(255,255,251,.95); box-shadow:0 2px 12px rgba(30,48,40,.12); color:var(--map-hint-ink); overflow:hidden; }
+.map-legend { position:absolute; z-index:800; left:12px; bottom:12px; max-width:min(330px, calc(100% - 24px)); border:1px solid var(--overlay-border); border-radius:var(--radius-md); background:var(--overlay-bg); box-shadow:0 2px 12px rgba(30,48,40,.12); color:var(--map-hint-ink); overflow:hidden; }
 .map-legend summary { display:flex; align-items:center; gap:8px; min-height:36px; padding:0 11px; color:var(--ink-2); cursor:pointer; font-size:var(--text-xs); font-weight:800; list-style:none; }
 .map-legend summary::-webkit-details-marker { display:none; }
-.map-legend summary::before { content:"?"; display:grid; place-items:center; width:17px; height:17px; border-radius:var(--radius-round); background:var(--action); color:var(--white); font-size:11px; line-height:1; }
+.map-legend summary::before { content:"?"; display:grid; place-items:center; width:17px; height:17px; border-radius:var(--radius-round); background:var(--action-fill); color:var(--on-accent); font-size:11px; line-height:1; }
 .map-legend summary::after { content:"+"; margin-left:auto; color:var(--action); font-size:var(--text-lg); }
 .map-legend[open] summary { border-bottom:1px solid var(--line); }
 .map-legend[open] summary::after { content:"−"; }
@@ -74,7 +74,7 @@
 .osm-geolocate-btn svg { width:22px; height:22px; }
 .osm-geolocate-btn:hover { background:var(--map-surface); }
 .osm-geolocate-btn:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
-.osm-geolocate-btn[aria-pressed="true"] { background:var(--action); border-color:var(--action); color:var(--card-bg); }
+.osm-geolocate-btn[aria-pressed="true"] { background:var(--action-fill); border-color:var(--action-fill); color:var(--on-accent); }
 .osm-geolocate-btn[hidden] { display:none; }
 /* User-location marker (t_18259daa): a small precision dot + accuracy
    circle — deliberately NOT a camera marker (distinct style: the camera
@@ -83,7 +83,7 @@
    radius with a translucent mint fill. */
 .osm-user-dot {
   display:block; width:16px; height:16px; border-radius:var(--radius-round);
-  background:var(--action); border:3px solid var(--card-bg);
+  background:var(--action-fill); border:3px solid var(--on-accent);
   box-shadow:0 0 0 2px rgb(11 112 92 / .45);
 }
 .map-geo-notice {
@@ -102,7 +102,7 @@
 .report-minimap .fov-cone { pointer-events:none; }
 .report-minimap .fov-cone.active { stroke:var(--action); fill:var(--action); }
 .report-pick-marker { display:grid; place-items:center; width:28px; height:28px; }
-.report-pick-marker i { width:14px; height:14px; border-radius:50%; background:var(--action); border:3px solid var(--white); box-shadow:0 0 0 1px var(--action), 0 1px 4px rgba(0,0,0,.35); }
+.report-pick-marker i { width:14px; height:14px; border-radius:50%; background:var(--action-fill); border:3px solid var(--on-accent); box-shadow:0 0 0 1px var(--action), 0 1px 4px rgba(0,0,0,.35); }
 .fov-rotate-handle-wrap { display:grid; place-items:center; }
 .fov-rotate-handle { width:18px; height:18px; border-radius:50%; background:var(--white); border:2px solid var(--action); box-shadow:0 1px 4px rgba(0,0,0,.3); cursor:grab; }
 .fov-rotate-handle:active { cursor:grabbing; }
@@ -225,10 +225,10 @@
 .osm-grid-badge {
   display:flex; align-items:center; justify-content:center;
   width:44px; height:44px; border-radius:50%;
-  background:var(--action); color:var(--white);
+  background:var(--action-fill); color:var(--on-accent);
   font-size:var(--text-md); font-weight:800; line-height:1;
   box-shadow:0 1px 4px rgb(10 30 40 / .35);
-  border:2px solid var(--white);
+  border:2px solid var(--on-accent);
 }
 .leaflet-marker-icon.osm-grid-badge-wrap:focus-visible {
   outline:3px solid var(--focus); outline-offset:2px; border-radius:50%;
@@ -430,3 +430,21 @@
   .map-explorer-search .map-list-search label { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
   .map-explorer-search .map-list-search:not(:focus-within) .map-list-search-hint { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
 }
+
+/* Dark theme (2026-11): Leaflet's own chrome is hard-coded white, and the
+   OSM raster tiles are light — invert them (hue-rotated back so water stays
+   blue). Same two selectors as the token blocks in globals.css. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .leaflet-tile-pane { filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.9); }
+  :root:not([data-theme="light"]) .leaflet-popup-content-wrapper, :root:not([data-theme="light"]) .leaflet-popup-tip { background:var(--card-bg); color:var(--ink); }
+  :root:not([data-theme="light"]) .leaflet-bar a, :root:not([data-theme="light"]) .leaflet-bar a:hover { background-color:var(--card-bg); color:var(--ink); border-bottom-color:var(--line); }
+  :root:not([data-theme="light"]) .leaflet-control-attribution { background:rgba(20,30,37,.8) !important; color:var(--muted); }
+  :root:not([data-theme="light"]) .leaflet-control-attribution a { color:var(--action); }
+  :root:not([data-theme="light"]) .leaflet-container { background:var(--map-canvas); }
+}
+:root[data-theme="dark"] .leaflet-tile-pane { filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.9); }
+:root[data-theme="dark"] .leaflet-popup-content-wrapper, :root[data-theme="dark"] .leaflet-popup-tip { background:var(--card-bg); color:var(--ink); }
+:root[data-theme="dark"] .leaflet-bar a, :root[data-theme="dark"] .leaflet-bar a:hover { background-color:var(--card-bg); color:var(--ink); border-bottom-color:var(--line); }
+:root[data-theme="dark"] .leaflet-control-attribution { background:rgba(20,30,37,.8) !important; color:var(--muted); }
+:root[data-theme="dark"] .leaflet-control-attribution a { color:var(--action); }
+:root[data-theme="dark"] .leaflet-container { background:var(--map-canvas); }

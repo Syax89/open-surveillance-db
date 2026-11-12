@@ -7,7 +7,7 @@
 // ./moderation. This file only composes them.
 
 import Link from "next/link";
-import { LocaleToggle } from "./LocaleProvider";
+import { HeaderPreferences } from "./LocaleProvider";
 import { useDomainMessages } from "../lib/use-domain-messages";
 import { errorsByLocale } from "../lib/i18n/errors";
 import { moderationByLocale } from "../lib/i18n/moderation";
@@ -30,7 +30,7 @@ export function ModerationDashboard() {
 
   return <main id="main-content">
     <SiteHeader navLabel={t.navigation} homeLabel={t.home} toggle="none">
-      <div className="nav-actions"><LocaleToggle /><Link className="text-button" href="/">{t.returnPublic} <span aria-hidden="true">→</span></Link></div>
+      <div className="nav-actions"><HeaderPreferences /><Link className="text-button" href="/">{t.returnPublic} <span aria-hidden="true">→</span></Link></div>
     </SiteHeader>
 
     <section className="moderation-page" aria-labelledby="moderation-title">

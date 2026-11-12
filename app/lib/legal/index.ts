@@ -19,11 +19,15 @@
  */
 import { enLegal } from "./en";
 import { itLegal } from "./it";
+import { frLegal } from "./fr";
+import { deLegal } from "./de";
+import { esLegal } from "./es";
+import { ptLegal } from "./pt";
 import { SUPPORTED_LOCALES } from "../i18n/types";
 import type { Locale } from "../i18n/types";
 import type { LegalContent } from "./types";
 
-const legalSources = { en: enLegal, it: itLegal } as const;
+const legalSources = { en: enLegal, it: itLegal, fr: frLegal, de: deLegal, es: esLegal, pt: ptLegal } as const;
 
 /** Legal content keyed exactly by the registry — never by hand. */
 export const legalMessages = Object.fromEntries(

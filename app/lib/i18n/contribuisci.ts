@@ -10,6 +10,10 @@
  * tracking, no forms — just the two ways to support the project.
  */
 import type { Locale, Translation } from "./types";
+import { fr } from "./locales/fr/contribuisci";
+import { de } from "./locales/de/contribuisci";
+import { es } from "./locales/es/contribuisci";
+import { pt } from "./locales/pt/contribuisci";
 
 export const en = {
   navigation: "Support navigation",
@@ -72,4 +76,4 @@ export const it: Translation<typeof en> = {
  * `useDomainMessages`, app/lib/use-messages.ts) instead of the aggregated
  * `messages` map, which would ship EVERY domain in BOTH locales.
  */
-export const contribuisciByLocale: Record<Locale, Translation<typeof en>> = { en, it };
+export const contribuisciByLocale: Record<Locale, Translation<typeof en>> = { en, it, fr, de, es, pt };

@@ -30,8 +30,12 @@
  * and can run in plain Node (route tests import it via loadLibModule).
  */
 
-import { SUPPORTED_LOCALES } from "./i18n/types";
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from "./i18n/types";
 import type { Locale } from "./i18n/types";
+import { fr as frEmail } from "./i18n/locales/fr/email";
+import { de as deEmail } from "./i18n/locales/de/email";
+import { es as esEmail } from "./i18n/locales/es/email";
+import { pt as ptEmail } from "./i18n/locales/pt/email";
 
 export type AuthEmailKind = "verify" | "reset";
 
@@ -44,6 +48,13 @@ export type AuthEmailContext = {
   siteName: string;
   /** Public site URL shown as a plain-text fallback (never a tracking link). */
   siteUrl: string;
+  /**
+   * The requester's interface language (their locale cookie at the time of
+   * the request), when they chose one. The message ships English (pilot)
+   * plus this language; without it, English + Italian as before. Six
+   * languages in every email would bury the action link.
+   */
+  locale?: Locale | null;
 };
 
 export type RenderedAuthEmail = {
@@ -81,7 +92,7 @@ export function buildAuthActionUrl(kind: AuthEmailKind, rawToken: string, verify
   return `${base}${path}?token=${encodeURIComponent(rawToken)}`;
 }
 
-type Greeting = (displayName: string | null | undefined) => string;
+export type Greeting = (displayName: string | null | undefined) => string;
 
 /** One kind's localized copy block (intro/button/ignore, see EMAIL_COPY). */
 type EmailBlockCopy = {
@@ -98,7 +109,7 @@ type EmailBlockCopy = {
 };
 
 /** Per-locale email copy. Every registered locale must have one (tsc). */
-type EmailCopy = {
+export type EmailCopy = {
   greeting: Greeting;
   /** Self-name of the language shown as the block divider ("— Italiano —"). */
   divider: string;
@@ -158,6 +169,10 @@ const EMAIL_COPY: Record<Locale, EmailCopy> = {
       ignore: "Se non hai richiesto la reimpostazione della password, puoi ignorare questa email — la tua password resta invariata.",
     },
   },
+  fr: frEmail,
+  de: deEmail,
+  es: esEmail,
+  pt: ptEmail,
 };
 
 const BUTTON_STYLE = "background-color:#0b705c;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:6px;font-weight:bold;";
@@ -165,7 +180,15 @@ const TEXT_LINK_STYLE = "color:#0b705c;";
 const HR_STYLE = "border:none;border-top:1px solid #e0e0e0;margin:24px 0;";
 const DIVIDER_STYLE = "color:#444444;";
 
-/** Render the HTML body for `kind`: every registered locale, pilot first. */
+/** The locales a message ships, pilot first (see AuthEmailContext.locale). */
+function messageLocales(context: AuthEmailContext): (typeof SUPPORTED_LOCALES)[number][] {
+  const wanted: Locale[] = context.locale
+    ? [DEFAULT_LOCALE, context.locale]
+    : [DEFAULT_LOCALE, "it"];
+  return SUPPORTED_LOCALES.filter(({ code }) => wanted.includes(code));
+}
+
+/** Render the HTML body for `kind`: pilot first, then the requester's language. */
 function renderBilingualHtml(kind: AuthEmailKind, context: AuthEmailContext): string {
   const siteName = context.siteName || DEFAULT_SITE_NAME;
   const actionUrl = context.actionUrl;
@@ -189,7 +212,7 @@ function renderBilingualHtml(kind: AuthEmailKind, context: AuthEmailContext): st
     return `<hr style="${HR_STYLE}" />\n  <p${lang} style="${DIVIDER_STYLE}">${copy.divider}</p>\n  ${lines.join("\n  ")}`;
   };
 
-  const body = SUPPORTED_LOCALES.map((locale, index) => block(locale, index === 0)).join("\n  ");
+  const body = messageLocales(context).map((locale, index) => block(locale, index === 0)).join("\n  ");
 
   return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.5;color:#1a1a1a;max-width:600px;margin:0 auto;">
   ${body}
@@ -198,7 +221,7 @@ function renderBilingualHtml(kind: AuthEmailKind, context: AuthEmailContext): st
 </div>`;
 }
 
-/** Render the plain-text body for `kind`: every registered locale, pilot first. */
+/** Render the plain-text body for `kind`: pilot first, then the requester's language. */
 function renderBilingualText(kind: AuthEmailKind, context: AuthEmailContext): string {
   const siteName = context.siteName || DEFAULT_SITE_NAME;
   const actionUrl = context.actionUrl;
@@ -219,7 +242,7 @@ function renderBilingualText(kind: AuthEmailKind, context: AuthEmailContext): st
     return isPilot ? lines : [copy.divider, "", ...lines];
   };
 
-  const parts = SUPPORTED_LOCALES.map((locale, index) => block(locale, index === 0)).flat();
+  const parts = messageLocales(context).map((locale, index) => block(locale, index === 0)).flat();
   parts.push(`${siteName} · ${context.siteUrl}`);
   return parts.join("\n");
 }

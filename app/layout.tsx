@@ -3,7 +3,7 @@ import { LocaleProvider } from "./components/LocaleProvider";
 import { LegacyAnchorRedirect } from "./components/LegacyAnchorRedirect";
 import { DocumentNavigation } from "./components/DocumentNavigation";
 import { SiteFooter } from "./components/SiteFooter";
-import { getServerLocale, getServerMessages } from "./lib/server-i18n";
+import { getServerLocale, getServerMessages, getServerTheme } from "./lib/server-i18n";
 import { getConfiguredSiteUrl } from "./lib/site-url";
 import "./globals.css";
 
@@ -67,9 +67,12 @@ export default async function RootLayout({
   // rendered by the server (SiteFooter, skip link, toggle active state) also
   // match the cookie locale instead of always being English (QA-2026-08-01-1).
   const locale = await getServerLocale();
+  // Chosen colour theme (cookie), server-rendered so there is no flash;
+  // absent = follow the system setting via CSS prefers-color-scheme.
+  const theme = await getServerTheme();
 
   return (
-    <html lang={locale}>
+    <html lang={locale} data-theme={theme ?? undefined}>
       <head>
         {/* Relative href on purpose: metadata icons would be resolved against
             metadataBase (or the localhost fallback), which breaks the favicon
