@@ -53,8 +53,17 @@
  * rate_limited without minting, so it cannot revoke the link that won the
  * window and was delivered.
  *
+ * Account-exists notice (kind 'account_exists'): POST /api/auth/register
+ * answers the same for new and existing addresses, and mails the owner of
+ * an existing address a token-less notice instead. It goes through the
+ * same reservation (so it shares the 1-per-5-minutes window) PLUS a per-kind
+ * daily cap (ACCOUNT_EXISTS_EMAIL_DAILY_MAX per 24 h, same atomic INSERT),
+ * so repeatedly submitting the register form with someone's address cannot
+ * flood their inbox. The 24 h cap fits inside retention R18's 24 h sweep.
+ *
  * Privacy by design: the log row stores NO content, NO recipient address
- * and NO IP — only contributor_id, kind ('verify' | 'reset') and sent_at.
+ * and NO IP — only contributor_id, kind ('verify' | 'reset' |
+ * 'account_exists') and sent_at.
  * The templates carry zero tracking (no pixels, no remote assets, only the
  * action link). The recipient address is read by the CALLER from
  * contributors.email and passed to send(); it is never persisted here.
@@ -64,10 +73,12 @@ import { env } from "cloudflare:workers";
 import { getD1 } from "./cameras";
 import type { Locale } from "../app/lib/i18n/types";
 import {
+  buildAccountExistsUrls,
   buildAuthActionUrl,
   renderAuthEmail,
   type AuthEmailKind,
   type AuthEmailContext,
+  type TokenEmailKind,
 } from "../app/lib/email-templates";
 
 // ---------------------------------------------------------------------------
@@ -80,6 +91,17 @@ import {
 
 export const EMAIL_SEND_LIMIT_DEFAULT_MAX = 1;
 export const EMAIL_SEND_LIMIT_DEFAULT_WINDOW_SECONDS = 5 * 60;
+
+/**
+ * Per-kind daily cap on top of the shared window: at most this many
+ * account-exists notices per contributor per rolling 24 h (anti inbox
+ * flooding through the public register form).
+ */
+export const ACCOUNT_EXISTS_EMAIL_DAILY_MAX = 3;
+const KIND_DAILY_CAP_WINDOW_SECONDS = 24 * 60 * 60;
+const KIND_DAILY_CAPS: Partial<Record<AuthEmailKind, number>> = {
+  account_exists: ACCOUNT_EXISTS_EMAIL_DAILY_MAX,
+};
 
 export type EmailSendLimits = {
   maxRequests: number;
@@ -197,6 +219,10 @@ export type AuthEmailReservation =
  * `releaseEmailReservation` so the budget is not burned. A caller that
  * holds a reservation may safely mint its token: the loser answered
  * rate_limited without ever reaching the mint.
+ *
+ * A kind with a daily cap (KIND_DAILY_CAPS — 'account_exists') adds a
+ * second condition to the SAME statement: fewer than the cap rows of that
+ * kind for the contributor in the last 24 h.
  */
 export async function reserveAuthEmail(
   contributorId: number,
@@ -207,26 +233,61 @@ export async function reserveAuthEmail(
   const limits = emailSendLimits(config);
   const d1 = await getD1();
   const windowStartIso = new Date(Date.parse(nowIso) - limits.windowSeconds * 1000).toISOString();
-  const row = await d1
-    .prepare(
-      `INSERT INTO email_send_log (contributor_id, kind, sent_at)
-       SELECT ?, ?, ?
-       WHERE (
-         SELECT COUNT(*) FROM email_send_log
-         WHERE contributor_id = ? AND sent_at >= ?
-       ) < ?
-       RETURNING id`,
-    )
-    .bind(contributorId, kind, nowIso, contributorId, windowStartIso, limits.maxRequests)
-    .first<{ id: number }>();
+  const dailyCap = KIND_DAILY_CAPS[kind];
+  const dailyStartIso = new Date(Date.parse(nowIso) - KIND_DAILY_CAP_WINDOW_SECONDS * 1000).toISOString();
+  const row = dailyCap === undefined
+    ? await d1
+      .prepare(
+        `INSERT INTO email_send_log (contributor_id, kind, sent_at)
+         SELECT ?, ?, ?
+         WHERE (
+           SELECT COUNT(*) FROM email_send_log
+           WHERE contributor_id = ? AND sent_at >= ?
+         ) < ?
+         RETURNING id`,
+      )
+      .bind(contributorId, kind, nowIso, contributorId, windowStartIso, limits.maxRequests)
+      .first<{ id: number }>()
+    : await d1
+      .prepare(
+        `INSERT INTO email_send_log (contributor_id, kind, sent_at)
+         SELECT ?, ?, ?
+         WHERE (
+           SELECT COUNT(*) FROM email_send_log
+           WHERE contributor_id = ? AND sent_at >= ?
+         ) < ?
+         AND (
+           SELECT COUNT(*) FROM email_send_log
+           WHERE contributor_id = ? AND kind = ? AND sent_at >= ?
+         ) < ?
+         RETURNING id`,
+      )
+      .bind(
+        contributorId, kind, nowIso,
+        contributorId, windowStartIso, limits.maxRequests,
+        contributorId, kind, dailyStartIso, dailyCap,
+      )
+      .first<{ id: number }>();
   if (row) {
     return { ok: true, reservationId: Number(row.id) };
   }
-  return {
-    ok: false,
-    reason: "rate_limited",
-    retryAfterSeconds: await retryAfterSeconds(contributorId, nowIso, limits),
-  };
+  let retryAfter = await retryAfterSeconds(contributorId, nowIso, limits);
+  if (dailyCap !== undefined) {
+    const daily = await d1
+      .prepare(
+        `SELECT COUNT(*) AS n, MIN(sent_at) AS oldest FROM email_send_log
+         WHERE contributor_id = ? AND kind = ? AND sent_at >= ?`,
+      )
+      .bind(contributorId, kind, dailyStartIso)
+      .first<{ n: number; oldest: string | null }>();
+    if (Number(daily?.n ?? 0) >= dailyCap && daily?.oldest) {
+      retryAfter = Math.max(
+        retryAfter,
+        Math.ceil((Date.parse(daily.oldest) + KIND_DAILY_CAP_WINDOW_SECONDS * 1000 - Date.parse(nowIso)) / 1000),
+      );
+    }
+  }
+  return { ok: false, reason: "rate_limited", retryAfterSeconds: retryAfter };
 }
 
 /**
@@ -322,15 +383,20 @@ export type SendAuthEmailInput = {
   contributorId: number;
   /** Recipient address (caller reads it from contributors.email). */
   to: string;
-  kind: AuthEmailKind;
-  /** Raw single-use token (already hashed before storage by the caller). */
-  rawToken: string;
   displayName?: string | null;
   siteName?: string;
   siteUrl?: string;
   /** Requester's interface language (locale cookie), if they chose one. */
   locale?: Locale | null;
-};
+} & (
+  | {
+    kind: TokenEmailKind;
+    /** Raw single-use token (already hashed before storage by the caller). */
+    rawToken: string;
+  }
+  // The account-exists notice carries no token (two plain links).
+  | { kind: "account_exists"; rawToken?: undefined }
+);
 
 export type SendAuthEmailResult =
   | { ok: true; messageId: string }
@@ -420,8 +486,11 @@ export async function sendAuthEmail(input: SendAuthEmailInput): Promise<SendAuth
   }
 
   try {
+    const links = input.kind === "account_exists"
+      ? buildAccountExistsUrls(baseUrl)
+      : { actionUrl: buildAuthActionUrl(input.kind, input.rawToken, baseUrl) };
     const context: AuthEmailContext = {
-      actionUrl: buildAuthActionUrl(input.kind, input.rawToken, baseUrl),
+      ...links,
       displayName: input.displayName,
       siteName: input.siteName ?? "OpenSurveillanceDB",
       siteUrl: input.siteUrl ?? "https://opensurveillancedb.org",

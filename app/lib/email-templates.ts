@@ -2,14 +2,18 @@
  * Transactional email templates for the auth flows (AUTH MULTI-METODO
  * Fase A2, t_4c398006 — ADR 0020 decision 2).
  *
- * Two templates, each rendered in BOTH HTML and plain text:
+ * Three templates, each rendered in BOTH HTML and plain text:
  *   - verification   (email address verification after register)
  *   - password reset (Fase B)
+ *   - account exists (registration attempted with an address that already
+ *     has an account — the register endpoint answers the same for new and
+ *     existing addresses, so the owner learns about it here, privately)
  *
  * Zero-tracking contract (PRIVACY_AND_SAFETY.md, PROCESSOR_REGISTER.md PR1):
  *   - NO <img> tags: no tracking pixels, no remote images, no beacons;
- *   - NO external links beyond the single action URL — no analytics,
- *     no social, no unsubscribe-tracking endpoints;
+ *   - NO external links beyond the action URL(s) on the site itself (the
+ *     account-exists notice carries two: sign in and reset password) — no
+ *     analytics, no social, no unsubscribe-tracking endpoints;
  *   - NO remote stylesheets/fonts: all styling is inline so the mailer
  *     never phones home to render;
  *   - a plain-text alternative is ALWAYS present (accessibility + spam
@@ -37,11 +41,23 @@ import { de as deEmail } from "./i18n/locales/de/email";
 import { es as esEmail } from "./i18n/locales/es/email";
 import { pt as ptEmail } from "./i18n/locales/pt/email";
 
-export type AuthEmailKind = "verify" | "reset";
+/** Emails that carry a single-use token (verification / password reset). */
+export type TokenEmailKind = "verify" | "reset";
+
+/**
+ * Every auth email kind. `account_exists` carries NO token: it is the
+ * notice sent to the owner of an address someone tried to register again.
+ */
+export type AuthEmailKind = TokenEmailKind | "account_exists";
 
 export type AuthEmailContext = {
-  /** The full action URL (verification or reset link) with the raw token. */
+  /**
+   * The full action URL (verification or reset link with the raw token; the
+   * sign-in page for the account-exists notice).
+   */
   actionUrl: string;
+  /** Second action link (account-exists notice only: the forgot-password page). */
+  secondaryActionUrl?: string;
   /** Optional public display name; escaped in HTML output. */
   displayName?: string | null;
   /** Brand name shown in header/footer, e.g. "OpenSurveillanceDB". */
@@ -86,10 +102,20 @@ export function escapeHtml(value: string): string {
  * verify link pointed at GET /api/auth/verify-email, i.e. raw JSON in the
  * browser, and the reset link at a route that does not exist.)
  */
-export function buildAuthActionUrl(kind: AuthEmailKind, rawToken: string, verifyBaseUrl: string): string {
+export function buildAuthActionUrl(kind: TokenEmailKind, rawToken: string, verifyBaseUrl: string): string {
   const base = verifyBaseUrl.replace(/\/+$/, "");
   const path = kind === "verify" ? "/verify-email" : "/reset-password";
   return `${base}${path}?token=${encodeURIComponent(rawToken)}`;
+}
+
+/**
+ * The two plain links of the account-exists notice: the sign-in page and
+ * the forgot-password page that starts a reset (no token, no query string —
+ * nothing to track; /reset-password itself needs a reset token).
+ */
+export function buildAccountExistsUrls(verifyBaseUrl: string): { actionUrl: string; secondaryActionUrl: string } {
+  const base = verifyBaseUrl.replace(/\/+$/, "");
+  return { actionUrl: `${base}/login`, secondaryActionUrl: `${base}/forgot-password` };
 }
 
 export type Greeting = (displayName: string | null | undefined) => string;
@@ -108,6 +134,12 @@ type EmailBlockCopy = {
   ignore: string;
 };
 
+/** The account-exists notice: two actions (sign in, reset password). */
+type EmailTwoActionCopy = EmailBlockCopy & {
+  /** Second button / plain-text link label (reset password). */
+  secondaryButton: string;
+};
+
 /** Per-locale email copy. Every registered locale must have one (tsc). */
 export type EmailCopy = {
   greeting: Greeting;
@@ -117,7 +149,14 @@ export type EmailCopy = {
   buttonFallback: string;
   verify: EmailBlockCopy;
   reset: EmailBlockCopy;
+  /** Notice for a registration attempt on an address that has an account. */
+  accountExists: EmailTwoActionCopy;
 };
+
+/** The copy block for `kind`. */
+function blockCopy(copy: EmailCopy, kind: AuthEmailKind): EmailBlockCopy & { secondaryButton?: string } {
+  return kind === "account_exists" ? copy.accountExists : copy[kind];
+}
 
 /** Substitute the brand name placeholder in a copy string. */
 function fillSiteName(copy: string, siteName: string): string {
@@ -151,6 +190,13 @@ const EMAIL_COPY: Record<Locale, EmailCopy> = {
       button: "Reset password",
       ignore: "If you did not request a password reset, you can ignore this email — your password stays unchanged.",
     },
+    accountExists: {
+      intro:
+        "Someone tried to create an account on {SITE} with this email address. If it was you, you already have an account: sign in, or reset your password if you have forgotten it.",
+      button: "Sign in",
+      secondaryButton: "Reset password",
+      ignore: "If it wasn't you, you can ignore this email — nothing has changed.",
+    },
   },
   it: {
     greeting: (displayName) => (displayName ? `Ciao ${displayName},` : "Ciao,"),
@@ -168,6 +214,13 @@ const EMAIL_COPY: Record<Locale, EmailCopy> = {
       button: "Reimposta la password",
       ignore: "Se non hai richiesto la reimpostazione della password, puoi ignorare questa email — la tua password resta invariata.",
     },
+    accountExists: {
+      intro:
+        "Qualcuno ha provato a creare un account su {SITE} con questo indirizzo email. Se eri tu, hai già un account: accedi, oppure reimposta la password se l'hai dimenticata.",
+      button: "Accedi",
+      secondaryButton: "Reimposta la password",
+      ignore: "Se non eri tu, puoi ignorare questa email — non è cambiato nulla.",
+    },
   },
   fr: frEmail,
   de: deEmail,
@@ -176,6 +229,7 @@ const EMAIL_COPY: Record<Locale, EmailCopy> = {
 };
 
 const BUTTON_STYLE = "background-color:#0b705c;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:6px;font-weight:bold;";
+const SECONDARY_BUTTON_STYLE = "background-color:#ffffff;color:#0b705c;text-decoration:none;padding:11px 19px;border:1px solid #0b705c;border-radius:6px;font-weight:bold;margin-left:8px;";
 const TEXT_LINK_STYLE = "color:#0b705c;";
 const HR_STYLE = "border:none;border-top:1px solid #e0e0e0;margin:24px 0;";
 const DIVIDER_STYLE = "color:#444444;";
@@ -193,20 +247,30 @@ function renderBilingualHtml(kind: AuthEmailKind, context: AuthEmailContext): st
   const siteName = context.siteName || DEFAULT_SITE_NAME;
   const actionUrl = context.actionUrl;
   const actionUrlEscaped = escapeHtml(actionUrl);
+  const secondaryUrlEscaped = context.secondaryActionUrl ? escapeHtml(context.secondaryActionUrl) : null;
   const name = context.displayName ?? null;
 
   const block = (locale: (typeof SUPPORTED_LOCALES)[number], isPilot: boolean) => {
     const copy = EMAIL_COPY[locale.code];
+    const kindCopy = blockCopy(copy, kind);
     const lang = isPilot ? "" : ` lang="${locale.bcp47}"`;
+    const secondary = secondaryUrlEscaped && kindCopy.secondaryButton ? secondaryUrlEscaped : null;
+    const secondaryButton = secondary
+      ? `\n    <a href="${secondary}" style="${SECONDARY_BUTTON_STYLE}">${kindCopy.secondaryButton}</a>`
+      : "";
+    const secondaryFallback = secondary
+      ? [`<p${lang}><a href="${secondary}" style="${TEXT_LINK_STYLE}">${secondary}</a></p>`]
+      : [];
     const lines = [
       `<p${lang}>${escapeHtml(copy.greeting(name))}</p>`,
       // Escape the substituted brand name only: the template's own <strong>
       // markup must survive (the plain-text renderer strips it later).
-      `<p${lang}>${fillSiteName(copy[kind].intro, escapeHtml(siteName))}</p>`,
-      `<p${lang} style="margin:24px 0;">\n    <a href="${actionUrlEscaped}" style="${BUTTON_STYLE}">${copy[kind].button}</a>\n  </p>`,
+      `<p${lang}>${fillSiteName(kindCopy.intro, escapeHtml(siteName))}</p>`,
+      `<p${lang} style="margin:24px 0;">\n    <a href="${actionUrlEscaped}" style="${BUTTON_STYLE}">${kindCopy.button}</a>${secondaryButton}\n  </p>`,
       `<p${lang}>${copy.buttonFallback}</p>`,
       `<p${lang}><a href="${actionUrlEscaped}" style="${TEXT_LINK_STYLE}">${actionUrlEscaped}</a></p>`,
-      `<p${lang}>${fillSiteName(copy[kind].ignore, escapeHtml(siteName))}</p>`,
+      ...secondaryFallback,
+      `<p${lang}>${fillSiteName(kindCopy.ignore, escapeHtml(siteName))}</p>`,
     ];
     if (isPilot) return lines.join("\n  ");
     return `<hr style="${HR_STYLE}" />\n  <p${lang} style="${DIVIDER_STYLE}">${copy.divider}</p>\n  ${lines.join("\n  ")}`;
@@ -229,14 +293,20 @@ function renderBilingualText(kind: AuthEmailKind, context: AuthEmailContext): st
 
   const block = (locale: (typeof SUPPORTED_LOCALES)[number], isPilot: boolean) => {
     const copy = EMAIL_COPY[locale.code];
+    const kindCopy = blockCopy(copy, kind);
+    const secondary =
+      context.secondaryActionUrl && kindCopy.secondaryButton
+        ? [`${kindCopy.secondaryButton}: ${context.secondaryActionUrl}`]
+        : [];
     const lines = [
       copy.greeting(name),
       "",
-      stripStrong(fillSiteName(copy[kind].intro, siteName)),
+      stripStrong(fillSiteName(kindCopy.intro, siteName)),
       "",
-      `${copy[kind].button}: ${actionUrl}`,
+      `${kindCopy.button}: ${actionUrl}`,
+      ...secondary,
       "",
-      fillSiteName(copy[kind].ignore, siteName),
+      fillSiteName(kindCopy.ignore, siteName),
       "",
     ];
     return isPilot ? lines : [copy.divider, "", ...lines];
@@ -278,7 +348,25 @@ export function renderPasswordResetEmail(context: AuthEmailContext): RenderedAut
   };
 }
 
+/**
+ * Render the account-exists notice: someone submitted the registration form
+ * with an address that already has an account. The register endpoint
+ * answers exactly the same for new and existing addresses (no account
+ * enumeration), so this private message is the only place the outcome is
+ * told — and only to the mailbox owner. Two plain links (sign in, reset
+ * password: `buildAccountExistsUrls`), no token.
+ */
+export function renderAccountExistsEmail(context: AuthEmailContext): RenderedAuthEmail {
+  const siteName = context.siteName || DEFAULT_SITE_NAME;
+  return {
+    subject: `Sign-up attempt with your email · ${siteName}`,
+    html: renderBilingualHtml("account_exists", context),
+    text: renderBilingualText("account_exists", context),
+  };
+}
+
 /** Render whichever template `kind` selects. */
 export function renderAuthEmail(kind: AuthEmailKind, context: AuthEmailContext): RenderedAuthEmail {
+  if (kind === "account_exists") return renderAccountExistsEmail(context);
   return kind === "verify" ? renderVerificationEmail(context) : renderPasswordResetEmail(context);
 }

@@ -20,4 +20,11 @@ export const de: EmailCopy = {
     button: "Passwort zurücksetzen",
     ignore: "Wenn du kein Zurücksetzen des Passworts angefordert hast, kannst du diese E-Mail ignorieren – dein Passwort bleibt unverändert.",
   },
+  accountExists: {
+    intro:
+      "Jemand hat versucht, mit dieser E-Mail-Adresse ein Konto bei {SITE} zu erstellen. Wenn du das warst: Du hast bereits ein Konto – melde dich an oder setze dein Passwort zurück, falls du es vergessen hast.",
+    button: "Anmelden",
+    secondaryButton: "Passwort zurücksetzen",
+    ignore: "Wenn du das nicht warst, kannst du diese E-Mail ignorieren – es hat sich nichts geändert.",
+  },
 };

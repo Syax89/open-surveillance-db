@@ -65,7 +65,11 @@ export const en = {
   loggedOutTitle: "You are logged out",
   loggedOutBody: "Your session has ended. You can close this window or log in again.",
   errorInvalidCredentials: "Invalid credentials.",
-  errorEmailTaken: "An account with this email already exists.",
+  // Register confirmation: shown after EVERY accepted submit, new address or
+  // not — the API answers the same for both (no account enumeration).
+  registerCheckEmailTitle: "Check your email",
+  registerCheckEmailBody:
+    "If this address can be used, we have sent you an email with the next step. Check your inbox (and spam).",
   errorGeneric: "Something went wrong. Please try again.",
   errorCrossOrigin: "Cross-site request rejected.",
   // Static copy on /login (t_6dc1c96f — CEO feedback 2026-08-03): login is
@@ -249,6 +253,8 @@ export const en = {
   verifyExpiredTitle: "This link is no longer valid",
   verifyExpiredBody:
     "This verification link has already been used or has expired. Request a new link to continue.",
+  verifyForgotPasswordHint:
+    "Can't sign in to request a new link? Use “Forgot password?” with the same address: setting a new password also confirms your email.",
   verifyResend: "Resend verification email",
   verifyResent: "Verification email sent.",
   verifyResendRateLimited: "Too many emails. Please try again later.",
@@ -363,7 +369,11 @@ export const it: Translation<typeof en> = {
   loggedOutTitle: "Hai effettuato il logout",
   loggedOutBody: "La sessione è terminata. Puoi chiudere questa finestra o accedere di nuovo.",
   errorInvalidCredentials: "Credenziali non valide.",
-  errorEmailTaken: "Esiste già un account con questa email.",
+  // Register confirmation: shown after EVERY accepted submit, new address or
+  // not — the API answers the same for both (no account enumeration).
+  registerCheckEmailTitle: "Controlla la tua email",
+  registerCheckEmailBody:
+    "Se questo indirizzo può essere usato, ti abbiamo inviato un'email con il prossimo passo. Controlla la posta in arrivo (e lo spam).",
   errorGeneric: "Qualcosa è andato storto. Riprova.",
   errorCrossOrigin: "Richiesta cross-site rifiutata.",
   // Testo statico su /login (t_6dc1c96f — feedback CEO 2026-08-03): l'accesso
@@ -551,6 +561,8 @@ export const it: Translation<typeof en> = {
   verifyExpiredTitle: "Questo link non è più valido",
   verifyExpiredBody:
     "Questo link di verifica è già stato usato o è scaduto. Richiedi un nuovo link per continuare.",
+  verifyForgotPasswordHint:
+    "Non riesci ad accedere per chiedere un nuovo link? Usa «Password dimenticata?» con lo stesso indirizzo: impostare una nuova password conferma anche la tua email.",
   verifyResend: "Invia di nuovo l'email di verifica",
   verifyResent: "Email di verifica inviata.",
   verifyResendRateLimited: "Troppe email. Riprova più tardi.",

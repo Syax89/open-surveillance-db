@@ -59,7 +59,11 @@ export const fr: Translation<typeof en> = {
   loggedOutTitle: "Vous êtes déconnecté",
   loggedOutBody: "Votre session est terminée. Vous pouvez fermer cette fenêtre ou vous reconnecter.",
   errorInvalidCredentials: "Identifiants invalides.",
-  errorEmailTaken: "Un compte existe déjà avec cette adresse e-mail.",
+  // Register confirmation: shown after EVERY accepted submit, new address or
+  // not — the API answers the same for both (no account enumeration).
+  registerCheckEmailTitle: "Consultez vos e-mails",
+  registerCheckEmailBody:
+    "Si cette adresse peut être utilisée, nous vous avons envoyé un e-mail indiquant l’étape suivante. Consultez votre boîte de réception (et vos spams).",
   errorGeneric: "Une erreur est survenue. Veuillez réessayer.",
   errorCrossOrigin: "Requête intersite refusée.",
   // Static copy on /login (t_6dc1c96f — CEO feedback 2026-08-03): login is
@@ -243,6 +247,8 @@ export const fr: Translation<typeof en> = {
   verifyExpiredTitle: "Ce lien n’est plus valide",
   verifyExpiredBody:
     "Ce lien de vérification a déjà été utilisé ou a expiré. Demandez un nouveau lien pour continuer.",
+  verifyForgotPasswordHint:
+    "Vous ne pouvez pas vous connecter pour demander un nouveau lien ? Utilisez « Mot de passe oublié ? » avec la même adresse : définir un nouveau mot de passe confirme aussi votre e-mail.",
   verifyResend: "Renvoyer l’e-mail de vérification",
   verifyResent: "E-mail de vérification envoyé.",
   verifyResendRateLimited: "Trop d’e-mails envoyés. Veuillez réessayer plus tard.",

@@ -4,9 +4,12 @@
 // db modules against a fresh in-memory D1 (schema replayed from the real
 // Drizzle migrations), so the verification lifecycle is exercised at runtime:
 //
-//   1. register → 201 + read-only session: the contributor has
-//      email_verified_at NULL (me shows it), a verification token row exists
-//      (hash-only), and — with no EMAIL binding — the dev link is echoed;
+//   1. register → 202 { ok, status: "check_email" } and NO session (the
+//      same answer as for an existing address — anti-enumeration): the
+//      contributor has email_verified_at NULL, a verification token row
+//      exists (hash-only) and the link is only in the captured mail; an
+//      existing address gets the token-less account-exists notice instead
+//      (shared window + 3/24h cap);
 //   2. GET /api/auth/verify-email consumes the token once: 200, the account
 //      flips to verified (me reflects it), and reusing the link answers 410;
 //   3. POST /api/auth/verify-email/resend mints a fresh token (the OLD link
@@ -96,15 +99,6 @@ after(async () => {
 // mutations can echo it through X-CSRF-Token like the browser client does.
 const csrfBySessionToken = new Map();
 
-function sessionCookie(response) {
-  const cookie = response.headers.getSetCookie().find((entry) => entry.startsWith("osdb_session="));
-  assert.ok(cookie, "register must issue a session cookie");
-  const rawToken = /osdb_session=([^;]+)/.exec(cookie)[1];
-  const csrfCookie = response.headers.getSetCookie().find((entry) => entry.startsWith("osdb_csrf="));
-  if (csrfCookie) csrfBySessionToken.set(rawToken, decodeURIComponent(/osdb_csrf=([^;]+)/.exec(csrfCookie)[1]));
-  return rawToken;
-}
-
 function withSession(pathAndQuery, rawToken, init = {}) {
   const csrfToken = csrfBySessionToken.get(rawToken) ?? "csrf-token-123";
   return apiRequest(pathAndQuery, {
@@ -117,21 +111,44 @@ function withSession(pathAndQuery, rawToken, init = {}) {
   });
 }
 
-async function registerAndExtract(email) {
-  const response = await registerRoute.POST(apiRequest("/api/auth/register", {
+/**
+ * Registration no longer opens a session (anti-enumeration: a Set-Cookie on
+ * the new-address branch only would reveal it). A READ-ONLY session can
+ * still exist — one opened at register before that change, within its TTL —
+ * and the resend endpoint still serves it, so the resend tests mint one
+ * through the real db module (same instance the routes use).
+ */
+async function legacySession(contributorId) {
+  const dbAuth = await loadE2EModule("db/auth.mjs");
+  const { rawToken, csrfToken } = await dbAuth.createSession(contributorId, { ttlSeconds: 3600 });
+  csrfBySessionToken.set(rawToken, csrfToken);
+  return rawToken;
+}
+
+function registerRequest(email, password = "Sup3rsecret!123") {
+  return apiRequest("/api/auth/register", {
     method: "POST",
-    body: { email, displayName: "E2E Verifier", password: "Sup3rsecret!123" },
-  }));
-  assert.equal(response.status, 201);
-  const body = await responseBody(response);
-  // The canonical mailer delivered through the EMAIL binding mock.
-  assert.equal(body.verification.sent, true, "email delivered through the EMAIL binding");
-  // Fail-closed: the raw token is never in the API response — it exists only
-  // in the mail channel (P1-1: devLink echo removed).
-  assert.ok(!("devLink" in body.verification), "no raw token in the API response");
+    body: { email, displayName: "E2E Verifier", password },
+  });
+}
+
+async function registerAndExtract(email) {
+  const before = capturedMail.length;
+  const response = await registerRoute.POST(registerRequest(email));
+  assert.equal(response.status, 202);
+  assert.deepEqual(await responseBody(response), { ok: true, status: "check_email" });
+  assert.deepEqual(response.headers.getSetCookie(), [], "registration opens no session");
+  // The canonical mailer delivered through the EMAIL binding mock; the raw
+  // token exists only in the mail channel (fail-closed, no devLink echo).
+  assert.equal(capturedMail.length, before + 1, "verification email delivered through the EMAIL binding");
+  assert.match(capturedMail.at(-1).subject, /^Verify your email/);
   const rawToken = mailToken();
   assert.ok(rawToken, "captured mail carries the raw verification token");
-  return { response, body, rawToken, session: sessionCookie(response) };
+  const dbAuth = await loadE2EModule("db/auth.mjs");
+  const row = await dbAuth.findContributorByEmail(email);
+  assert.ok(row, "the account was created");
+  const contributor = await dbAuth.getContributorById(row.id);
+  return { response, body: { contributor }, rawToken, session: await legacySession(row.id) };
 }
 
 test("register→verify→me: a fresh account is read-only, then flips to verified", async () => {
@@ -279,16 +296,17 @@ test("CONCURRENCY (issue #440): 8 parallel resends — exactly one wins the wind
     },
   };
   try {
-    const reg = await registerRoute.POST(apiRequest("/api/auth/register", {
-      method: "POST",
-      body: { email, displayName: "QA Race", password: "Sup3rsecret!123" },
-    }));
-    assert.equal(reg.status, 201);
-    assert.equal((await responseBody(reg)).verification.sent, false, "mail failure released the reservation");
+    const reg = await registerRoute.POST(registerRequest(email));
+    assert.equal(reg.status, 202, "a mail failure never changes the generic answer");
     // Restore the working binding BEFORE the resends: the winner must be
     // able to deliver mail (mailToken() below reads the capture).
     env.EMAIL = workingBinding;
-    const session = sessionCookie(reg);
+    const created = await env.DB.prepare("SELECT id FROM contributors WHERE email = ?").bind(email).first();
+    const releasedRows = (
+      await env.DB.prepare("SELECT COUNT(*) AS n FROM email_send_log WHERE contributor_id = ?").bind(created.id).first()
+    ).n;
+    assert.equal(releasedRows, 0, "mail failure released the reservation");
+    const session = await legacySession(created.id);
 
     // 8 simultaneous resends against an EMPTY window: the ATOMIC reservation
     // (INSERT ... SELECT ... WHERE count < limit RETURNING id) admits exactly
@@ -331,6 +349,61 @@ test("CONCURRENCY (issue #440): 8 parallel resends — exactly one wins the wind
     assert.equal(logRows, 1, "exactly one reservation/send row is retained");
   } finally {
     env.EMAIL = workingBinding;
+  }
+});
+
+test("register with an EXISTING address: identical answer, nothing created, the owner gets the account-exists notice", async () => {
+  const email = `exists-e2e-${crypto.randomUUID()}@example.org`;
+  const first = await registerRoute.POST(registerRequest(email));
+  assert.equal(first.status, 202);
+  const firstBody = await first.text();
+  // Let the notice through the shared 1-per-5-minutes window (it would
+  // otherwise be held by the verification email just sent) so the per-kind
+  // daily cap is what this test exercises.
+  // The per-IP registration cap (5/24h) is lifted too: this test submits
+  // the same address six times from one caller.
+  const hadMax = "EMAIL_SEND_LIMIT_MAX" in env;
+  const prevMax = env.EMAIL_SEND_LIMIT_MAX;
+  const hadIpMax = "REGISTER_IP_RATE_LIMIT_MAX" in env;
+  const prevIpMax = env.REGISTER_IP_RATE_LIMIT_MAX;
+  env.EMAIL_SEND_LIMIT_MAX = "100";
+  env.REGISTER_IP_RATE_LIMIT_MAX = "100";
+  try {
+    const before = capturedMail.length;
+    const again = await registerRoute.POST(registerRequest(email, "Different-Passw0rd!"));
+    assert.equal(again.status, first.status);
+    assert.equal(await again.text(), firstBody, "byte-identical body");
+    assert.deepEqual(again.headers.getSetCookie(), [], "no session cookie");
+    assert.deepEqual([...again.headers.entries()], [...first.headers.entries()], "identical headers");
+
+    const accounts = (await env.DB.prepare("SELECT COUNT(*) AS n FROM contributors WHERE email = ?").bind(email).first()).n;
+    assert.equal(accounts, 1, "no second account");
+    assert.equal(capturedMail.length, before + 1, "the owner is told, privately");
+    const notice = capturedMail.at(-1);
+    assert.equal(notice.to, email);
+    assert.match(notice.subject, /^Sign-up attempt with your email/);
+    assert.ok(notice.text.includes("https://osdb.test/login"));
+    assert.ok(notice.text.includes("https://osdb.test/forgot-password"));
+    assert.equal(/token=/.test(notice.text + notice.html), false, "the notice carries no token");
+
+    // The password of the existing account is untouched.
+    const dbAuth = await loadE2EModule("db/auth.mjs");
+    const row = await dbAuth.findContributorByEmail(email);
+    assert.equal(await dbAuth.verifyPassword("Sup3rsecret!123", row.passwordHash), true);
+
+    // Daily cap: 3 notices per address per 24 h, then silence (same 202).
+    for (let index = 0; index < 4; index += 1) {
+      const response = await registerRoute.POST(registerRequest(email));
+      assert.equal(response.status, 202);
+      assert.equal(await response.text(), firstBody);
+    }
+    const notices = capturedMail.filter((message) => message.to === email && /^Sign-up attempt/.test(message.subject));
+    assert.equal(notices.length, 3, "at most 3 account-exists notices per day");
+  } finally {
+    if (hadMax) env.EMAIL_SEND_LIMIT_MAX = prevMax;
+    else delete env.EMAIL_SEND_LIMIT_MAX;
+    if (hadIpMax) env.REGISTER_IP_RATE_LIMIT_MAX = prevIpMax;
+    else delete env.REGISTER_IP_RATE_LIMIT_MAX;
   }
 });
 

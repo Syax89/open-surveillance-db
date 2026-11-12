@@ -12,7 +12,7 @@
 // Qui ogni flusso parte dall'endpoint reale e termina con una scrittura
 // reale sulla stessa sessione:
 //
-//   1. register (reale) → sessione read-only → POST /api/cameras → 403
+//   1. register (reale, 202 senza sessione) → sessione read-only → POST /api/cameras → 403
 //      → verify-email (reale, token dal dev link) → POST /api/cameras → 201
 //      → riuso del link → 410.
 //   2. register + verify (reali) → issueRecoveryCodes (db reale) →
@@ -124,6 +124,27 @@ function sessionHeaders(response) {
   };
 }
 
+/**
+ * Register non apre più una sessione (anti-enumeration: stessa risposta 202
+ * per indirizzo nuovo ed esistente). Una sessione READ-ONLY può comunque
+ * esistere — aperta al register prima di questo cambio, entro il suo TTL —
+ * e il write gate deve continuare a rifiutarla: la si conia con il modulo db
+ * reale (stessa istanza delle route).
+ */
+async function legacySessionHeaders(email) {
+  const dbAuth = await loadE2EModule("db/auth.mjs");
+  const row = await dbAuth.findContributorByEmail(email);
+  assert.ok(row, "register must have created the account");
+  const { rawToken, csrfToken } = await dbAuth.createSession(row.id, { ttlSeconds: 3600 });
+  return { cookie: `osdb_session=${rawToken}; osdb_csrf=${csrfToken}`, csrfToken };
+}
+
+/** Register reale: risposta generica 202, nessun cookie. */
+function assertRegistered(response) {
+  assert.equal(response.status, 202);
+  assert.deepEqual(response.headers.getSetCookie(), [], "register opens no session");
+}
+
 /** The OIDC browser-binding cookie set by /start, as a `Cookie` header pair. */
 function oidcBindingCookie(start) {
   const cookie = start.headers.getSetCookie().find((entry) => /^(__Host-)?osdb_oidc_binding=/.test(entry));
@@ -154,10 +175,8 @@ async function registerVerifiedContributor() {
     method: "POST",
     body: { email, displayName: "QA Writer", password: "Sup3rsecret!123" },
   }));
-  assert.equal(response.status, 201);
-  const body = await responseBody(response);
-  const headers = sessionHeaders(response);
-  assert.equal(body.verification.sent, true, "email delivered through the EMAIL binding");
+  assertRegistered(response);
+  const headers = await legacySessionHeaders(email);
   const rawToken = mailToken();
   assert.ok(rawToken, "captured mail carries the raw verification token");
   const verify = await verifyEmailRoute.GET(
@@ -177,8 +196,8 @@ test("email: una sessione fresca NON scrive (403), dopo verify-email scrive (201
     method: "POST",
     body: { email, displayName: "QA Writer", password: "Sup3rsecret!123" },
   }));
-  assert.equal(response.status, 201);
-  const headers = sessionHeaders(response);
+  assertRegistered(response);
+  const headers = await legacySessionHeaders(email);
 
   // Sessione read-only: il write gate rifiuta PRIMA della verifica.
   const denied = await camerasRoute.POST(writeWith(headers));
@@ -406,8 +425,8 @@ async function registerUnverified() {
     method: "POST",
     body: { email, displayName: "QA Gate", password: "Sup3rsecret!123" },
   }));
-  assert.equal(response.status, 201);
-  const session = sessionHeaders(response);
+  assertRegistered(response);
+  const session = await legacySessionHeaders(email);
   const rawVerifyToken = mailToken();
   assert.ok(rawVerifyToken, "captured mail carries the raw verification token");
   const contributorId = (await env.DB.prepare(
@@ -537,7 +556,7 @@ test("verify-email: un token oltre il TTL di 24h risponde 410 (link morto)", asy
     method: "POST",
     body: { email, displayName: "QA Expired", password: "Sup3rsecret!123" },
   }));
-  assert.equal(response.status, 201);
+  assertRegistered(response);
   const rawToken = mailToken();
   assert.ok(rawToken, "captured mail carries the raw verification token");
 
@@ -674,10 +693,9 @@ test("email: budget mail (override 3/600) esaurito con register+2 resend reali �
       method: "POST",
       body: { email, displayName: "QA Mail Budget", password: "Sup3rsecret!123" },
     }));
-    assert.equal(response.status, 201); // invio #1
-    const body = await responseBody(response);
-    const headers = sessionHeaders(response);
-    assert.equal(body.verification.sent, true, "register reports the mail was accepted (no devLink, P1-1)");
+    assertRegistered(response); // invio #1
+    assert.equal(capturedMail.length, 1, "the verification mail was accepted (no devLink, P1-1)");
+    const headers = await legacySessionHeaders(email);
     const firstToken = mailToken();
 
     const resendOne = await resendRoute.POST(apiRequest("/api/auth/verify-email/resend", { method: "POST", headers: { cookie: headers.cookie, "x-csrf-token": headers.csrfToken } }));
@@ -732,8 +750,8 @@ test("oidc: conflitto email → merge manuale reale → sessione linked → writ
     method: "POST",
     body: { email, displayName: "QA Merge Target", password: "Sup3rsecret!123" },
   }));
-  assert.equal(register.status, 201);
-  const contributorId = (await responseBody(register)).contributor.id;
+  assertRegistered(register);
+  const contributorId = (await env.DB.prepare("SELECT id FROM contributors WHERE email = ?").bind(email).first()).id;
 
   // Il provider (solo la rete esterna è stubata) dichiara la STESSA email
   // come verificata: il callback NON deve auto-linkare, ma emettere un merge

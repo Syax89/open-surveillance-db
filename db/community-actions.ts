@@ -4,6 +4,13 @@ import { getD1 } from "./cameras";
 import { ACTION_WEIGHT_BY_LEVEL, verifiedContributionCount } from "./confirmations";
 import { deriveLevel } from "../app/lib/trust-levels";
 import { getCommunitySettingsCached } from "./community-settings";
+import {
+  COMMUNITY_PRIVACY_FLAG_ACTION,
+  COMMUNITY_PRIVACY_QUEUED_ACTION,
+  COMMUNITY_PROBLEM_QUEUED_ACTION,
+  MODERATOR_PRIVACY_CLEARED_ACTION,
+  PRIVACY_FLAG_REJECTED_ACTION,
+} from "./moderation";
 
 /**
  * Community actions (ADR 0021 §3 — kanban t_a9f23581 FASE 2 API).
@@ -41,13 +48,14 @@ export function isCommunityActionType(value: string): value is CommunityActionTy
 }
 
 export type SetCommunityActionResult =
-  | { kind: "ok"; actionType: CommunityActionType; counts: CommunityActionCounts }
-  | { kind: "switched"; actionType: CommunityActionType; switchedFrom: CommunityActionType; counts: CommunityActionCounts }
+  | { kind: "ok"; actionType: CommunityActionType; counts: CommunityActionCounts; queuedForReview?: true }
+  | { kind: "switched"; actionType: CommunityActionType; switchedFrom: CommunityActionType; counts: CommunityActionCounts; queuedForReview?: true }
   | { kind: "duplicate" }
   | { kind: "self_action" }
   | { kind: "camera_not_found" }
   | { kind: "invalid_action" }
   | { kind: "daily_quota_exceeded"; retryAfterSeconds: number }
+  | { kind: "privacy_quota_exceeded"; retryAfterSeconds: number }
   | { kind: "per_record_cap_exceeded"; retryAfterSeconds: number };
 
 export type RemoveCommunityActionResult =
@@ -112,14 +120,14 @@ async function cameraActionStats(
   return map;
 }
 
-type StatusChange = { action: string; actor: string | null; newStatus: string; createdAt: string };
+type StatusChange = { id: number; action: string; actor: string | null; previousStatus: string; newStatus: string; createdAt: string };
 
 /** Latest status transition recorded for a camera (see evaluateCommunityThresholds). */
 async function lastStatusChange(cameraId: number): Promise<StatusChange | null> {
   const d1 = await getD1();
   return d1
     .prepare(
-      `SELECT action, actor, new_status AS newStatus, created_at AS createdAt
+      `SELECT id, action, actor, previous_status AS previousStatus, new_status AS newStatus, created_at AS createdAt
          FROM moderation_events
         WHERE entity = 'camera' AND entity_id = ? AND previous_status != new_status AND recused = 0
         ORDER BY id DESC
@@ -133,6 +141,118 @@ async function lastStatusChange(cameraId: number): Promise<StatusChange | null> 
 function isCommunityTransition(change: StatusChange): boolean {
   return change.action.startsWith("community-") && (change.actor ?? "").startsWith("community:");
 }
+
+/**
+ * A moderator put the record back online after a community withdrawal
+ * (hidden/removed → active by a non-community actor): that verdict is final
+ * against community hides (ADR 0021 §6.4).
+ */
+function isModeratorRestore(change: StatusChange | null): boolean {
+  return (
+    change !== null &&
+    !isCommunityTransition(change) &&
+    change.newStatus === "active" &&
+    (change.previousStatus === "hidden" || change.previousStatus === "removed")
+  );
+}
+
+/** A `moderator-privacy-cleared` verdict recorded after the last status change (event id order). */
+async function moderatorClearedSince(cameraId: number, sinceEventId: number | null): Promise<boolean> {
+  const d1 = await getD1();
+  const row = await d1
+    .prepare(
+      `SELECT 1 AS hit FROM moderation_events
+        WHERE entity = 'camera' AND entity_id = ? AND action = '${MODERATOR_PRIVACY_CLEARED_ACTION}'
+          AND id > ?
+        LIMIT 1`,
+    )
+    .bind(cameraId, sinceEventId ?? 0)
+    .first<{ hit: number }>();
+  return row !== null;
+}
+
+/** Distinct accounts holding a privacy action on the record cast at/after `since`. */
+async function privacyFlaggersSince(cameraId: number, since: string | null): Promise<number[]> {
+  const d1 = await getD1();
+  const rows = await d1
+    .prepare(
+      `SELECT DISTINCT contributor_id AS contributorId FROM camera_community_actions
+        WHERE camera_id = ? AND action_type = 'privacy' AND (? IS NULL OR updated_at >= ?)`,
+    )
+    .bind(cameraId, since, since)
+    .all<{ contributorId: number }>();
+  return rows.results.map((row) => Number(row.contributorId));
+}
+
+/**
+ * Accounts whose privacy flags no longer auto-hide (ADR 0021 §6.4 abuse
+ * penalty): at least `penalties.privacyRejectedFlags` of their privacy flags
+ * were judged unfounded by a moderator (`community-privacy-flag-rejected`)
+ * in the last `penalties.privacyRejectedWindowDays` days.
+ */
+export async function privacyPenalisedContributors(
+  contributorIds: number[],
+  now: string,
+  settings?: Record<string, unknown>,
+): Promise<Set<number>> {
+  if (contributorIds.length === 0) return new Set();
+  const knobs = settings ?? (await getCommunitySettingsCached());
+  const minRejected = settingsNumber(knobs, "penalties.privacyRejectedFlags", 2);
+  const windowDays = settingsNumber(knobs, "penalties.privacyRejectedWindowDays", 90);
+  const windowStart = new Date(Date.parse(now) - windowDays * 24 * 60 * 60 * 1000).toISOString();
+  const d1 = await getD1();
+  const rows = await d1
+    .prepare(
+      `SELECT actor FROM moderation_events
+        WHERE entity = 'camera' AND action = '${PRIVACY_FLAG_REJECTED_ACTION}'
+          AND actor IN (SELECT 'community:' || value FROM json_each(?))
+          AND created_at >= ?
+        GROUP BY actor
+       HAVING COUNT(*) >= ?`,
+    )
+    .bind(JSON.stringify(contributorIds), windowStart, minRejected)
+    .all<{ actor: string }>();
+  return new Set(rows.results.map((row) => Number(row.actor.slice("community:".length))));
+}
+
+/**
+ * Open (or upgrade) the record's moderation_queue row so the item shows in
+ * the moderator's review tab. Never lowers an existing sensitivity; a
+ * privacy item is `sensitive` and carries the two-person flag (honoured only
+ * when another active reviewer exists, db/moderation.ts).
+ */
+function enqueueForReviewStatements(
+  d1: Awaited<ReturnType<typeof getD1>>,
+  cameraId: number,
+  sensitivity: "sensitive" | "standard",
+  now: string,
+): D1PreparedStatement[] {
+  const statements = [
+    d1
+      .prepare(
+        `INSERT INTO moderation_queue (entity, entity_id, state, assignee_id, sensitivity, requires_second_review, second_reviewer_id, escalation_reason, created_at, updated_at)
+         SELECT 'camera', ?, 'queued', NULL, ?, ?, NULL, NULL, ?, ?
+         WHERE NOT EXISTS (SELECT 1 FROM moderation_queue WHERE entity = 'camera' AND entity_id = ? AND state != 'closed')`,
+      )
+      .bind(cameraId, sensitivity, sensitivity === "sensitive" ? 1 : 0, now, now, cameraId),
+  ];
+  if (sensitivity === "sensitive") {
+    statements.push(
+      d1
+        .prepare(
+          `UPDATE moderation_queue
+              SET sensitivity = CASE WHEN sensitivity = 'urgent' THEN 'urgent' ELSE 'sensitive' END,
+                  requires_second_review = 1, updated_at = ?
+            WHERE entity = 'camera' AND entity_id = ? AND state != 'closed'`,
+        )
+        .bind(now, cameraId),
+    );
+  }
+  return statements;
+}
+
+/** Outcome of one threshold evaluation. */
+export type CommunityEvaluationOutcome = "transitioned" | "queued" | "none";
 
 /** Statuses on which community actions are part of the ADR 0021 design (§2, §6.3). */
 const COMMUNITY_ACTIONABLE_STATUSES: ReadonlySet<string> = new Set(["active", "hidden", "removed"]);
@@ -173,7 +293,9 @@ export async function evaluateCommunityThresholds(input: {
   contributorId: number;
   now: string;
   env?: unknown;
-}): Promise<void> {
+  /** The action that triggered this evaluation (a privacy flag that does not hide is queued). */
+  actionType?: string;
+}): Promise<CommunityEvaluationOutcome> {
   const d1 = await getD1();
   const nowMs = Date.parse(input.now);
   const settings = await getCommunitySettingsCached();
@@ -195,7 +317,7 @@ export async function evaluateCommunityThresholds(input: {
     .prepare("SELECT status FROM cameras WHERE id = ?")
     .bind(input.cameraId)
     .first<{ status: string }>();
-  if (!camera) return;
+  if (!camera) return "none";
 
   const currentStatus = camera.status;
 
@@ -214,7 +336,7 @@ export async function evaluateCommunityThresholds(input: {
   // launder it into a restorable state). Unknown cause (no transition event,
   // or one that does not match the current status) fails closed.
   if (currentStatus === "hidden" || currentStatus === "removed") {
-    if (!lastChange || lastChange.newStatus !== currentStatus || !isCommunityTransition(lastChange)) return;
+    if (!lastChange || lastChange.newStatus !== currentStatus || !isCommunityTransition(lastChange)) return "none";
   }
 
   const stats = await cameraActionStats(input.cameraId, lastChange?.createdAt ?? null);
@@ -226,15 +348,42 @@ export async function evaluateCommunityThresholds(input: {
   let reason: string | null = null;
   let triggerType: string | null = null;
   let eventType: string | null = null;
+  // Privacy flaggers behind a privacy hide (recorded on the transition so a
+  // later moderator restore can be charged to them), and a flag that did
+  // not transition the record but must reach the moderator.
+  let privacyFlaggers: number[] = [];
+  let queued: { action: string; sensitivity: "sensitive" | "standard"; reason: string } | null = null;
 
   if (currentStatus === "active") {
-    // 1. privacy: non-weighted count threshold
+    // A moderator's verdict that the record may stay public — restoring a
+    // community hide, or clearing a privacy review — is final: the
+    // community can no longer hide the record again on its own. New
+    // privacy/problem flags still reach the moderator (queued), and a
+    // `gone` consensus (a physical fact, 3 distinct accounts, only actions
+    // cast after the verdict) can still remove it.
+    const since = lastChange?.createdAt ?? null;
+    const moderatorCleared = isModeratorRestore(lastChange) || (await moderatorClearedSince(input.cameraId, lastChange?.id ?? null));
+
+    // 1. privacy: non-weighted count threshold over the flags of accounts
+    //    that are NOT penalised (≥ N rejected privacy flags in the window):
+    //    a penalised account's flag is stored and queued, never hides.
     const privacy = getStats("privacy");
-    if (privacy.distinctCount >= thresholds.privacy) {
-      newStatus = "hidden";
-      reason = "privacy";
-      triggerType = "privacy";
-      eventType = "hidden";
+    if (privacy.distinctCount > 0) {
+      privacyFlaggers = await privacyFlaggersSince(input.cameraId, since);
+      const penalised = await privacyPenalisedContributors(privacyFlaggers, input.now, settings);
+      const eligible = privacyFlaggers.filter((id) => !penalised.has(id));
+      if (!moderatorCleared && eligible.length >= thresholds.privacy) {
+        newStatus = "hidden";
+        reason = "privacy";
+        triggerType = "privacy";
+        eventType = "hidden";
+      } else if (input.actionType === "privacy") {
+        queued = {
+          action: COMMUNITY_PRIVACY_QUEUED_ACTION,
+          sensitivity: "sensitive",
+          reason: moderatorCleared ? "moderator-cleared" : penalised.has(input.contributorId) ? "penalised" : "below-threshold",
+        };
+      }
     }
     // 2. gone → removed
     if (!newStatus) {
@@ -245,14 +394,18 @@ export async function evaluateCommunityThresholds(input: {
         eventType = "removed";
       }
     }
-    // 3. problem → hidden
+    // 3. problem → hidden (queued instead on a moderator-cleared record)
     if (!newStatus) {
       const problem = getStats("problem");
       if (problem.sum >= thresholds.problem && problem.distinctCount >= thresholds.problemMinDistinct) {
-        newStatus = "hidden";
-        reason = "problem";
-        triggerType = "problem";
-        eventType = "hidden";
+        if (!moderatorCleared) {
+          newStatus = "hidden";
+          reason = "problem";
+          triggerType = "problem";
+          eventType = "hidden";
+        } else if (input.actionType === "problem" && !queued) {
+          queued = { action: COMMUNITY_PROBLEM_QUEUED_ACTION, sensitivity: "standard", reason: "moderator-cleared" };
+        }
       }
     }
   } else if (currentStatus === "hidden") {
@@ -282,7 +435,7 @@ export async function evaluateCommunityThresholds(input: {
             const cooldownMs = thresholds.cooldownPrivacyHiddenDays * 24 * 60 * 60 * 1000;
             if (nowMs - hiddenMs < cooldownMs) {
               // Cooldown not yet expired — restore blocked
-              return;
+              return "none";
             }
           }
         }
@@ -301,7 +454,31 @@ export async function evaluateCommunityThresholds(input: {
     }
   }
 
-  if (!newStatus || !triggerType) return;
+  if (!newStatus || !triggerType) {
+    if (!queued) return "none";
+    // No transition, but the flag must reach a human: open/upgrade the
+    // moderation_queue row and record why (the review tab lists the record
+    // while this event is newer than the latest moderator verdict).
+    await d1.batch([
+      ...enqueueForReviewStatements(d1, input.cameraId, queued.sensitivity, input.now),
+      d1
+        .prepare(
+          `INSERT INTO moderation_events (entity, entity_id, previous_status, new_status, action, reason_code, note, actor, reviewer_id, actor_role, recused, escalated, second_reviewer_id, created_at)
+           VALUES ('camera', ?, ?, ?, ?, ?, ?, ?, NULL, NULL, 0, 0, NULL, ?)`,
+        )
+        .bind(
+          input.cameraId,
+          currentStatus,
+          currentStatus,
+          queued.action,
+          queued.action,
+          JSON.stringify({ reason: queued.reason, contributorId: input.contributorId }),
+          `community:${input.contributorId}`,
+          input.now,
+        ),
+    ]);
+    return "queued";
+  }
 
   const trigger = getStats(triggerType);
   const detailJson = JSON.stringify(
@@ -329,7 +506,7 @@ export async function evaluateCommunityThresholds(input: {
   if (updateResult.meta.changes === 0) {
     // A concurrent evaluation already performed this transition (or the
     // status changed under us): record nothing, consume nothing.
-    return;
+    return "none";
   }
 
   // We won the transition: status is now `newStatus` (committed by the CAS
@@ -357,7 +534,11 @@ export async function evaluateCommunityThresholds(input: {
         newStatus,
         actionCode,
         actionCode,
-        JSON.stringify({ triggerType, counts: { sum: trigger.sum, distinct: trigger.distinctCount } }),
+        JSON.stringify(
+          triggerType === "privacy"
+            ? { triggerType, counts: { sum: trigger.sum, distinct: trigger.distinctCount }, contributorIds: privacyFlaggers }
+            : { triggerType, counts: { sum: trigger.sum, distinct: trigger.distinctCount } },
+        ),
         actor,
         input.now,
       ),
@@ -377,7 +558,15 @@ export async function evaluateCommunityThresholds(input: {
       .bind(input.cameraId, JSON.stringify({ actionType: triggerType, count: trigger.distinctCount }), input.now),
   );
 
+  // 6. A privacy hide lands in the moderator's review queue AT ONCE, marked
+  // sensitive (ADR 0021 §6.4): hiding protects the person in the picture
+  // first, and a moderator then confirms the removal or restores it.
+  if (triggerType === "privacy") {
+    batchStatements.push(...enqueueForReviewStatements(d1, input.cameraId, "sensitive", input.now));
+  }
+
   await d1.batch(batchStatements);
+  return "transitioned";
 }
 
 /**
@@ -445,19 +634,43 @@ export async function setCommunityAction(input: {
   const maxPerDayTrusted = settingsNumber(settings, "quotas.actionsPerDayTrusted", 40);
   const dailyLimit = activeCount >= 1 ? maxPerDayTrusted : maxPerDay;
   const perRecordCap = settingsNumber(settings, "quotas.perRecordPerDay", 5);
+  // Separate, low cap for privacy flags (ADR 0021 §6.4): one privacy flag
+  // hides a record at once, so the number an account may cast is bounded on
+  // its own. Counted on the append-only `community-privacy-flag` ledger
+  // (moderation_events), NOT on camera_community_actions: a flag that hid a
+  // record is consumed by the transition, and remove + re-flag must not
+  // refund the allowance either.
+  const privacyCap = settingsNumber(settings, "quotas.privacyFlagsPerDay", 5);
+  const isPrivacy = actionType === "privacy";
 
   const windowStartMs = nowMs - 24 * 60 * 60 * 1000;
   const windowStart = new Date(windowStartMs).toISOString();
+  const actor = `community:${input.contributorId}`;
+  const privacyCapSql = `(SELECT COUNT(*) FROM moderation_events WHERE entity = 'camera' AND action = '${COMMUNITY_PRIVACY_FLAG_ACTION}' AND actor = ? AND created_at >= ?) < ?`;
+  const privacyCapBinds = isPrivacy ? [actor, windowStart, privacyCap] : [];
+  // The ledger row of an accepted privacy flag (no status change: it never
+  // reads as a transition). `guard` keeps it from landing when the write it
+  // records did not happen.
+  const privacyLedgerStatement = (guard: string, guardBinds: (string | number)[]) =>
+    d1
+      .prepare(
+        `INSERT INTO moderation_events (entity, entity_id, previous_status, new_status, action, reason_code, note, actor, reviewer_id, actor_role, recused, escalated, second_reviewer_id, created_at)
+         SELECT 'camera', ?, ?, ?, '${COMMUNITY_PRIVACY_FLAG_ACTION}', '${COMMUNITY_PRIVACY_FLAG_ACTION}', ?, ?, NULL, NULL, 0, 0, NULL, ?
+         WHERE ${guard}`,
+      )
+      .bind(input.cameraId, camera.status, camera.status, JSON.stringify({ contributorId: input.contributorId }), actor, input.now, ...guardBinds);
 
   // 5. Atomic quota enforcement + upsert in ONE batch (pattern setConfirmation)
-  const batch = (await d1.batch([
+  const statements: D1PreparedStatement[] = [
     // (A) INSERT with quota enforcement
     d1
       .prepare(
         `INSERT INTO camera_community_actions (camera_id, contributor_id, action_type, weight, created_at, updated_at)
          SELECT ?, ?, ?, ?, ?, ?
          WHERE (SELECT COUNT(*) FROM camera_community_actions WHERE contributor_id = ? AND created_at >= ?) < ?
-           AND (SELECT COUNT(DISTINCT contributor_id) FROM camera_community_actions WHERE camera_id = ? AND action_type = ? AND created_at >= ?) < ?
+           AND (SELECT COUNT(DISTINCT contributor_id) FROM camera_community_actions WHERE camera_id = ? AND action_type = ? AND created_at >= ?) < ?${
+             isPrivacy ? `\n           AND ${privacyCapSql}` : ""
+           }
          ON CONFLICT (camera_id, contributor_id) DO NOTHING
          RETURNING id`,
       )
@@ -475,6 +688,7 @@ export async function setCommunityAction(input: {
         actionType,
         windowStart,
         perRecordCap,
+        ...privacyCapBinds,
       ),
     // (B) Probe: existing row (for duplicate / switch detection)
     d1
@@ -488,7 +702,21 @@ export async function setCommunityAction(input: {
     d1
       .prepare("SELECT COUNT(DISTINCT contributor_id) AS n FROM camera_community_actions WHERE camera_id = ? AND action_type = ? AND created_at >= ?")
       .bind(input.cameraId, actionType, windowStart),
-  ])) as D1BatchResult[];
+  ];
+  if (isPrivacy) {
+    statements.push(
+      // (E) Privacy cap count (classification)
+      d1
+        .prepare(`SELECT COUNT(*) AS n FROM moderation_events WHERE entity = 'camera' AND action = '${COMMUNITY_PRIVACY_FLAG_ACTION}' AND actor = ? AND created_at >= ?`)
+        .bind(actor, windowStart),
+      // (F) Ledger row, only when (A) inserted this very privacy row
+      privacyLedgerStatement(
+        "EXISTS (SELECT 1 FROM camera_community_actions WHERE camera_id = ? AND contributor_id = ? AND action_type = 'privacy' AND created_at = ?)",
+        [input.cameraId, input.contributorId, input.now],
+      ),
+    );
+  }
+  const batch = (await d1.batch(statements)) as D1BatchResult[];
 
   const inserted = (batch[0].results?.[0] as { id?: number } | undefined)?.id;
 
@@ -502,8 +730,9 @@ export async function setCommunityAction(input: {
     }
 
     // 7. Evaluate community thresholds after a successful insert
+    let outcome: CommunityEvaluationOutcome = "none";
     try {
-      await evaluateCommunityThresholds({ cameraId: input.cameraId, contributorId: input.contributorId, now: input.now, env: effectiveEnv });
+      outcome = await evaluateCommunityThresholds({ cameraId: input.cameraId, contributorId: input.contributorId, now: input.now, env: effectiveEnv, actionType });
     } catch (error) {
       console.error("evaluateCommunityThresholds failed", error);
       // Fail-open: the action is already committed. A threshold
@@ -514,7 +743,7 @@ export async function setCommunityAction(input: {
     // Public aggregate event (ADR §7.2): the timeline shows the action
     // landing, with the resulting count — never the actor.
     await appendActionLifecycleEvent({ cameraId: input.cameraId, actionType, counts, now: input.now });
-    return { kind: "ok", actionType, counts };
+    return outcome === "queued" ? { kind: "ok", actionType, counts, queuedForReview: true } : { kind: "ok", actionType, counts };
   }
 
   // INSERT produced no row → classify rejection reason (same batch snapshot)
@@ -536,32 +765,50 @@ export async function setCommunityAction(input: {
     // and was counted when it was inserted, so a switch consumes no new daily
     // allowance.
     const oldType = existing.actionType;
-    const switched = await d1
-      .prepare(
-        `UPDATE camera_community_actions SET action_type = ?, weight = ?, updated_at = ?
-         WHERE camera_id = ? AND contributor_id = ?
-           AND (SELECT COUNT(DISTINCT contributor_id) FROM camera_community_actions WHERE camera_id = ? AND action_type = ? AND created_at >= ?) < ?
-         RETURNING id`,
-      )
-      .bind(
-        actionType,
-        weight,
-        input.now,
-        input.cameraId,
-        input.contributorId,
-        input.cameraId,
-        actionType,
-        windowStart,
-        perRecordCap,
-      )
-      .all<{ id: number }>();
-    if ((switched.results?.length ?? 0) === 0) {
+    // A switch INTO privacy is a new privacy flag: the privacy cap applies
+    // and the ledger records it (same batch, guarded on the switched row).
+    const switchStatements: D1PreparedStatement[] = [
+      d1
+        .prepare(
+          `UPDATE camera_community_actions SET action_type = ?, weight = ?, updated_at = ?
+           WHERE camera_id = ? AND contributor_id = ?
+             AND (SELECT COUNT(DISTINCT contributor_id) FROM camera_community_actions WHERE camera_id = ? AND action_type = ? AND created_at >= ?) < ?${
+               isPrivacy ? `\n             AND ${privacyCapSql}` : ""
+             }
+           RETURNING id`,
+        )
+        .bind(
+          actionType,
+          weight,
+          input.now,
+          input.cameraId,
+          input.contributorId,
+          input.cameraId,
+          actionType,
+          windowStart,
+          perRecordCap,
+          ...privacyCapBinds,
+        ),
+    ];
+    if (isPrivacy) {
+      switchStatements.push(
+        privacyLedgerStatement(
+          "EXISTS (SELECT 1 FROM camera_community_actions WHERE camera_id = ? AND contributor_id = ? AND action_type = 'privacy' AND updated_at = ?)",
+          [input.cameraId, input.contributorId, input.now],
+        ),
+      );
+    }
+    const switchBatch = (await d1.batch(switchStatements)) as D1BatchResult[];
+    if ((switchBatch[0].results?.length ?? 0) === 0) {
+      const privacyCount = batch[4]?.results?.[0] as { n?: number } | undefined;
+      if (isPrivacy && Number(privacyCount?.n ?? 0) >= privacyCap) {
+        return { kind: "privacy_quota_exceeded", retryAfterSeconds: windowRetryAfterSeconds(windowStartMs, nowMs) };
+      }
       return { kind: "per_record_cap_exceeded", retryAfterSeconds: windowRetryAfterSeconds(windowStartMs, nowMs) };
     }
 
     // Log action-changed in moderation_events (internal, not public)
     try {
-      const actor = `community:${input.contributorId}`;
       await d1
         .prepare(
           `INSERT INTO moderation_events (entity, entity_id, previous_status, new_status, action, reason_code, note, actor, reviewer_id, actor_role, recused, escalated, second_reviewer_id, created_at)
@@ -587,8 +834,9 @@ export async function setCommunityAction(input: {
     }
 
     // Evaluate thresholds after switch
+    let outcome: CommunityEvaluationOutcome = "none";
     try {
-      await evaluateCommunityThresholds({ cameraId: input.cameraId, contributorId: input.contributorId, now: input.now, env: effectiveEnv });
+      outcome = await evaluateCommunityThresholds({ cameraId: input.cameraId, contributorId: input.contributorId, now: input.now, env: effectiveEnv, actionType });
     } catch (error) {
       console.error("evaluateCommunityThresholds failed after switch", error);
     }
@@ -597,13 +845,20 @@ export async function setCommunityAction(input: {
     // Public aggregate event for the NEW action (ADR §7.2): the timeline
     // shows the switch landing, with the resulting count — never the actor.
     await appendActionLifecycleEvent({ cameraId: input.cameraId, actionType, counts, now: input.now });
-    return { kind: "switched", actionType, switchedFrom: oldType as CommunityActionType, counts };
+    const switchedFrom = oldType as CommunityActionType;
+    return outcome === "queued"
+      ? { kind: "switched", actionType, switchedFrom, counts, queuedForReview: true }
+      : { kind: "switched", actionType, switchedFrom, counts };
   }
 
   // Neither inserted nor existing → quota exceeded (same batch snapshot)
   const daily = batch[2].results?.[0] as { n?: number } | undefined;
   if (Number(daily?.n ?? 0) >= dailyLimit) {
     return { kind: "daily_quota_exceeded", retryAfterSeconds: windowRetryAfterSeconds(windowStartMs, nowMs) };
+  }
+  const privacyCount = batch[4]?.results?.[0] as { n?: number } | undefined;
+  if (isPrivacy && Number(privacyCount?.n ?? 0) >= privacyCap) {
+    return { kind: "privacy_quota_exceeded", retryAfterSeconds: windowRetryAfterSeconds(windowStartMs, nowMs) };
   }
   const perRecord = batch[3].results?.[0] as { n?: number } | undefined;
   if (Number(perRecord?.n ?? 0) >= perRecordCap) {

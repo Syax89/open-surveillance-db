@@ -150,6 +150,37 @@ conclusion for three reasons:
    device dependence) — no method is hidden and none is pushed. Copy and
    disclosures are bilingual EN/IT (ADR 0007).
 
+### Amendment: registration never reveals an existing account (2026-11)
+
+Owner decision (ethics/privacy): on a site that maps surveillance cameras,
+confirming that an address — an activist's, a journalist's — has an account
+can expose that person. `POST /api/auth/register` therefore answers the
+**same `202 { ok: true, status: "check_email" }`**, with the same headers and
+**no cookies**, for a new and an existing address (it used to answer `409`
+for an existing one):
+
+- **new address** — the account is created unverified and the verification
+  link is emailed, as before; **no session is opened at registration** any
+  more (a Set-Cookie on that branch only would be an existence oracle). The
+  user verifies through the link, then logs in (the login gate above is
+  unchanged). The "read-only session opened at register" described in
+  decision 2 now only exists for sessions opened before this change; an
+  unverified user whose link expired recovers through password reset (which
+  verifies the address) — the account-exists notice below points there;
+- **existing address** — nothing is created or changed; the owner receives
+  an **account-exists notice** (token-less; plain links to `/login` and
+  `/forgot-password`; same zero-tracking templates, EN + requester's
+  language). It shares the per-contributor 1-per-5-minutes window and has
+  its own cap of **3 per 24 h** (`email_send_log.kind = 'account_exists'`,
+  same atomic reservation; no migration), so the public form cannot flood an
+  inbox.
+
+Timing: both branches pay the same PBKDF2 hashing (the unique email index,
+never a pre-check SELECT, detects the existing address after the hash), and
+all mail work (reservation, token mint, provider send) runs after the
+response inside `ctx.waitUntil`, like the password-reset request. The per-IP
+registration attempt is kept on both branches.
+
 ## Consequences
 
 - **Processor register:** Cloudflare Email Routing is covered by the existing

@@ -286,7 +286,7 @@ export const ptLegal: LegalContent = {
     intro:
       "Estes termos regem a utilização do OpenSurveillanceDB, a base de dados aberta e mantida pela comunidade sobre a infraestrutura de vigilância pública visível. Aplicam-se à aplicação web, à API pública, às exportações de dados e aos serviços relacionados (\"o Serviço\").",
     versionNote:
-      "Versão 0.5 — 8 de agosto de 2026. Alinhamento com o estado atual (pronto para modelo): ressincronizada com os TERMS_OF_USE canónicos v0.8 (docs/TERMS_OF_USE.md continua a ser canónico). § 3.7 divulgação sobre autenticação (verificação de email para acesso de escrita, chaves de acesso, OIDC — ADR 0020, controlado no servidor); § 5 publicação imediata e ações da comunidade; § 6 correções privadas e o poder de emergência legal; provas em imagem removidas (2026-08-08).",
+      "Versão 0.6 — 12 de novembro de 2026. § 6.3 atualizado: os moderadores analisam as fichas ocultadas por sinalizações de privacidade da comunidade; as remoções decididas por um moderador ou pelo administrador nunca são revertidas por ações da comunidade e só podem ser contestadas através de um recurso (TERMS_OF_USE canónicos v0.10).",
     sections: [
       {
         heading: "1. Quem somos",
@@ -396,7 +396,7 @@ export const ptLegal: LegalContent = {
             items: [
               "**Ações da comunidade.** Qualquer conta verificada pode marcar uma ficha como útil, confirmar que ainda está presente, assinalá-la como já não presente ou levantar um problema ou uma preocupação de privacidade. Uma conta, uma ação ativa por ficha. Os limiares automáticos — incluindo um limiar de privacidade deliberadamente baixo — decidem quando uma ficha é ocultada ou removida; cada transição fica registada no histórico público da ficha, sem atribuição a qualquer perfil.",
               "**Correções.** Qualquer pessoa pode pedir uma correção ou remoção através do formulário privado de correção (página inicial, secção \"Reportar um problema / correção\") ou de [privacy@opensurveillancedb.org](mailto:privacy@opensurveillancedb.org). Os pedidos são privados, analisados por uma pessoa e nunca alteram o mapa automaticamente. Prazos de resposta: primeira resposta em **48 horas**, resposta substantiva em **14 dias**; as ocultações por emergência legal são imediatas.",
-              "**Emergências legais.** O único poder de escrita humano que resta é a ocultação ou remoção por emergência legal pelo administrador, usada quando a lei o exige e revista a posteriori. Os administradores não podem repor nem desocultar unilateralmente: o consenso da comunidade previsto na secção 5 é a única via de reversão.",
+              "**Emergências legais e decisões de moderação.** O administrador pode ocultar ou remover de imediato uma ficha quando a lei o exige (com revisão posterior), e os moderadores analisam as fichas ocultadas por sinalizações de privacidade da comunidade, confirmando ou anulando a ocultação. Uma remoção decidida por um moderador ou pelo administrador nunca é revertida por ações da comunidade: só pode ser contestada através do procedimento de recurso.",
               "Os direitos dos titulares dos dados (acesso, retificação, apagamento, limitação, oposição, portabilidade) estão descritos na [política de privacidade](/privacy) e são exercidos através do mesmo contacto.",
             ],
           },

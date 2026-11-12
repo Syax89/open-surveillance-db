@@ -642,7 +642,7 @@ test("F7: il cap per-IP di registrazione regge anche con X-Forwarded-For ruotato
   // aggirabile).
   assert.deepEqual(
     results,
-    [201, 201, 201, 201, 429, 429],
+    [202, 202, 202, 202, 429, 429],
     "il cap per-IP (5/24h) deve reggere anche ruotando X-Forwarded-For: " +
       "callerKey (rate-limit.ts:236) NON deve fidarsi del primo hop senza " +
       "cf-connecting-ip, il cap è aggirabile. Status osservati: " +
@@ -680,7 +680,7 @@ test("F7b: TRUST_XFF=true (opt-in esplicito t_b6f04976) ripristina i cap per-IP 
   // default fail-closed (F7) li raggrupperebbe tutti in "unknown" -> 429.
   assert.deepEqual(
     results,
-    [201, 201, 201, 201, 201, 201],
+    [202, 202, 202, 202, 202, 202],
     "TRUST_XFF=true deve ripristinare i cap per-IP leggendo il primo hop di " +
       "X-Forwarded-For (proxy dichiarato affidabile): 6 IP diversi devono " +
       `passare tutti. Status osservati: ${results.join(", ")}`,

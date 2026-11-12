@@ -35,13 +35,19 @@ const variantConfig: Record<CameraVariant, {
 export function CameraQueueItem({ camera, variant, queueBadge, api, readableDate }: Props) {
   const t = useDomainMessages(moderationByLocale);
   const config = variantConfig[variant];
+  // The review tab also lists records a community flag put in front of a
+  // moderator (ADR 0021 §6.4): say which, so `reverify`/`hide` read right.
+  const topline =
+    variant === "review" && camera.status === "hidden" ? "communityHidden"
+    : variant === "review" && camera.status === "active" ? "communityFlagged"
+    : config.topline;
   const key = `camera-${camera.id}`;
   const choices = api.metadataChoices(key);
   const metadataAvailable = Boolean(camera.manufacturer || camera.observedOn);
 
   return (
     <article className="record-list-card">
-      <div><p className="card-topline"><span className={`status-dot ${config.dotClass}`} /> {t[config.topline]}</p><h3>{camera.title}</h3><p className="record-kind">{camera.kind}</p></div>
+      <div><p className="card-topline"><span className={`status-dot ${config.dotClass}`} /> {t[topline]}</p><h3>{camera.title}</h3><p className="record-kind">{camera.kind}</p></div>
       {queueBadge}
       <dl>
         <div><dt>{t.approximateLocation}</dt><dd>{camera.address || t.noAddress}<br />{camera.latitude.toFixed(5)}, {camera.longitude.toFixed(5)}</dd></div>

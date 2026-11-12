@@ -158,6 +158,11 @@ export function VerifyEmailBody() {
             <p className="auth-switch">
               <Link href="/account">{t.verifyGoToAccount}</Link>
             </p>
+            {/* Unverified accounts cannot sign in to resend (registration no
+                longer opens a session): a password reset also verifies. */}
+            <p className="auth-switch">
+              {t.verifyForgotPasswordHint} <Link href="/forgot-password">{t.forgotPassword}</Link>
+            </p>
           </>
         ) : null}
 

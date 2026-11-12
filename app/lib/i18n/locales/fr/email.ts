@@ -20,4 +20,11 @@ export const fr: EmailCopy = {
     button: "Réinitialiser le mot de passe",
     ignore: "Si vous n’avez pas demandé de réinitialisation du mot de passe, vous pouvez ignorer cet e-mail — votre mot de passe reste inchangé.",
   },
+  accountExists: {
+    intro:
+      "Quelqu’un a essayé de créer un compte sur {SITE} avec cette adresse e-mail. Si c’était vous, vous avez déjà un compte : connectez-vous, ou réinitialisez votre mot de passe si vous l’avez oublié.",
+    button: "Se connecter",
+    secondaryButton: "Réinitialiser le mot de passe",
+    ignore: "Si ce n’était pas vous, vous pouvez ignorer cet e-mail — rien n’a changé.",
+  },
 };

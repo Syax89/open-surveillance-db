@@ -59,7 +59,11 @@ export const de: Translation<typeof en> = {
   loggedOutTitle: "Du bist abgemeldet",
   loggedOutBody: "Deine Sitzung ist beendet. Du kannst dieses Fenster schließen oder dich erneut anmelden.",
   errorInvalidCredentials: "Ungültige Anmeldedaten.",
-  errorEmailTaken: "Es gibt bereits ein Konto mit dieser E-Mail-Adresse.",
+  // Register confirmation: shown after EVERY accepted submit, new address or
+  // not — the API answers the same for both (no account enumeration).
+  registerCheckEmailTitle: "Sieh in dein Postfach",
+  registerCheckEmailBody:
+    "Falls diese Adresse verwendet werden kann, haben wir dir eine E-Mail mit dem nächsten Schritt geschickt. Sieh in deinem Posteingang (und im Spam-Ordner) nach.",
   errorGeneric: "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
   errorCrossOrigin: "Websiteübergreifende Anfrage abgelehnt.",
   // Static copy on /login (t_6dc1c96f — CEO feedback 2026-08-03): login is
@@ -243,6 +247,8 @@ export const de: Translation<typeof en> = {
   verifyExpiredTitle: "Dieser Link ist nicht mehr gültig",
   verifyExpiredBody:
     "Dieser Bestätigungslink wurde bereits verwendet oder ist abgelaufen. Fordere einen neuen Link an, um fortzufahren.",
+  verifyForgotPasswordHint:
+    "Du kannst dich nicht anmelden, um einen neuen Link anzufordern? Nutze „Passwort vergessen?“ mit derselben Adresse: Ein neues Passwort bestätigt auch deine E-Mail.",
   verifyResend: "Bestätigungs-E-Mail erneut senden",
   verifyResent: "Bestätigungs-E-Mail gesendet.",
   verifyResendRateLimited: "Zu viele E-Mails. Bitte versuche es später erneut.",

@@ -8,9 +8,11 @@
  *      POSTs to /api/cameras; the item lands in the moderation queue and a
  *      moderator approves it into the public listing (SSR home + record
  *      detail reachable after publish).
- *   3. login → account: register builds a real session; /api/auth/me
- *      resolves the contributor, submissions list shows ONLY the
- *      contributor's own reports, logout revokes the session.
+ *   3. register → verify → login → account: register answers the generic
+ *      202 with no session, the emailed link verifies the address, login
+ *      builds a real session; /api/auth/me resolves the contributor,
+ *      submissions list shows ONLY the contributor's own reports, logout
+ *      revokes the session.
  *
  * Journey 1 (browse → filtri → record) lives in
  * tests/browse-filter-record.test.mjs (client filter interaction + SSR
@@ -92,6 +94,10 @@ async function ensureSubmitHeaders() {
   if (!submitHeaders) submitHeaders = await submitterSessionHeaders();
   return submitHeaders;
 }
+// Outbound mail captured from the EMAIL binding mock (the verification link
+// exists only in the mail channel).
+let capturedMail = [];
+
 // Mark a freshly registered contributor email-verified (the write gate
 // refuses writes until the account is verified; the verify-email endpoint
 // is Fase B, so journeys simulate the verified state directly).
@@ -110,6 +116,8 @@ let camerasRoute;
 let cameraEditRoute;
 let moderationRoute;
 let registerRoute;
+let verifyEmailRoute;
+let loginRoute;
 let meRoute;
 let submissionsRoute;
 let logoutRoute;
@@ -127,9 +135,19 @@ beforeEach(async () => {
   cameraEditRoute = await load("cameraEdit", "app/api/cameras/[id]/route.mjs");
   moderationRoute = await load("moderation", "app/api/moderation/route.mjs");
   registerRoute = await load("register", "app/api/auth/register/route.mjs");
-  // loginRoute is deliberately not exercised here: ADR 0013 makes register
-  // create the session immediately, so the login→account journey runs
-  // through register (login is covered by api-auth.test.mjs).
+  // Register no longer opens a session (anti-enumeration: the same answer
+  // for a new and an existing address), so the account journey verifies the
+  // emailed link and logs in like a real user.
+  verifyEmailRoute = await load("verifyEmail", "app/api/auth/verify-email/route.mjs");
+  loginRoute = await load("login", "app/api/auth/login/route.mjs");
+  capturedMail = [];
+  env.EMAIL = {
+    send: async (message) => {
+      capturedMail.push(message);
+      return { messageId: `m${capturedMail.length}` };
+    },
+  };
+  env.VERIFY_BASE_URL = "https://osdb.test";
   meRoute = await load("me", "app/api/auth/me/route.mjs");
   submissionsRoute = await load("submissions", "app/api/auth/me/submissions/route.mjs");
   logoutRoute = await load("logout", "app/api/auth/logout/route.mjs");
@@ -234,29 +252,37 @@ test("journey segnala: submit → immediate publication → public listing → r
 // Journey 3: login → account
 // ---------------------------------------------------------------------------
 
-test("journey account: register builds a session, me resolves the contributor, submissions show only own data", async () => {
-  // 1. Register (creates a session immediately — ADR 0013).
+test("journey account: register → verify → login builds a session, me resolves the contributor, submissions show only own data", async () => {
+  // 1. Register: the generic 202, no session (anti-enumeration).
   const registered = await registerRoute.POST(apiRequest("/api/auth/register", {
     method: "POST",
     body: CONTRIBUTOR,
   }));
-  assert.equal(registered.status, 201, "register must return 201");
-  const registerCookies = registered.headers.getSetCookie().join("; ");
-  assert.match(registerCookies, /osdb_session=/, "register must issue a session cookie");
+  assert.equal(registered.status, 202, "register must return the generic 202");
+  assert.deepEqual(registered.headers.getSetCookie(), [], "register opens no session");
+
+  // 1b. Verify through the emailed link (the token exists only in the mail).
+  const mail = capturedMail.at(-1);
+  assert.ok(mail, "the verification email was sent");
+  const token = decodeURIComponent(/token=([^"&<\s]+)/.exec(mail.text)[1]);
+  const verified = await verifyEmailRoute.GET(apiRequest(`/api/auth/verify-email?token=${encodeURIComponent(token)}`));
+  assert.equal(verified.status, 200);
+
+  // 1c. Log in: the verified account opens a real session.
+  const login = await loginRoute.POST(apiRequest("/api/auth/login", {
+    method: "POST",
+    body: { email: CONTRIBUTOR.email, password: CONTRIBUTOR.password },
+  }));
+  assert.equal(login.status, 200, "the verified account can log in");
+  const registerCookies = login.headers.getSetCookie().map((cookie) => cookie.split(";")[0]).join("; ");
+  assert.match(registerCookies, /osdb_session=/, "login must issue a session cookie");
 
   // 2. me: the session resolves the contributor.
   const me = await meRoute.GET(apiRequest("/api/auth/me", { headers: { cookie: registerCookies } }));
   assert.equal(me.status, 200);
   const { contributor } = await responseBody(me);
   assert.equal(contributor.email, CONTRIBUTOR.email, "me must return the registered contributor");
-
-  // 2b. Verify the account email (write gate Fase E1): a fresh register is
-  //     read-only — the session only gains write access once the account is
-  //     verified. The verify-email endpoint is Fase B; the journey simulates
-  //     the verified state directly on the column the gate reads.
-  await env.DB.prepare("UPDATE contributors SET email_verified_at = ? WHERE id = ?")
-    .bind(new Date().toISOString(), contributor.id)
-    .run();
+  assert.ok(contributor.emailVerifiedAt, "the account is verified");
 
   // 3. Submissions are empty before any report.
   const empty = await submissionsRoute.GET(apiRequest("/api/auth/me/submissions", { headers: { cookie: registerCookies } }));
@@ -300,10 +326,15 @@ async function registerContributor(overrides = {}) {
     method: "POST",
     body: { email, displayName: "Edit Journey Tester", password: "Sup3rsecret!123", ...overrides },
   }));
-  assert.equal(response.status, 201, "register must return 201");
-  const cookies = response.headers.getSetCookie().join("; ");
-  const csrfToken = /osdb_csrf=([^;]+)/.exec(cookies)?.[1];
-  assert.ok(csrfToken, "register must issue a CSRF cookie");
+  assert.equal(response.status, 202, "register must return the generic 202");
+  // Register opens no session any more; an UNVERIFIED (read-only) session
+  // can still exist — one opened at register before that change, within its
+  // TTL — and this journey needs one to prove the write gate, so mint it
+  // through the real db module (same instance the routes use).
+  const dbAuth = await loadE2EModule("db/auth.mjs");
+  const row = await dbAuth.findContributorByEmail(email);
+  const { rawToken, csrfToken } = await dbAuth.createSession(row.id, { ttlSeconds: 3600 });
+  const cookies = `osdb_session=${rawToken}; osdb_csrf=${csrfToken}`;
   return { cookies, csrfToken, email };
 }
 

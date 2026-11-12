@@ -11,7 +11,7 @@
 //   3. the cap is per-IP: a different caller IP can still register;
 //   4. only the SHA-256 of the caller key is stored — never the raw IP
 //      (privacy by design);
-//   5. FAILED registrations (400/409/500) roll back their reservation: junk
+//   5. FAILED registrations (400/500) roll back their reservation: junk
 //      attempts never consume the per-IP budget, and the malformed-body
 //      "no write" contract of malformed-json-routes.test.mjs still holds;
 //   6. the 24h window is rolling: attempts older than the window stop
@@ -120,7 +120,7 @@ test("E2E: 4 registrations from one IP succeed; the 5th and 6th answer 429 with 
 
   assert.deepEqual(
     statuses.map((response) => response.status),
-    [201, 201, 201, 201, 429, 429],
+    [202, 202, 202, 202, 429, 429],
     "4 ok, 5a 429, 6a 429",
   );
 
@@ -153,9 +153,9 @@ test("E2E: 4 registrations from one IP succeed; the 5th and 6th answer 429 with 
 
 test("E2E: the cap is per-IP — a different caller IP can still register after the first is blocked", async () => {
   for (let i = 0; i < 5; i += 1) {
-    assert.equal((await registerAttempt(IP_A, `a-${i}`)).status, i < 4 ? 201 : 429);
+    assert.equal((await registerAttempt(IP_A, `a-${i}`)).status, i < 4 ? 202 : 429);
   }
-  assert.equal((await registerAttempt(IP_B, "b-0")).status, 201, "a second IP is untouched");
+  assert.equal((await registerAttempt(IP_B, "b-0")).status, 202, "a second IP is untouched");
 });
 
 // ---------------------------------------------------------------------------
@@ -203,7 +203,7 @@ test("E2E: failed registrations roll back their reservation — junk attempts ne
   // The budget is intact: four valid registrations still succeed, the 5th is
   // blocked — exactly as if the junk had never happened.
   for (let i = 0; i < 5; i += 1) {
-    assert.equal((await registerAttempt(IP_A, `post-${i}`)).status, i < 4 ? 201 : 429);
+    assert.equal((await registerAttempt(IP_A, `post-${i}`)).status, i < 4 ? 202 : 429);
   }
 });
 
@@ -232,7 +232,7 @@ test("E2E: a malformed JSON body answers 400 and writes nothing to any table", a
 test("E2E: the 24h window is rolling — attempts older than the window stop counting", async () => {
   // Default cap: 4 ok, 5th blocked.
   for (let i = 0; i < 5; i += 1) {
-    assert.equal((await registerAttempt(IP_A, `w-${i}`)).status, i < 4 ? 201 : 429);
+    assert.equal((await registerAttempt(IP_A, `w-${i}`)).status, i < 4 ? 202 : 429);
   }
 
   // Backdate every reservation row beyond the window: the COUNT must drop to
@@ -242,14 +242,14 @@ test("E2E: the 24h window is rolling — attempts older than the window stop cou
 
   assert.equal(
     (await registerAttempt(IP_A, "reset-0")).status,
-    201,
+    202,
     "after the window rolls, registration is allowed again",
   );
 
   // The new attempt anchors a fresh window: 3 more succeed, then the cap
   // trips again on the 5th in-window attempt.
   for (let i = 1; i < 4; i += 1) {
-    assert.equal((await registerAttempt(IP_A, `reset-${i}`)).status, 201);
+    assert.equal((await registerAttempt(IP_A, `reset-${i}`)).status, 202);
   }
   assert.equal((await registerAttempt(IP_A, "reset-4")).status, 429);
 });
@@ -263,7 +263,7 @@ test("E2E: the cap honours the REGISTER_IP_RATE_LIMIT_MAX override", async () =>
   // 3rd are blocked (count 2 >= 2, count 3 >= 2) — same "N-th request that
   // reaches the cap is blocked" semantics as the default (5th of 5).
   env.REGISTER_IP_RATE_LIMIT_MAX = "2";
-  assert.equal((await registerAttempt(IP_A, "o-0")).status, 201);
+  assert.equal((await registerAttempt(IP_A, "o-0")).status, 202);
   assert.equal((await registerAttempt(IP_A, "o-1")).status, 429);
   assert.equal((await registerAttempt(IP_A, "o-2")).status, 429);
 });
@@ -277,7 +277,28 @@ test("E2E: the cap honours the REGISTER_IP_RATE_LIMIT_WINDOW_SECONDS override", 
   await env.DB.prepare("UPDATE registrations_ip_log SET created_at = ?").bind(stale).run();
   assert.equal(
     (await registerAttempt(IP_A, "tw-1")).status,
-    201,
+    202,
     "a row older than the overridden window does not count",
   );
+});
+
+// ---------------------------------------------------------------------------
+// 4b. Existing-address attempts count like new ones (anti-enumeration)
+// ---------------------------------------------------------------------------
+
+test("E2E: a registration with an EXISTING address keeps its attempt row — the cap is no existence oracle", async () => {
+  const email = `cap-existing-${crypto.randomUUID()}@example.org`;
+  const attempt = () => registerRoute.POST(
+    apiRequest("/api/auth/register", {
+      method: "POST",
+      headers: { "cf-connecting-ip": IP_A },
+      body: { email, password: PASSWORD, displayName: "Cap Test" },
+    }),
+  );
+  assert.equal((await attempt()).status, 202, "new address");
+  assert.equal((await attempt()).status, 202, "same address again: same answer");
+  const rows = await env.DB.prepare("SELECT COUNT(*) AS n FROM registrations_ip_log").first();
+  assert.equal(Number(rows.n), 2, "both attempts count against the per-IP cap");
+  const accounts = await env.DB.prepare("SELECT COUNT(*) AS n FROM contributors WHERE email = ?").bind(email).first();
+  assert.equal(Number(accounts.n), 1, "the second attempt created nothing");
 });

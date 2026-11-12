@@ -20,4 +20,11 @@ export const pt: EmailCopy = {
     button: "Redefinir palavra-passe",
     ignore: "Se não pediste a redefinição da palavra-passe, podes ignorar este email — a tua palavra-passe mantém-se inalterada.",
   },
+  accountExists: {
+    intro:
+      "Alguém tentou criar uma conta no {SITE} com este endereço de email. Se foste tu, já tens uma conta: inicia sessão ou redefine a tua palavra-passe se te esqueceste dela.",
+    button: "Iniciar sessão",
+    secondaryButton: "Redefinir palavra-passe",
+    ignore: "Se não foste tu, podes ignorar este email — nada foi alterado.",
+  },
 };

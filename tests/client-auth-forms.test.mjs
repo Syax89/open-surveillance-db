@@ -190,7 +190,7 @@ test("register: OIDC panel renders GitHub/Google buttons when providers are conf
   assert.equal(github.getAttribute("href"), "/api/auth/oidc/github/start?redirect_to=%2Faccount");
 });
 
-test("register: valid submit POSTs to /api/auth/register and redirects", async () => {
+test("register: valid submit POSTs to /api/auth/register and shows the check-email confirmation (no redirect)", async () => {
   const { screen, waitFor } = rtl;
   const user = makeUser();
   let capturedRequest = null;
@@ -199,7 +199,7 @@ test("register: valid submit POSTs to /api/auth/register and redirects", async (
     // /api/auth/oidc/providers discovery GET has no body and must not win the
     // capturedRequest slot (same race as the login test above).
     if (String(input) === "/api/auth/register") capturedRequest = { input, init };
-    return jsonResponse({}, { status: 200 });
+    return jsonResponse({ ok: true, status: "check_email" }, { status: 202 });
   });
   await setNavState({ pushed: [] });
 
@@ -219,8 +219,13 @@ test("register: valid submit POSTs to /api/auth/register and redirects", async (
     displayName: "Fixture Contributor",
   });
 
-  const nav = await getNavState();
-  await waitFor(() => assert.deepEqual(window.__locationAssigns, ["/account"]));
+  // No session at registration: the page stays put and shows the same
+  // confirmation for every accepted submit (anti-enumeration).
+  const status = await screen.findByRole("status");
+  assert.match(status.textContent, /Check your email/);
+  assert.match(status.textContent, /If this address can be used, we have sent you an email with the next step\. Check your inbox \(and spam\)\./);
+  assert.equal(screen.queryByRole("button", { name: "Create account" }), null, "the form is replaced by the confirmation");
+  assert.deepEqual(window.__locationAssigns ?? [], [], "no navigation to /account");
 });
 
 test("register: blank displayName is omitted from the payload", async () => {
@@ -245,16 +250,40 @@ test("register: blank displayName is omitted from the payload", async () => {
   assert.equal("displayName" in body, false);
 });
 
-test("register: 409 shows the email-taken error", async () => {
+test("register: an already-registered address gets the SAME check-email confirmation (no email-taken error)", async () => {
   const { screen } = rtl;
   const user = makeUser();
-  installFetchMock(() => jsonResponse({ error: "email taken" }, { status: 409 }));
+  // The API answers the same 202 for a new and an existing address; the
+  // page has no other signal and must not invent one.
+  installFetchMock((input) =>
+    String(input) === "/api/auth/register"
+      ? jsonResponse({ ok: true, status: "check_email" }, { status: 202 })
+      : jsonResponse({ providers: [] }, { status: 200 }));
+
+  await registerForm();
+  await user.type(screen.getByLabelText("Email"), "taken@example.test");
+  await user.type(screen.getByLabelText(/^Password/), "Correct-Horse-Battery1");
+  await user.click(screen.getByRole("button", { name: "Create account" }));
+  const status = await screen.findByRole("status");
+  assert.match(status.textContent, /Check your email/);
+  assert.equal(screen.queryByRole("alert"), null, "no error for an existing address");
+  assert.equal(document.body.textContent.includes("already exists"), false);
+});
+
+test("register: a rate-limited submit (429) keeps the generic error and the form", async () => {
+  const { screen } = rtl;
+  const user = makeUser();
+  installFetchMock((input) =>
+    String(input) === "/api/auth/register"
+      ? jsonResponse({ error: "Too many requests. Please try again shortly." }, { status: 429 })
+      : jsonResponse({ providers: [] }, { status: 200 }));
 
   await registerForm();
   await user.type(screen.getByLabelText("Email"), "contributor@example.test");
   await user.type(screen.getByLabelText(/^Password/), "Correct-Horse-Battery1");
   await user.click(screen.getByRole("button", { name: "Create account" }));
-  assert.equal((await screen.findByRole("alert")).textContent, "An account with this email already exists.");
+  assert.equal((await screen.findByRole("alert")).textContent, "Something went wrong. Please try again.");
+  assert.ok(screen.getByRole("button", { name: "Create account" }), "the form stays for a retry");
 });
 
 test("register: password field carries minLength 10 and new-password autocomplete", async () => {

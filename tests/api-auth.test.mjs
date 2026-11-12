@@ -1,5 +1,5 @@
 // Runtime API tests for the contributor-auth routes (STATUS gap #1, ADR 0013):
-//   - POST /api/auth/register     create account + open session (2 cookies)
+//   - POST /api/auth/register     create account (same 202 for new/existing, no session)
 //   - POST /api/auth/login        verify credentials + open session
 //   - POST /api/auth/logout       revoke session + clear cookies (CSRF-gated)
 //   - GET  /api/auth/me           current profile or 401
@@ -119,190 +119,154 @@ function sessionRequest(pathAndQuery, rawToken, { headers = {}, ...rest } = {}) 
 }
 
 // ---------------------------------------------------------------------------
-// POST /api/auth/register
+// POST /api/auth/register — anti-enumeration (owner decision, ethics/privacy):
+// the SAME 202 { ok: true, status: "check_email" } for a new and an existing
+// address, no session cookie on either branch; the outcome is told only to
+// the mailbox owner (verification link vs account-exists notice).
 // ---------------------------------------------------------------------------
 
-test("register creates a contributor, mints a verification token, opens a session, and sets both cookies", async () => {
+const UNIQUE_VIOLATION = () => {
+  throw new Error("UNIQUE constraint failed: contributors.email");
+};
+
+/** Stubs for the new-address branch (account created, verification mailed). */
+function stubNewAccount() {
   stub("createContributor", async () => contributor);
   stub("createVerificationToken", async () => ({ rawToken: "verify-token-abc", expiresAt: "2026-08-02T08:00:00.000Z" }));
-  stub("createSession", async () => newSession);
-  // The canonical mailer (db/mailer.ts): the ATOMIC reservation admits the
-  // send (issue #440), then sendAuthEmail is invoked with the minted token
-  // and the reservation id; the provider accepts, so sent:true.
   stub("reserveAuthEmail", async () => ({ ok: true, reservationId: 42 }));
   stub("sendAuthEmail", async () => ({ ok: true, messageId: "m1" }));
+}
+
+/** Stubs for the existing-address branch (unique index hit, notice mailed). */
+function stubExistingAccount() {
+  stub("createContributor", async () => UNIQUE_VIOLATION());
+  stub("findContributorByEmail", async () => ({ ...verifiedContributor, passwordHash: "pbkdf2$x" }));
+  stub("reserveAuthEmail", async () => ({ ok: true, reservationId: 43 }));
+  stub("sendAuthEmail", async () => ({ ok: true, messageId: "m2" }));
+}
+
+function registerPost(body = { email: "contributor@example.org", password: "Sup3rsecret!123" }) {
+  return apiRequest("/api/auth/register", { method: "POST", body });
+}
+
+/** Everything observable about a response: status, sorted headers, body. */
+async function observable(response) {
+  return {
+    status: response.status,
+    headers: [...response.headers.entries()].sort(([a], [b]) => a.localeCompare(b)),
+    setCookie: response.headers.getSetCookie(),
+    body: await response.text(),
+  };
+}
+
+test("register (new address) creates the contributor, mails the verification link, and opens NO session", async () => {
+  stubNewAccount();
   const { POST } = await registerRoute();
   const response = await POST(
-    apiRequest("/api/auth/register", {
-      method: "POST",
-      body: { email: "  Contributor@Example.ORG ", password: "Sup3rsecret!123", displayName: "  Contributor  " },
-    }),
+    registerPost({ email: "  Contributor@Example.ORG ", password: "Sup3rsecret!123", displayName: "  Contributor  " }),
   );
-  assert.equal(response.status, 201);
-  const body = await responseBody(response);
-  assert.deepEqual(body.contributor, contributor);
+  assert.equal(response.status, 202);
+  assert.deepEqual(await responseBody(response), { ok: true, status: "check_email" });
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.deepEqual(response.headers.getSetCookie(), [], "no session cookie at registration");
+  assert.equal(callArgs("createSession").length, 0, "no session row at registration");
 
   // The db layer received the normalised email and trimmed display name.
   const [createArgs] = callArgs("createContributor");
   assert.deepEqual(createArgs, [{ email: "contributor@example.org", displayName: "Contributor", password: "Sup3rsecret!123" }]);
-  // Fase B: the mail slot is reserved BEFORE the token is minted, so a
-  // blocked request never creates a token it cannot mail.
+  // The mail slot is reserved BEFORE the token is minted (issue #440).
   const [reserveArgs] = callArgs("reserveAuthEmail");
   assert.deepEqual(reserveArgs.slice(0, 2), [contributor.id, "verify"]);
-  // A verification token is minted for the new account (purpose 'verify')
-  // so the emailed link can prove mailbox control.
   const [tokenArgs] = callArgs("createVerificationToken");
   assert.equal(tokenArgs[0], contributor.id);
   assert.equal(tokenArgs[1], "verify");
-  assert.ok(typeof tokenArgs[2] === "string" && tokenArgs[2].length > 0, "token created_at is an ISO timestamp");
-  // The canonical mailer receives the minted token for THIS contributor,
-  // settled against the exact reservation the route was granted.
   const [mailArgs] = callArgs("sendAuthEmail");
-  assert.deepEqual(mailArgs[0].contributorId, contributor.id);
+  assert.equal(mailArgs[0].contributorId, contributor.id);
   assert.equal(mailArgs[0].reservationId, 42);
   assert.equal(mailArgs[0].to, "contributor@example.org");
   assert.equal(mailArgs[0].kind, "verify");
   assert.equal(mailArgs[0].rawToken, "verify-token-abc");
-  // The DB TTL follows the same env knob as the cookie (sessionTtlSeconds):
-  // default 30 days = 2592000 s, so expires_at and Max-Age can never diverge
-  // (audit t_5ca60ab2, P2).
-  const [sessionArgs] = callArgs("createSession");
-  assert.deepEqual(sessionArgs, [7, { ttlSeconds: 2592000 }]);
-
-  // The provider accepted the email: sent:true. The raw token is NEVER in
-  // the response — it lives only in the mail channel (fail-closed, no
-  // devLink echo, P1-1). The response still marks the session read-only:
-  // the contributor's emailVerifiedAt is NULL (the fixture above) and the
-  // write gate (Fase E1) enforces it.
-  assert.deepEqual(body.verification, { sent: true });
-  assert.ok(!("devLink" in body.verification), "no raw token in the API response");
-
-  // Cookie pair: HttpOnly session cookie + script-readable CSRF cookie.
-  assert.deepEqual(cookieNames(response).sort(), ["osdb_csrf", "osdb_session"]);
-  const sessionCookie = findCookie(response, "osdb_session");
-  assert.match(sessionCookie, /osdb_session=raw-session-token-abc123/);
-  assert.match(sessionCookie, /HttpOnly/);
-  assert.match(sessionCookie, /SameSite=Strict/);
-  assert.match(sessionCookie, /Path=\//);
-  assert.match(sessionCookie, /Max-Age=2592000/);
-  // QA#3 F2: Secure is the DEFAULT (fail-closed). The test env has no
-  // AUTH_COOKIE_SECURE and no ENVIRONMENT=development, so the cookie must
-  // carry Secure — the old fail-open default (Secure only when the operator
-  // remembered the var) is gone. The explicit non-Secure dev override is
-  // covered by its own test below.
-  assert.match(sessionCookie, /Secure/);
-  const csrfCookie = findCookie(response, "osdb_csrf");
-  assert.match(csrfCookie, /osdb_csrf=csrf-token-123/);
-  assert.doesNotMatch(csrfCookie, /HttpOnly/);
-  assert.match(csrfCookie, /SameSite=Strict/);
+  // The existing-address branch never ran.
+  assert.equal(callArgs("findContributorByEmail").length, 0);
 });
 
-test("register does NOT release the reservation when a post-send step (createSession) throws — a delivered email keeps its send-log row", async () => {
-  stub("createContributor", async () => contributor);
-  stub("createVerificationToken", async () => ({ rawToken: "verify-token-abc", expiresAt: "2026-08-02T08:00:00.000Z" }));
-  // The provider ACCEPTS the email: the reservation row becomes the
-  // permanent send-log row (issue #440).
-  stub("reserveAuthEmail", async () => ({ ok: true, reservationId: 42 }));
-  stub("sendAuthEmail", async () => ({ ok: true, messageId: "m1" }));
-  // ...but session creation then fails. The route must answer 500 WITHOUT
-  // deleting the send-log row: sendAuthEmail settled the reservation (kept
-  // on success) and the route cleared it the moment sendAuthEmail returned,
-  // so the catch's rollback must NOT fire — otherwise the quota would be
-  // weakened by every delivered email whose session step throws.
-  stub("createSession", async () => {
-    throw new Error("session insert failed");
-  });
+test("register (existing address) creates nothing and mails the owner the account-exists notice", async () => {
+  stubExistingAccount();
   const { POST } = await registerRoute();
-  const response = await POST(
-    apiRequest("/api/auth/register", {
-      method: "POST",
-      body: { email: "contributor@example.org", password: "Sup3rsecret!123" },
-    }),
-  );
-  assert.equal(response.status, 500);
-  assert.equal(
-    callArgs("releaseEmailReservation").length,
-    0,
-    "a delivered email's send-log row is never deleted by a later route failure",
-  );
+  const response = await POST(registerPost({ email: "Contributor@Example.org", password: "Sup3rsecret!123" }));
+  assert.equal(response.status, 202);
+  assert.deepEqual(await responseBody(response), { ok: true, status: "check_email" });
+  assert.deepEqual(response.headers.getSetCookie(), []);
+  // No pre-check SELECT: the unique index detected the address, AFTER the
+  // PBKDF2 hashing inside createContributor (same cost as a new address).
+  assert.equal(callArgs("createContributor").length, 1);
+  assert.deepEqual(callArgs("findContributorByEmail")[0], ["contributor@example.org"]);
+  // The notice: its own kind (shared window + daily cap in the mailer), no
+  // token minted, no session.
+  assert.deepEqual(callArgs("reserveAuthEmail")[0].slice(0, 2), [verifiedContributor.id, "account_exists"]);
+  assert.equal(callArgs("createVerificationToken").length, 0, "no token for the notice");
+  const [mailArgs] = callArgs("sendAuthEmail");
+  assert.equal(mailArgs[0].kind, "account_exists");
+  assert.equal(mailArgs[0].reservationId, 43);
+  assert.equal(mailArgs[0].to, verifiedContributor.email);
+  assert.equal(mailArgs[0].rawToken, undefined);
+  assert.equal(callArgs("createSession").length, 0);
+  // The per-IP attempt is kept on both branches (rolling it back for one
+  // branch only would turn the cap into an existence oracle).
+  assert.equal(callArgs("deleteRegistrationAttempt").length, 0);
 });
 
-// ---------------------------------------------------------------------------
-// Cookie Secure policy (QA#3 F2, t_63e0d13c) — secure-by-default
-// ---------------------------------------------------------------------------
+test("register answers byte-identical status, headers and body for a new and an existing address", async () => {
+  const { POST } = await registerRoute();
+  stubNewAccount();
+  const fresh = await observable(await POST(registerPost()));
+  resetMockState();
+  stub("recordRegistrationAttempt", async () => ({ id: 1, count: 0 }));
+  stub("deleteRegistrationAttempt", async () => {});
+  stub("registrationIpHash", async (value) => createHash("sha256").update(value).digest("hex").slice(0, 32));
+  rateLimit.resetRateLimitState();
+  stubExistingAccount();
+  const existing = await observable(await POST(registerPost()));
+  assert.deepEqual(existing, fresh);
+  assert.equal(fresh.status, 202);
+  assert.deepEqual(fresh.setCookie, []);
+});
 
-/**
- * Build a register POST against an env override and return the session cookie.
- * The mock env object is shared (cloudflare-workers.mjs); we mutate the knob,
- * run, and restore it so sibling tests see the original state.
- */
-async function sessionCookieWithEnv(envModule, envChanges) {
-  const previous = {};
-  for (const [key, value] of Object.entries(envChanges)) {
-    previous[key] = envModule.env[key];
-    envModule.env[key] = value;
-  }
-  try {
+test("register (existing address) past the notice cap still answers the generic 202 and sends nothing", async () => {
+  stubExistingAccount();
+  stub("reserveAuthEmail", async () => ({ ok: false, reason: "rate_limited", retryAfterSeconds: 3600 }));
+  const { POST } = await registerRoute();
+  const response = await POST(registerPost());
+  assert.equal(response.status, 202);
+  assert.deepEqual(await responseBody(response), { ok: true, status: "check_email" });
+  assert.equal(callArgs("sendAuthEmail").length, 0, "no mail past the cap");
+});
+
+test("register on Workers answers BEFORE the mail work runs (ctx.waitUntil), for both branches", async () => {
+  const { POST } = await registerRoute();
+  for (const setup of [stubNewAccount, stubExistingAccount]) {
     resetMockState();
     stub("recordRegistrationAttempt", async () => ({ id: 1, count: 0 }));
     stub("deleteRegistrationAttempt", async () => {});
     stub("registrationIpHash", async (value) => createHash("sha256").update(value).digest("hex").slice(0, 32));
-    stub("createContributor", async () => contributor);
-    stub("createVerificationToken", async () => ({ rawToken: "verify-token-abc", expiresAt: "2026-08-02T08:00:00.000Z" }));
-    stub("createSession", async () => newSession);
-    stub("reserveAuthEmail", async () => ({ ok: true, reservationId: 42 }));
-    stub("sendAuthEmail", async () => ({ ok: true, messageId: "m1" }));
-    const { POST } = await registerRoute();
-    const response = await POST(
-      apiRequest("/api/auth/register", {
-        method: "POST",
-        body: { email: "contributor@example.org", password: "Sup3rsecret!123", displayName: "Contributor" },
-      }),
-    );
-    return findCookie(response, "osdb_session");
-  } finally {
-    for (const [key] of Object.entries(envChanges)) {
-      if (previous[key] === undefined) delete envModule.env[key];
-      else envModule.env[key] = previous[key];
-    }
+    rateLimit.resetRateLimitState();
+    setup();
+    let releaseSend;
+    const sendGate = new Promise((resolve) => { releaseSend = resolve; });
+    stub("sendAuthEmail", async () => { await sendGate; return { ok: true, messageId: "m" }; });
+    const background = [];
+    const ctx = { waitUntil: (promise) => background.push(promise) };
+    const response = await runWithExecutionContext(ctx, () => POST(registerPost()));
+    assert.equal(response.status, 202, setup.name);
+    assert.equal(background.length, 1, `${setup.name}: the mail work was handed to waitUntil`);
+    releaseSend();
+    await Promise.all(background);
+    assert.equal(callArgs("sendAuthEmail").length, 1, setup.name);
   }
-}
-
-test("cookie Secure is the fail-closed default (no AUTH_COOKIE_SECURE, no ENVIRONMENT)", async () => {
-  // Already covered by the register test above (Secure matched with a bare
-  // env); this test pins the policy table explicitly via cookieSecure().
-  const { cookieSecure } = await loadLibModule("auth-session");
-  assert.equal(cookieSecure({}), true, "unset env → Secure (fail-closed)");
-  assert.equal(cookieSecure({ AUTH_COOKIE_SECURE: "true" }), true, "explicit true → Secure");
-  assert.equal(cookieSecure({ AUTH_COOKIE_SECURE: "false" }), false, "explicit false → non-Secure (local HTTP prototype)");
-  assert.equal(cookieSecure({ ENVIRONMENT: "development" }), false, "development env → non-Secure (plain-HTTP LAN prototype)");
-  assert.equal(cookieSecure({ ENVIRONMENT: "production" }), true, "production env → Secure even without the var");
-  assert.equal(cookieSecure({ ENVIRONMENT: "staging" }), true, "any non-development env → Secure");
 });
 
-test("AUTH_COOKIE_SECURE=false (local prototype on plain HTTP) drops Secure from the cookie", async () => {
-  const envModule = await loadTreeModule("cloudflare-workers.mjs");
-  const sessionCookie = await sessionCookieWithEnv(envModule, { AUTH_COOKIE_SECURE: "false" });
-  assert.match(sessionCookie, /osdb_session=raw-session-token-abc123/);
-  assert.doesNotMatch(sessionCookie, /Secure/, "explicit false override must drop Secure on the LAN prototype");
-  assert.match(sessionCookie, /SameSite=Strict/, "SameSite stays Strict on every path");
-});
-
-test("ENVIRONMENT=development alone also drops Secure (plain-HTTP prototype default)", async () => {
-  const envModule = await loadTreeModule("cloudflare-workers.mjs");
-  const sessionCookie = await sessionCookieWithEnv(envModule, { ENVIRONMENT: "development" });
-  assert.doesNotMatch(sessionCookie, /Secure/);
-});
-
-test("register reports sent:false when the mailer cannot deliver (provider error) — and never echoes the token", async () => {
-  stub("createContributor", async () => contributor);
-  stub("createVerificationToken", async () => ({ rawToken: "verify-token-abc", expiresAt: "2026-08-02T08:00:00.000Z" }));
-  stub("createSession", async () => newSession);
-  // The atomic reservation admits the send (issue #440)...
-  stub("reserveAuthEmail", async () => ({ ok: true, reservationId: 42 }));
-  // ...then the provider rejects. Mail must never break registration: a
-  // provider rejection still answers 201, but sent:false — the user can
-  // re-send from the session.
+test("register still answers 202 when the mailer cannot deliver (provider error) — mail is best-effort, no token echo", async () => {
+  stubNewAccount();
   stub("sendAuthEmail", async () => ({
     ok: false,
     reason: "provider",
@@ -310,80 +274,36 @@ test("register reports sent:false when the mailer cannot deliver (provider error
     message: "sender domain not verified",
   }));
   const { POST } = await registerRoute();
-  const response = await POST(
-    apiRequest("/api/auth/register", {
-      method: "POST",
-      body: { email: "contributor@example.org", password: "Sup3rsecret!123", displayName: "Contributor" },
-    }),
-  );
-  assert.equal(response.status, 201);
-  const body = await responseBody(response);
-  assert.deepEqual(body.verification, { sent: false });
-  assert.equal(JSON.stringify(body).includes("verify-token-abc"), false, "the raw token never leaves the mail channel");
+  const response = await POST(registerPost());
+  assert.equal(response.status, 202);
+  const text = await response.text();
+  assert.equal(text.includes("verify-token-abc"), false, "the raw token never leaves the mail channel");
 });
 
-test("register propagates AUTH_SESSION_TTL_DAYS to BOTH the DB session and the cookie Max-Age (no TTL divergence)", async () => {
-  // Audit t_5ca60ab2, P2: the DB expires_at and the cookie Max-Age must
-  // derive from the same sessionTtlSeconds(env). With the knob at 7 days the
-  // db layer receives ttlSeconds 604800 and the cookie carries Max-Age=604800.
-  const envModule = await loadTreeModule("cloudflare-workers.mjs");
-  const previous = envModule.env.AUTH_SESSION_TTL_DAYS;
-  envModule.env.AUTH_SESSION_TTL_DAYS = "7";
+test("register releases the EXACT reservation when createVerificationToken throws — never sends mail, still answers 202", async () => {
+  stubNewAccount();
+  stub("createVerificationToken", async () => {
+    throw new Error("token mint failed");
+  });
+  stub("releaseEmailReservation", async () => {});
+  const { POST } = await registerRoute();
+  const originalError = console.error;
+  console.error = () => {};
+  let response;
   try {
-    stub("createContributor", async () => contributor);
-    stub("createVerificationToken", async () => ({ rawToken: "verify-token-abc", expiresAt: "2026-08-02T08:00:00.000Z" }));
-    stub("createSession", async () => newSession);
-    stub("reserveAuthEmail", async () => ({ ok: true, reservationId: 42 }));
-    stub("sendAuthEmail", async () => ({ ok: true, messageId: "m1" }));
-    const { POST } = await registerRoute();
-    const response = await POST(
-      apiRequest("/api/auth/register", {
-        method: "POST",
-        body: { email: "contributor@example.org", password: "Sup3rsecret!123", displayName: "Contributor" },
-      }),
-    );
-    assert.equal(response.status, 201);
-    assert.deepEqual(callArgs("createSession")[0], [7, { ttlSeconds: 604800 }]);
-    const sessionCookie = findCookie(response, "osdb_session");
-    assert.match(sessionCookie, /Max-Age=604800/, "cookie Max-Age matches the DB TTL");
+    response = await POST(registerPost());
   } finally {
-    envModule.env.AUTH_SESSION_TTL_DAYS = previous;
+    console.error = originalError;
   }
-});
-
-test("register answers 409 via the unique index, never pre-checking email existence", async () => {
-  // Anti-enumeration contract: no fast-path SELECT on the email. The 409
-  // comes only from the unique-index constraint on insert, so an existing
-  // email costs the same PBKDF2 hashing as a new one (no timing oracle).
-  stub("createContributor", async () => {
-    throw new Error("UNIQUE constraint failed: contributors.email");
-  });
-  const { POST } = await registerRoute();
-  const response = await POST(
-    apiRequest("/api/auth/register", {
-      method: "POST",
-      body: { email: "contributor@example.org", password: "Sup3rsecret!123" },
-    }),
+  // The account exists (createContributor succeeded): the generic answer
+  // stays the same — a 500 on this branch only would be an oracle.
+  assert.equal(response.status, 202);
+  assert.deepEqual(
+    callArgs("releaseEmailReservation")[0],
+    [42, 7, "verify"],
+    "the exact granted reservation is released, scoped to contributor + kind",
   );
-  assert.equal(response.status, 409);
-  assert.equal(callArgs("findContributorByEmail").length, 0, "no pre-check query");
-});
-
-test("register maps a unique-index race to 409 with the generic, non-distinct body", async () => {
-  stub("createContributor", async () => {
-    throw new Error("UNIQUE constraint failed: contributors.email");
-  });
-  const { POST } = await registerRoute();
-  const response = await POST(
-    apiRequest("/api/auth/register", {
-      method: "POST",
-      body: { email: "contributor@example.org", password: "Sup3rsecret!123" },
-    }),
-  );
-  assert.equal(response.status, 409);
-  // Body must be identical to the 400 validation body so responses do not
-  // reveal whether the email is already registered.
-  assert.equal((await responseBody(response)).error, "Unable to register with this email.");
+  assert.equal(callArgs("sendAuthEmail").length, 0, "no mail is sent when the mint fails");
 });
 
 test("register rejects invalid payloads with 400 and never touches the db", async (t) => {
@@ -410,8 +330,7 @@ test("register rejects invalid payloads with 400 and never touches the db", asyn
     await t.test(name, async () => {
       const response = await POST(apiRequest("/api/auth/register", { method: "POST", body }));
       assert.equal(response.status, 400, name);
-      // 400 body identical to the 409 body: a caller cannot tell "invalid
-      // input" apart from "email already registered".
+      // Validation never depends on whether the address has an account.
       assert.equal((await responseBody(response)).error, "Unable to register with this email.", name);
       assert.equal(callArgs("findContributorByEmail").length + callArgs("createContributor").length, 0, name);
     });
@@ -446,27 +365,13 @@ test("register maps a syntactically invalid JSON body to 400 (not 500)", async (
 });
 
 test("register respects the auth rate-limit bucket", async () => {
-  stub("createContributor", async () => contributor);
-  stub("createVerificationToken", async () => ({ rawToken: "verify-token-abc", expiresAt: "2026-08-02T08:00:00.000Z" }));
-  stub("createSession", async () => newSession);
-  stub("reserveAuthEmail", async () => ({ ok: true, reservationId: 42 }));
-  stub("sendAuthEmail", async () => ({ ok: true, messageId: "m1" }));
+  stubNewAccount();
   const { POST } = await registerRoute();
   for (let index = 0; index < 10; index += 1) {
-    const response = await POST(
-      apiRequest("/api/auth/register", {
-        method: "POST",
-        body: { email: "contributor@example.org", password: "Sup3rsecret!123" },
-      }),
-    );
-    assert.equal(response.status, 201, `request ${index + 1} must stay allowed`);
+    const response = await POST(registerPost());
+    assert.equal(response.status, 202, `request ${index + 1} must stay allowed`);
   }
-  const blocked = await POST(
-    apiRequest("/api/auth/register", {
-      method: "POST",
-      body: { email: "contributor@example.org", password: "Sup3rsecret!123" },
-    }),
-  );
+  const blocked = await POST(registerPost());
   assert.equal(blocked.status, 429);
   assert.ok(Number(blocked.headers.get("retry-after")) > 0);
 });
@@ -476,44 +381,100 @@ test("register returns 500 when the database is unavailable", async () => {
     throw new Error("Database binding unavailable");
   });
   const { POST } = await registerRoute();
-  const response = await POST(
-    apiRequest("/api/auth/register", {
-      method: "POST",
-      body: { email: "contributor@example.org", password: "Sup3rsecret!123" },
-    }),
-  );
-  assert.equal(response.status, 500);
+  const originalError = console.error;
+  console.error = () => {};
+  try {
+    const response = await POST(registerPost());
+    assert.equal(response.status, 500);
+  } finally {
+    console.error = originalError;
+  }
 });
 
-test("register releases the EXACT reservation when createVerificationToken throws after a successful admission — and never sends mail", async () => {
-  stub("createContributor", async () => contributor);
-  // The ATOMIC admission grants the slot (issue #440)...
-  stub("reserveAuthEmail", async () => ({ ok: true, reservationId: 42 }));
-  // ...then the token mint throws: the route must roll the EXACT reservation
-  // back (reservationId + contributorId + kind) so the failed attempt does
-  // not burn the budget, and it must NOT reach the mailer (no token exists).
-  stub("createVerificationToken", async () => {
-    throw new Error("token mint failed");
-  });
-  stub("releaseEmailReservation", async () => {});
-  const { POST } = await registerRoute();
-  const response = await POST(
-    apiRequest("/api/auth/register", {
-      method: "POST",
-      body: { email: "contributor@example.org", password: "Sup3rsecret!123" },
-    }),
-  );
-  // Behaviour mapping: a mint failure before any mail is sent is a 500
-  // (mail is best-effort, but this never got as far as the mailer).
-  assert.equal(response.status, 500);
-  assert.equal((await responseBody(response)).error, "Unable to create account");
-  assert.deepEqual(
-    callArgs("releaseEmailReservation")[0],
-    [42, 7, "verify"],
-    "the exact granted reservation is released, scoped to contributor + kind",
-  );
-  assert.equal(callArgs("sendAuthEmail").length, 0, "no mail is sent when the mint fails");
+// ---------------------------------------------------------------------------
+// Cookie Secure policy (QA#3 F2, t_63e0d13c) — secure-by-default. Since the
+// register endpoint no longer opens a session, the cookie is taken from a
+// login (the same sessionCookieHeaders helper sets it for every method).
+// ---------------------------------------------------------------------------
+
+async function sessionCookieWithEnv(envModule, envChanges) {
+  const previous = {};
+  for (const [key, value] of Object.entries(envChanges)) {
+    previous[key] = envModule.env[key];
+    envModule.env[key] = value;
+  }
+  try {
+    resetMockState();
+    stub("loginLockoutKey", async (email) => `lockout:${email}`);
+    stub("getLoginLockout", async () => ({ locked: false, retryAfterSeconds: 0 }));
+    stub("authenticateContributor", async () => verifiedContributor);
+    stub("clearLoginAttempts", async () => {});
+    stub("createSession", async () => newSession);
+    const { POST } = await loginRoute();
+    const response = await POST(
+      apiRequest("/api/auth/login", {
+        method: "POST",
+        body: { email: "contributor@example.org", password: "Sup3rsecret!123" },
+      }),
+    );
+    return { response, sessionCookie: findCookie(response, "osdb_session") };
+  } finally {
+    for (const [key] of Object.entries(envChanges)) {
+      if (previous[key] === undefined) delete envModule.env[key];
+      else envModule.env[key] = previous[key];
+    }
+  }
+}
+
+test("session cookies: HttpOnly session + script-readable CSRF, SameSite=Strict, Secure by default", async () => {
+  const envModule = await loadTreeModule("cloudflare-workers.mjs");
+  const { response, sessionCookie } = await sessionCookieWithEnv(envModule, {});
+  assert.match(sessionCookie, /osdb_session=raw-session-token-abc123/);
+  assert.match(sessionCookie, /HttpOnly/);
+  assert.match(sessionCookie, /SameSite=Strict/);
+  assert.match(sessionCookie, /Path=\//);
+  assert.match(sessionCookie, /Max-Age=2592000/);
+  // QA#3 F2: Secure is the DEFAULT (fail-closed).
+  assert.match(sessionCookie, /Secure/);
+  const csrfCookie = findCookie(response, "osdb_csrf");
+  assert.match(csrfCookie, /osdb_csrf=csrf-token-123/);
+  assert.doesNotMatch(csrfCookie, /HttpOnly/);
+  assert.match(csrfCookie, /SameSite=Strict/);
 });
+
+test("cookie Secure is the fail-closed default (no AUTH_COOKIE_SECURE, no ENVIRONMENT)", async () => {
+  const { cookieSecure } = await loadLibModule("auth-session");
+  assert.equal(cookieSecure({}), true, "unset env → Secure (fail-closed)");
+  assert.equal(cookieSecure({ AUTH_COOKIE_SECURE: "true" }), true, "explicit true → Secure");
+  assert.equal(cookieSecure({ AUTH_COOKIE_SECURE: "false" }), false, "explicit false → non-Secure (local HTTP prototype)");
+  assert.equal(cookieSecure({ ENVIRONMENT: "development" }), false, "development env → non-Secure (plain-HTTP LAN prototype)");
+  assert.equal(cookieSecure({ ENVIRONMENT: "production" }), true, "production env → Secure even without the var");
+  assert.equal(cookieSecure({ ENVIRONMENT: "staging" }), true, "any non-development env → Secure");
+});
+
+test("AUTH_COOKIE_SECURE=false (local prototype on plain HTTP) drops Secure from the cookie", async () => {
+  const envModule = await loadTreeModule("cloudflare-workers.mjs");
+  const { sessionCookie } = await sessionCookieWithEnv(envModule, { AUTH_COOKIE_SECURE: "false" });
+  assert.match(sessionCookie, /osdb_session=raw-session-token-abc123/);
+  assert.doesNotMatch(sessionCookie, /Secure/, "explicit false override must drop Secure on the LAN prototype");
+  assert.match(sessionCookie, /SameSite=Strict/, "SameSite stays Strict on every path");
+});
+
+test("ENVIRONMENT=development alone also drops Secure (plain-HTTP prototype default)", async () => {
+  const envModule = await loadTreeModule("cloudflare-workers.mjs");
+  const { sessionCookie } = await sessionCookieWithEnv(envModule, { ENVIRONMENT: "development" });
+  assert.doesNotMatch(sessionCookie, /Secure/);
+});
+
+test("login propagates AUTH_SESSION_TTL_DAYS to BOTH the DB session and the cookie Max-Age (no TTL divergence)", async () => {
+  // Audit t_5ca60ab2, P2: the DB expires_at and the cookie Max-Age must
+  // derive from the same sessionTtlSeconds(env).
+  const envModule = await loadTreeModule("cloudflare-workers.mjs");
+  const { sessionCookie } = await sessionCookieWithEnv(envModule, { AUTH_SESSION_TTL_DAYS: "7" });
+  assert.deepEqual(callArgs("createSession")[0], [7, { ttlSeconds: 604800 }]);
+  assert.match(sessionCookie, /Max-Age=604800/, "cookie Max-Age matches the DB TTL");
+});
+
 
 // ---------------------------------------------------------------------------
 // POST /api/auth/login

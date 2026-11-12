@@ -59,7 +59,11 @@ export const es: Translation<typeof en> = {
   loggedOutTitle: "Has cerrado sesión",
   loggedOutBody: "Tu sesión ha terminado. Puedes cerrar esta ventana o volver a iniciar sesión.",
   errorInvalidCredentials: "Credenciales no válidas.",
-  errorEmailTaken: "Ya existe una cuenta con este correo electrónico.",
+  // Register confirmation: shown after EVERY accepted submit, new address or
+  // not — the API answers the same for both (no account enumeration).
+  registerCheckEmailTitle: "Revisa tu correo",
+  registerCheckEmailBody:
+    "Si esta dirección puede usarse, te hemos enviado un correo con el siguiente paso. Revisa tu bandeja de entrada (y la carpeta de spam).",
   errorGeneric: "Algo ha salido mal. Inténtalo de nuevo.",
   errorCrossOrigin: "Solicitud entre sitios rechazada.",
   // Static copy on /login (t_6dc1c96f — CEO feedback 2026-08-03): login is
@@ -243,6 +247,8 @@ export const es: Translation<typeof en> = {
   verifyExpiredTitle: "Este enlace ya no es válido",
   verifyExpiredBody:
     "Este enlace de verificación ya se ha usado o ha caducado. Solicita un enlace nuevo para continuar.",
+  verifyForgotPasswordHint:
+    "¿No puedes iniciar sesión para pedir un nuevo enlace? Usa «¿Has olvidado tu contraseña?» con la misma dirección: establecer una nueva contraseña también confirma tu correo.",
   verifyResend: "Reenviar correo de verificación",
   verifyResent: "Correo de verificación enviado.",
   verifyResendRateLimited: "Demasiados correos. Inténtalo de nuevo más tarde.",
