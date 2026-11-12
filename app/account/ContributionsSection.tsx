@@ -40,22 +40,26 @@ export function ContributionsSection({ contributor, onSessionLost, onLevel }: Pr
     <section aria-labelledby="contributions-title">
       <div className="account-section-header">
         <h2 id="contributions-title">{community.yourContributions}</h2>
-        <div className="account-section-actions">
-          <Link className="button detail-outline" href="/segnala">{community.newReportCta}</Link>
-          <Link className="button detail-outline" href="/correggi">{community.newCorrectionCta}</Link>
-        </div>
+        {/* No contributions at all: the empty state below carries the one
+            primary action, so the header does not repeat it (2026-11). */}
+        {summary?.total === 0 ? null : (
+          <div className="account-section-actions">
+            <Link className="button detail-outline" href="/segnala">{community.newReportCta}</Link>
+            <Link className="button detail-outline" href="/correggi">{community.newCorrectionCta}</Link>
+          </div>
+        )}
       </div>
 
       {summary && summary.total > 0 ? <ContributionStats summary={summary} /> : null}
 
-      <ContributionFilters
+      {summary?.total === 0 ? null : <ContributionFilters
         filter={filter}
         typeFilter={typeFilter}
         summary={summary}
         selectFilter={selectFilter}
         selectTypeFilter={selectTypeFilter}
         clearContributionFilters={clearContributionFilters}
-      />
+      />}
 
       {contributionsError ? (
         <p className="auth-error" role="alert">{community.errorLoadContributions}</p>

@@ -260,11 +260,23 @@ button { cursor:pointer; }
 .explore-view-switch a { min-height:44px; display:inline-flex; align-items:center; padding:0 12px; border-radius:var(--radius-sm); color:var(--nav-ink); font-size:var(--text-sm); font-weight:800; text-decoration:none; }
 .explore-view-switch a[aria-current="page"] { background:var(--heading); color:var(--white); }
 .explore-view-switch a:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
-/* Map ↔ Directory cross-document View Transitions live in
-   public/explorer-view-transition.css, linked ONLY by the /mappa and
-   /directory pages (app/components/ExplorerViewTransitionStyles.tsx,
-   perf 2026-11): a global `@view-transition` here made every same-origin
-   navigation pay full-page snapshots. */
+/* Page transitions (owner 2026-11): every same-origin navigation crossfades
+   — the soft fade people saw between the directory and a record, now
+   everywhere. Opacity only (cheap to composite); every internal link is a
+   document navigation (app/components/DocumentNavigation.tsx), so it
+   applies to the header, footer and back links too. The map ↔ directory
+   switch layers its shared element and a small directional motion on top
+   (public/explorer-view-transition.css). Reduced motion: no animation. */
+@view-transition { navigation:auto; }
+@keyframes osdb-page-out { to { opacity:0; } }
+@keyframes osdb-page-in { from { opacity:0; } }
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(root) { animation:osdb-page-out .2s ease both; }
+  ::view-transition-new(root) { animation:osdb-page-in .2s ease both; }
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation:none !important; }
+}
 .nav-shell { width:var(--container-wide); margin:0 auto; padding:22px 0; display:flex; align-items:center; justify-content:space-between; gap:var(--space-6); }
 .brand { display:inline-flex; align-items:center; gap:10px; font-weight:800; letter-spacing:-.04em; font-size:19px; }
 .brand-mark { display:grid; place-items:center; flex:none; width:29px; height:29px; overflow:hidden; border-radius:var(--radius-round); background:var(--ink); color:var(--mint); font-size:var(--text-4xl); line-height:1; }
@@ -367,6 +379,24 @@ button { cursor:pointer; }
 .hero-trust-note { max-width:525px; margin:26px 0 0; color:var(--hero-stat-ink); font-size:var(--text-sm); line-height:1.5; }
 .hero-trust-note a { color:var(--mint); font-weight:800; text-decoration:underline; text-decoration-thickness:1px; text-underline-offset:3px; }
 .hero-trust-note a:hover { color:var(--mint-hover); }
+/* Home hero redesign (owner 2026-11: "the top of the home page needs
+   restyling"). One left column — headline, intro, search and actions share
+   ONE width — and a right panel with a quiet map preview, the database
+   figures and the provenance note. No scattered dots, no floating caption.
+   Below 1100px the panel follows the buttons in a single column. */
+.hero-panel { position:relative; z-index:2; margin:0 70px 56px; padding:18px; border:1px solid rgba(222,245,234,.16); border-radius:var(--radius-xl); background:rgba(6,28,48,.55); }
+.hero-panel-map { position:relative; height:200px; overflow:hidden; border-radius:var(--radius-lg); background:linear-gradient(135deg,var(--visual-mid),var(--visual-deeper)); }
+.hero-panel .hero-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin:18px 0 0; }
+.hero-panel .hero-trust-note { max-width:none; margin:16px 0 0; }
+@media (min-width:1100px) {
+  .hero { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(380px,.9fr); grid-template-areas:"intro panel" "search panel" "actions panel"; grid-template-rows:auto auto 1fr; column-gap:56px; min-height:0; padding:72px 64px 64px; }
+  .hero > .hero-copy { padding:0; max-width:none; }
+  .hero > .hero-copy--intro { grid-area:intro; }
+  .hero > .hero-search-row { grid-area:search; margin:0 0 16px; }
+  .hero > .hero-copy--details { grid-area:actions; }
+  .hero > .hero-panel { grid-area:panel; align-self:center; margin:0; }
+  .hero h1 { font-size:clamp(48px, 5.2vw, 76px); }
+}
 .hero-visual { position:absolute; inset:0; z-index:0; overflow:hidden; isolation:isolate; background:linear-gradient(135deg,rgb(9 35 58),rgb(16 35 50) 45%,rgb(20 45 62)); }
 /* Community map pattern: subtle topographic lines + organic shapes */
 .hero-map-pattern { position:absolute; inset:0; opacity:.15; background-image:
@@ -958,6 +988,7 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .hero-copy--intro { padding-bottom:0; }
   .hero-copy--details { padding-top:0; }
   .hero-search-row { margin-inline:50px; }
+  .hero-panel { margin-inline:50px; }
   /* t_7cafab72: below 980px the copy is full-width and the decorative
      .visual-label (aria-hidden, bottom-right of the background) would sit
      on top of the trust note — hide it at these widths (it is pure
@@ -1100,6 +1131,9 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   /* Phones (design review 2026-11): three columns in ~330px wrapped "No account"
      over four lines. One stat per row, value and label on one baseline. */
   .hero-stats { margin-top:40px; flex-direction:column; gap:10px }
+  .hero-panel { margin:28px 16px 18px; padding:14px; }
+  .hero-panel-map { display:none; }
+  .hero-panel .hero-stats { display:flex; flex-direction:column; gap:10px; margin-top:16px; }
   .hero-stats div { display:flex; align-items:baseline; gap:10px; }
   .hero-stats dt { font-size:19px; white-space:nowrap; }
   .hero-stats dd { margin:0; }
@@ -1753,6 +1787,27 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
    shared page width (var(--container-readable) = var(--container-wide),
    1320px on desktop) like every other page; no local cap. */
 .account-dashboard { max-width:none; }
+/* Dashboard redesign (owner 2026-11: "orribile da vedere"). The page is no
+   longer one big card holding grey boxes: the header sits on the paper and
+   each section is a light white card. Desktop: contributions (the main
+   work) in a wide column, profile / passkeys / API keys / danger zone in a
+   compact side column. Phones: one column, contributions first. */
+.record-detail.account-dashboard { padding:8px 0 0; border:0; background:transparent; box-shadow:none; }
+.account-dashboard > h1 { margin-bottom:6px; }
+.account-layout { display:grid; grid-template-columns:minmax(0,1fr); gap:18px; margin-top:24px; }
+.account-main, .account-aside { display:grid; gap:18px; align-content:start; min-width:0; }
+@media (min-width:1000px) { .account-layout { grid-template-columns:minmax(0,1.7fr) minmax(320px,1fr); gap:24px; } }
+.account-aside .auth-danger-zone { margin:0; }
+/* Header status as a row of light pills: trust level + e-mail state. */
+.account-dashboard > .account-trust--top, .account-dashboard > .verify-banner-done { display:inline-flex; align-items:center; vertical-align:middle; margin:10px 8px 0 0; padding:7px 14px; border:1px solid var(--line); border-radius:var(--radius-full); background:var(--card-bg); font-size:var(--text-sm); }
+.account-dashboard > .account-trust--top .level-badge { display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px; margin:0; }
+.account-dashboard > .account-trust--top .card-topline { margin:0; }
+.account-dashboard > .account-trust--top .level-progress { font-size:var(--text-sm); }
+.account-dashboard > .verify-banner-done { border-color:var(--notice-border); background:var(--notice-bg); color:var(--notice-ink); font-weight:700; }
+.account-dashboard > .verify-banner-done::before { content:"\2713"; margin-right:8px; font-weight:800; }
+/* Section intro copy at body size (it rendered at the 20px summary size). */
+.account-dashboard :is(.account-main, .account-aside) .record-detail-summary { font-size:var(--text-md); line-height:1.55; }
+.account-aside .account-section-header { align-items:flex-start; }
 /* Profile facts (2026-11): label column sized to its content instead of a
    50/50 split that parked every value in the middle of the page-wide card. */
 @media (min-width:701px) { .account-dashboard .record-detail-list { grid-template-columns:max-content minmax(0,1fr); column-gap:48px; align-items:baseline; } }
@@ -1766,18 +1821,15 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 /* Bordered workspaces (PR #354): the main sections become readable
    cards on the paper, the danger zone stays full-width and the verify
    banner keeps its own treatment. */
-.account-dashboard > section:not(.verify-banner):not(.auth-danger-zone),
-.account-dashboard > details.passkeys-disclosure { margin-top:18px; padding:24px; border:1px solid var(--line); border-radius:var(--radius-lg); background:var(--surface-muted); }
-.account-dashboard > section:not(.verify-banner):not(.auth-danger-zone) > h2,
-.account-dashboard > details.passkeys-disclosure > summary h2 { margin:0 0 18px; color:var(--ink); font-size:var(--text-3xl); letter-spacing:-.035em; }
-.account-dashboard > section.account-profile-grid { background:var(--card-bg); }
-.account-dashboard > section[aria-labelledby="contributions-title"] { background:var(--card-bg); }
+.account-dashboard :is(.account-main, .account-aside) > section:not(.auth-danger-zone),
+.account-dashboard .account-aside > details.passkeys-disclosure { margin:0; padding:24px; border:1px solid var(--line); border-radius:var(--radius-lg); background:var(--card-bg); box-shadow:0 1px 2px rgba(16,35,50,.04); }
+.account-dashboard :is(.account-main, .account-aside) > section:not(.auth-danger-zone) > h2,
+.account-dashboard .account-aside > details.passkeys-disclosure > summary h2 { margin:0 0 18px; color:var(--ink); font-size:var(--text-3xl); letter-spacing:-.035em; }
 .account-dashboard .verify-banner { margin:18px 0 0; }
 /* A04 (layout polish 2026-10-23): no local width cap — the passkey panel is a
    dashboard panel like the others and must align with them (it used to stop
    at 720px). Only this disclosure changes; no other auth route is widened. */
-.account-dashboard > details.passkeys-disclosure { border-top:1px solid var(--line); }
-.account-dashboard > details.passkeys-disclosure > summary { padding:0 0 6px; }
+.account-dashboard .account-aside > details.passkeys-disclosure > summary { padding:0; }
 .account-section-header { display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:14px; }
 .account-section-header h2 { margin:0; }
 /* A05 (layout polish 2026-10-23): ONE explicit heading scale for the four
@@ -1868,9 +1920,9 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .passkeys-disclosure summary:focus-visible { outline:3px solid var(--focus); outline-offset:2px; border-radius:var(--radius-md); }
 .passkeys-disclosure[open] summary { border-bottom:1px solid var(--line); }
 @media (max-width:820px) {
-  .account-dashboard { padding:28px 20px; }
-  .account-dashboard > section:not(.verify-banner):not(.auth-danger-zone),
-  .account-dashboard > details.passkeys-disclosure { padding:18px; }
+  .record-detail.account-dashboard { padding:4px 0 0; }
+  .account-dashboard :is(.account-main, .account-aside) > section:not(.auth-danger-zone),
+  .account-dashboard .account-aside > details.passkeys-disclosure { padding:18px; }
   .account-profile-grid { grid-template-columns:1fr; gap:18px; }
   .account-trust--top .level-badge { margin-bottom:14px; }
   .account-stats { grid-template-columns:repeat(2,minmax(0,1fr)); }
