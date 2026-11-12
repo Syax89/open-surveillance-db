@@ -79,7 +79,7 @@ test("form tools (/segnala, /correggi) share the 900px content column", async ()
     /\.write-gate-wall\s*\{[^}]*max-width/,
     "the write-gate wall must not cap its width below the tool wrapper",
   );
-  // … the authenticated /segnala form fills it too (max-width:920 untouched) …
+  // … the authenticated /segnala form fills it too …
   assert.match(
     css,
     /\.tool-section\.report-tool\s+\.report-section--tool\s*\{\s*width:\s*100%/,
@@ -87,8 +87,8 @@ test("form tools (/segnala, /correggi) share the 900px content column", async ()
   );
   assert.match(
     css,
-    /\.report-section\.report-section--tool\s*\{[^}]*max-width:\s*920px/,
-    "the scoped one-column max-width:920px contract remains",
+    /\.report-section\.report-section--tool\s*\{[^}]*max-width:\s*none/,
+    "the form spans the page width like every other page (owner 2026-11)",
   );
   // … and the embedded /correggi section no longer subtracts another 48px.
   assert.match(

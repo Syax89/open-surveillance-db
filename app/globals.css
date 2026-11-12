@@ -233,6 +233,17 @@ button { cursor:pointer; }
 /* The embedded /correggi section fills the wrapper instead of re-applying the
    container inset (the desktop grid is untouched). */
 .tool-section.correction-tool .correction-section { width:100%; }
+/* /correggi (2026-11, owner: fix it): same pattern as /segnala — the privacy
+   note sits above, the form spans the page. Wide screens put steps 1 and 2
+   on the left and the contact + send step on the right, instead of a form
+   pushed right with an empty left half under the note. Scoped to the tool
+   page: contacts/guide/rules keep the shared two-column .correction-section. */
+.tool-section.correction-tool .correction-section { grid-template-columns:minmax(0,1fr); gap:30px; padding-top:0; }
+.tool-section.correction-tool .correction-section > div { max-width:760px; }
+@media (min-width:1100px) {
+  .tool-section.correction-tool .correction-form { grid-template-columns:minmax(0,1fr) minmax(0,1fr); column-gap:28px; align-items:start; }
+  .tool-section.correction-tool .correction-form > .contribution-step-send { grid-column:2; grid-row:1 / span 2; }
+}
 /* The directory is the map's alternate explorer view, so their desktop
    workspaces share the same outer edge. Keep the inherited tool-section
    width below the map's desktop breakpoint: mobile sizing stays unchanged. */
@@ -615,7 +626,15 @@ button { cursor:pointer; }
    the split editorial/form grid made the work feel disconnected. This is
    deliberately a scoped variant: guide/contact/legacy ReportForm embeddings
    keep their own two-column composition. */
-.report-section.report-section--tool { grid-template-columns:minmax(0,1fr); gap:30px; max-width:920px; margin:0 auto; padding:42px 0 92px; }
+.report-section.report-section--tool { grid-template-columns:minmax(0,1fr); gap:30px; max-width:none; margin:0; padding:42px 0 92px; }
+/* /segnala on wide screens (2026-11, one page width): the form no longer sits
+   as a 920px block centred under a left-aligned heading. Step 1 (map +
+   coordinates) takes the left column across two rows; steps 2 and 3 stack on
+   the right, so each column keeps a readable measure. */
+@media (min-width:1100px) {
+  .report-section--tool .report-form { grid-template-columns:minmax(0,1.2fr) minmax(0,1fr); column-gap:28px; align-items:start; }
+  .report-section--tool .report-form > .contribution-step:first-child { grid-row:span 2; }
+}
 .report-section--tool > div { display:grid; gap:var(--space-3); max-width:760px; }
 .report-section--tool .report-rule { margin-top:0; }
 .report-section--tool .report-form { width:100%; padding:clamp(24px,4vw,38px); }
@@ -1720,6 +1739,9 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
    shared page width (var(--container-readable) = var(--container-wide),
    1320px on desktop) like every other page; no local cap. */
 .account-dashboard { max-width:none; }
+/* Profile facts (2026-11): label column sized to its content instead of a
+   50/50 split that parked every value in the middle of the page-wide card. */
+@media (min-width:701px) { .account-dashboard .record-detail-list { grid-template-columns:max-content minmax(0,1fr); column-gap:48px; align-items:baseline; } }
 .account-profile-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:28px; align-items:start; }
 .account-identity { min-width:0; }
 .account-logout { margin-top:18px; }

@@ -9,11 +9,14 @@
 // renders the removal/recovery dialogs via PasskeyDialogs).
 
 import { useDomainMessages } from "../lib/use-domain-messages";
+import { formatPublicDate } from "../lib/format-date";
+import { useLocale } from "../components/LocaleProvider";
 import { authByLocale } from "../lib/i18n/auth";
 import type { PasskeysApi } from "../lib/usePasskeys";
 
 export function PasskeysSection({ api }: { api: PasskeysApi }) {
   const t = useDomainMessages(authByLocale);
+  const { locale } = useLocale();
   const { passkeys, passkeysLoading, passkeysError, enrolling, enrollError, passkeyAdded, removingId, setConfirmRemove, onEnrollPasskey } = api;
 
   return (
@@ -41,7 +44,7 @@ export function PasskeysSection({ api }: { api: PasskeysApi }) {
         ) : (
           <ul className="auth-submissions passkey-list" aria-label={t.passkeysSection}>
             {passkeys.map((passkey) => {
-              const enrolledOn = new Date(passkey.createdAt).toLocaleDateString();
+              const enrolledOn = formatPublicDate(passkey.createdAt, locale);
               return (
                 <li key={passkey.id} className="passkey-row">
                   <span className="passkey-kind">
