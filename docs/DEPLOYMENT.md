@@ -220,8 +220,7 @@ GitHub repository secrets used by the workflow:
 and `CLOUDFLARE_ACCOUNT_ID` (the `PROD_URL` variable is only used by the
 `ops-monitoring.yml` health-check workflow, not by deploys). `PROD_URL`
 (hostname only, no scheme — the workflow prepends `https://`) is set to
-`open-surveillance-db.simone-rondina.workers.dev` (verified 2026-08-09:
-the deployed worker answers 200). The NPM→LXC public hostname
+the production custom domain `opensurveillancedb.org` (Cloudflare worker). The NPM→LXC public hostname
 `<preprod-host>` is the alternate; it can be added as the optional
 `PROD_URL_ALT` repository variable for the dual health check once the
 container accepts the host (see `ALLOWED_HOSTS` note in §Local LXC

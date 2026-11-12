@@ -134,12 +134,9 @@ ENABLE_RESTORE_DRILL (var)
                        "true" to arm the quarterly restore drill (see §3.4)
 PROD_URL (variable)    production hostname checked by ops-monitoring.yml
                        (hostname only, no scheme — the workflow prepends
-                       https://). Current value verified 2026-08-09:
-                       open-surveillance-db.simone-rondina.workers.dev
-                       (the deployed Cloudflare worker answers 200; the
-                       NPM→LXC host <preprod-host> currently answers
-                       403 from anonymous clients because the container's
-                       vite allowedHosts guard rejects it — see
+                       https://). Production: opensurveillancedb.org
+                       (Cloudflare worker, custom domain). Pre-production
+                       is <preprod-host> (NPM→LXC container, see
                        DEPLOYMENT.md §Local LXC deployment). Set via
                        `gh variable set PROD_URL <host>`, issue #203.
 PROD_URL_ALT (variable, optional)
