@@ -417,6 +417,161 @@ function maxSensitivity(a: QueueSensitivity, b: QueueSensitivity | undefined): Q
 /** Correction issue types that are privacy/legal takedown or abuse reports (db/corrections.ts whitelist). */
 const SENSITIVE_CORRECTION_ISSUE_TYPES = ["removal", "abuse"] as const;
 
+// ---------------------------------------------------------------------------
+// Community flag review (ADR 0021 §6.4, owner 2026-11)
+// ---------------------------------------------------------------------------
+//
+// Every community `privacy` flag reaches a human. The flags, the hides they
+// cause and the moderator's verdict are all recorded on the append-only
+// moderation_events trail (no extra table), with these action codes:
+//
+//   community-privacy-flag      one row per ACCEPTED privacy flag (actor
+//                               `community:<id>`, no status change). The
+//                               ledger survives the consumption DELETE, so
+//                               it is what the per-account privacy cap
+//                               counts and how the flaggers are found later.
+//   community-privacy-hidden    the community transition active → hidden.
+//   community-privacy-queued    a privacy flag that did NOT hide the record
+//                               (penalised account, moderator-cleared record,
+//                               threshold not reached) and was queued only.
+//   community-problem-queued    a problem consensus on a moderator-cleared
+//                               record (queued instead of hidden).
+//   community-privacy-flag-rejected
+//                               written by the moderator's restore/dismissal,
+//                               one per flagging account (actor
+//                               `community:<id>`): the abuse-penalty count.
+//   moderator-privacy-cleared   the moderator's verdict that the record may
+//                               stay public. Locks out community hides until
+//                               the next status transition.
+
+export const COMMUNITY_PRIVACY_FLAG_ACTION = "community-privacy-flag";
+export const COMMUNITY_PRIVACY_HIDDEN_ACTION = "community-privacy-hidden";
+export const COMMUNITY_PRIVACY_QUEUED_ACTION = "community-privacy-queued";
+export const COMMUNITY_PROBLEM_QUEUED_ACTION = "community-problem-queued";
+export const PRIVACY_FLAG_REJECTED_ACTION = "community-privacy-flag-rejected";
+export const MODERATOR_PRIVACY_CLEARED_ACTION = "moderator-privacy-cleared";
+
+/** Events that put a record in community-flag review. */
+const COMMUNITY_REVIEW_OPENING_ACTIONS = [
+  COMMUNITY_PRIVACY_HIDDEN_ACTION,
+  COMMUNITY_PRIVACY_QUEUED_ACTION,
+  COMMUNITY_PROBLEM_QUEUED_ACTION,
+] as const;
+const reviewOpeningList = COMMUNITY_REVIEW_OPENING_ACTIONS.map((action) => `'${action}'`).join(", ");
+
+/**
+ * SQL scalar: event id of the latest MODERATOR verdict on camera `idExpr`
+ * (a real status transition by a non-community actor, or a
+ * `moderator-privacy-cleared` marker), 0 when none. Ordered by the
+ * append-only autoincrement id, not by created_at: "after the verdict" must
+ * not depend on two writers' clocks agreeing.
+ */
+export function lastModeratorVerdictSql(idExpr: string): string {
+  return `COALESCE((SELECT MAX(mv.id) FROM moderation_events mv
+    WHERE mv.entity = 'camera' AND mv.entity_id = ${idExpr} AND mv.recused = 0
+      AND mv.actor NOT LIKE 'community:%'
+      AND (mv.previous_status != mv.new_status OR mv.action = '${MODERATOR_PRIVACY_CLEARED_ACTION}')), 0)`;
+}
+
+/**
+ * SQL predicate: camera `idExpr` (status active/hidden) has a community
+ * flag awaiting a moderator — a privacy hide / queued flag newer than the
+ * latest moderator verdict. The subquery is driven by the
+ * (entity, action, entity_id) index, so it touches only flagged records.
+ */
+function communityReviewOpenSql(idExpr: string): string {
+  return `${idExpr} IN (SELECT ce.entity_id FROM moderation_events ce
+    WHERE ce.entity = 'camera' AND ce.action IN (${reviewOpeningList})
+      AND ce.id > ${lastModeratorVerdictSql("ce.entity_id")})`;
+}
+
+/** Review tab: lifecycle reviews plus community flags awaiting a moderator. */
+const REVIEW_QUEUE_PREDICATE = `(status = 'needs_review' OR (status IN ('active', 'hidden') AND ${communityReviewOpenSql("cameras.id")}))`;
+
+async function isInCommunityReview(d1: ModerationD1, cameraId: number): Promise<boolean> {
+  const row = await d1
+    .prepare(`SELECT 1 AS hit FROM cameras WHERE id = ? AND status IN ('active', 'hidden') AND ${communityReviewOpenSql("cameras.id")}`)
+    .bind(cameraId)
+    .first<{ hit: number }>();
+  return row !== null;
+}
+
+/**
+ * Accounts whose privacy flags a moderator is about to judge: every
+ * `community-privacy-flag` ledger row on the record since the latest
+ * moderator verdict, plus any live privacy action (defensive: a row whose
+ * ledger entry predates the ledger). Read BEFORE the verdict is written.
+ */
+async function pendingPrivacyFlaggers(d1: ModerationD1, cameraId: number): Promise<number[]> {
+  const rows = await d1
+    .prepare(
+      `SELECT CAST(SUBSTR(actor, 11) AS INTEGER) AS contributorId FROM moderation_events
+        WHERE entity = 'camera' AND entity_id = ? AND action = '${COMMUNITY_PRIVACY_FLAG_ACTION}'
+          AND actor LIKE 'community:%' AND id > ${lastModeratorVerdictSql("?")}
+       UNION
+       SELECT contributor_id AS contributorId FROM camera_community_actions
+        WHERE camera_id = ? AND action_type = 'privacy'`,
+    )
+    .bind(cameraId, cameraId, cameraId)
+    .all<{ contributorId: number | null }>();
+  return [...new Set(rows.results.map((row) => Number(row.contributorId)).filter((id) => Number.isInteger(id) && id > 0))];
+}
+
+/**
+ * The moderator decided a community privacy flag was unfounded (restore of
+ * a privacy hide, or dismissal of a queued flag): one
+ * `community-privacy-flag-rejected` row per flagging account (the abuse
+ * penalty, db/community-actions.ts), the `moderator-privacy-cleared`
+ * marker that makes the verdict final against later community hides, and
+ * the consumption of the rejected privacy actions.
+ */
+async function recordPrivacyFlagsRejected(
+  d1: ModerationD1,
+  cameraId: number,
+  status: string,
+  flaggers: number[],
+  reviewer: Reviewer | null,
+  verdictEventId: number | null,
+): Promise<void> {
+  const createdAt = new Date().toISOString();
+  const statements: D1PreparedStatement[] = flaggers.map((contributorId) =>
+    d1
+      .prepare(
+        `INSERT INTO moderation_events (entity, entity_id, previous_status, new_status, action, reason_code, note, actor, reviewer_id, actor_role, recused, escalated, second_reviewer_id, appeal_id, created_at)
+         VALUES ('camera', ?, ?, ?, '${PRIVACY_FLAG_REJECTED_ACTION}', '${PRIVACY_FLAG_REJECTED_ACTION}', ?, ?, ?, ?, 0, 0, NULL, NULL, ?)`,
+      )
+      .bind(
+        cameraId,
+        status,
+        status,
+        JSON.stringify({ contributorId, verdictEventId }),
+        `community:${contributorId}`,
+        reviewer?.id ?? null,
+        reviewer?.role ?? null,
+        createdAt,
+      ),
+  );
+  statements.push(
+    d1
+      .prepare(
+        `INSERT INTO moderation_events (entity, entity_id, previous_status, new_status, action, reason_code, note, actor, reviewer_id, actor_role, recused, escalated, second_reviewer_id, appeal_id, created_at)
+         VALUES ('camera', ?, ?, ?, '${MODERATOR_PRIVACY_CLEARED_ACTION}', '${MODERATOR_PRIVACY_CLEARED_ACTION}', ?, ?, ?, ?, 0, 0, NULL, NULL, ?)`,
+      )
+      .bind(
+        cameraId,
+        status,
+        status,
+        JSON.stringify({ rejectedFlags: flaggers.length, verdictEventId }),
+        reviewer?.displayName ?? localModerator,
+        reviewer?.id ?? null,
+        reviewer?.role ?? null,
+        createdAt,
+      ),
+    d1.prepare("DELETE FROM camera_community_actions WHERE camera_id = ? AND action_type = 'privacy'").bind(cameraId),
+  );
+  await d1.batch(statements);
+}
+
 /**
  * Is there at least one OTHER active reviewer who could give the second
  * review? Without one the two-person rule cannot be satisfied and would leave
@@ -441,7 +596,9 @@ async function hasOtherActiveReviewer(d1: ModerationD1, reviewerId: number | nul
  *   - correction: a `removal` / `abuse` report (privacy/legal takedown or
  *     abuse) → `urgent`;
  *   - camera: an open `removal` / `abuse` report on the record → `urgent`;
- *     a community `privacy` flag on the record → `sensitive`;
+ *     a community `privacy` flag on the record, or a community privacy
+ *     hide / queued privacy flag not yet judged by a moderator (the flag
+ *     rows are consumed by the hide, the ledger is not) → `sensitive`;
  *   - camera_edit: the target camera's floor (same signals).
  */
 async function deriveQueueSensitivity(
@@ -470,9 +627,12 @@ async function deriveQueueSensitivity(
     .prepare(
       `SELECT
          EXISTS (SELECT 1 FROM correction_requests WHERE camera_id = ? AND status = 'pending' AND issue_type IN (${issueList})) AS urgentReport,
-         EXISTS (SELECT 1 FROM camera_community_actions WHERE camera_id = ? AND action_type = 'privacy') AS privacyFlag`,
+         (EXISTS (SELECT 1 FROM camera_community_actions WHERE camera_id = ? AND action_type = 'privacy')
+          OR EXISTS (SELECT 1 FROM moderation_events pe WHERE pe.entity = 'camera' AND pe.entity_id = ?
+                       AND pe.action IN ('${COMMUNITY_PRIVACY_HIDDEN_ACTION}', '${COMMUNITY_PRIVACY_QUEUED_ACTION}')
+                       AND pe.id > ${lastModeratorVerdictSql("pe.entity_id")})) AS privacyFlag`,
     )
-    .bind(cameraId, cameraId)
+    .bind(cameraId, cameraId, cameraId)
     .first<{ urgentReport: number; privacyFlag: number }>();
   if (Number(row?.urgentReport ?? 0) === 1) return "urgent";
   if (Number(row?.privacyFlag ?? 0) === 1) return "sensitive";
@@ -675,9 +835,12 @@ export async function listPendingModerationItems(
         .all<CameraRecord>(),
       d1
         .prepare(
-          `SELECT ${cameraColumns} FROM cameras WHERE status = ?${reviewAfter.sql} ORDER BY created_at ASC, id ASC LIMIT ?`,
+          // Review tab: lifecycle reviews (needs_review) AND every record a
+          // community flag put in moderator review (privacy hides, queued
+          // privacy flags of penalised accounts, flags on cleared records).
+          `SELECT ${cameraColumns} FROM cameras WHERE ${REVIEW_QUEUE_PREDICATE}${reviewAfter.sql} ORDER BY created_at ASC, id ASC LIMIT ?`,
         )
-        .bind("needs_review", ...reviewAfter.params, probe)
+        .bind(...reviewAfter.params, probe)
         .all<CameraRecord>(),
       d1
         .prepare(
@@ -733,7 +896,7 @@ export async function listPendingModerationItems(
           `SELECT
              (SELECT COUNT(*) FROM cameras WHERE status = 'pending') AS pending,
              (SELECT COUNT(*) FROM cameras WHERE status = 'active') AS published,
-             (SELECT COUNT(*) FROM cameras WHERE status = 'needs_review') AS review,
+             (SELECT COUNT(*) FROM cameras WHERE ${REVIEW_QUEUE_PREDICATE}) AS review,
              (SELECT COUNT(*) FROM cameras WHERE status = 'stale') AS stale,
              (SELECT COUNT(*) FROM correction_requests WHERE status = 'pending') AS corrections,
              (SELECT COUNT(*) FROM camera_edit_requests WHERE status = 'pending') AS edits`,
@@ -1049,8 +1212,18 @@ export async function moderateCamera(
 
   if (await isSelfReview(d1, reviewer, [current.contributorId])) return { kind: "self_review" };
 
-  const transition = getCameraTransition(current.status, action);
+  // Community-flag review (ADR 0021 §6.4): a record a community flag put in
+  // the review tab. `reverify` is the moderator's "the flag was unfounded"
+  // verdict — it restores a community hide (hidden → active) or dismisses a
+  // queued flag on a still-public record (active → active).
+  const inCommunityReview = await isInCommunityReview(d1, id);
+  const transition =
+    getCameraTransition(current.status, action) ??
+    (inCommunityReview && current.status === "active" && action === "reverify"
+      ? { newStatus: "active", updated: new Date().toISOString() }
+      : null);
   if (!transition) return { kind: "not_found" };
+  const rejectsCommunityFlag = inCommunityReview && action === "reverify";
 
   const needsSecondReview =
     context !== undefined &&
@@ -1102,6 +1275,11 @@ export async function moderateCamera(
     }
     secondReviewerId = first?.reviewerId ?? null;
   }
+
+  // The flaggers are read BEFORE the verdict is written (the verdict closes
+  // the review window they are read from). Null when this decision does not
+  // reject a community flag.
+  const flaggers = rejectsCommunityFlag ? await pendingPrivacyFlaggers(d1, id) : null;
 
   const nowIso = new Date().toISOString();
   // Approval and re-verification both write the informational review metadata
@@ -1156,6 +1334,7 @@ export async function moderateCamera(
     const item = results[0].results?.[0] as ModerationCameraRecord | undefined;
     if (!item) return { kind: "not_found" };
     const event = results[1].results?.[0] as ModerationEvent;
+    if (flaggers) await recordPrivacyFlagsRejected(d1, id, transition.newStatus, flaggers, reviewer, event?.id ?? null);
     const updatedQueue = (results[3].results?.[0] as ModerationQueueItem | undefined) ?? queue;
     return { kind: "ok", item, event, queue: updatedQueue };
   }
@@ -1165,6 +1344,7 @@ export async function moderateCamera(
   const item = results[0].results?.[0] as ModerationCameraRecord | undefined;
   if (!item) return { kind: "not_found" };
   const event = results[1].results?.[0] as ModerationEvent;
+  if (flaggers) await recordPrivacyFlagsRejected(d1, id, transition.newStatus, flaggers, reviewer, event?.id ?? null);
   return { kind: "ok", item, event, queue };
 }
 
@@ -1267,6 +1447,19 @@ function getCameraTransition(
   }
 
   if (previousStatus === "stale") {
+    if (action === "reverify") {
+      return { newStatus: "active", updated: nowIso };
+    }
+    if (action === "hide") {
+      return { newStatus: "removed", updated: nowIso };
+    }
+  }
+
+  // A community-hidden record (privacy/problem flag, ADR 0021 §6.4): the
+  // moderator restores it (`reverify` → active) or confirms the removal
+  // (`hide` → removed). Either verdict is a moderator decision, so the
+  // community can never reverse it (evaluateCommunityThresholds).
+  if (previousStatus === "hidden") {
     if (action === "reverify") {
       return { newStatus: "active", updated: nowIso };
     }
