@@ -142,6 +142,10 @@ export type QueuePayload = {
   queueNextCursors?: Partial<Record<PagedQueue, PublishedCursor | null>>;
   /** Whole-queue COUNT per queue, for "N of M". */
   queueTotals?: Partial<Record<PagedQueue | "published", number>>;
+  /** The logged-in moderator's own reviewer profile (null: none linked). */
+  actingReviewer?: { id: number; displayName: string; role: string } | null;
+  /** True only with the dev demo selector: the dashboard may pick an actor. */
+  actorSelectable?: boolean;
   error?: string;
 };
 

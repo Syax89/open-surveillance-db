@@ -12,6 +12,41 @@ changes accumulate under `[Unreleased]`.
 
 ## [Unreleased]
 
+### Security
+
+- **Audit di sicurezza completo (2026-11-12) e correzioni:**
+  - *Account:* niente passkey prima della verifica dell'email; il primo
+    login verificato e il reset della password cancellano passkey, codici di
+    recupero e chiavi API creati prima (chiude il furto di account per
+    pre-registrazione). Login OIDC legato al browser che l'ha avviato (cookie
+    di binding). Login passkey e reset password non rivelano più se un'email
+    è registrata. CSRF sul reinvio della verifica, `no-store` sulla lista
+    passkey, tempi uniformati sul merge OIDC.
+  - *Moderazione e community:* le azioni della community sono accettate solo
+    su schede pubbliche/nascoste/rimosse e non annullano mai una rimozione
+    decisa da un moderatore o da una correzione; contano solo le azioni
+    successive all'ultimo cambio di stato. Sensibilità e doppia revisione
+    derivate dal server (il client può solo alzarle); la doppia revisione si
+    applica solo se esiste un altro revisore attivo. Nessuna auto-moderazione
+    (né su appelli propri). Corse su approvazione modifiche e appelli chiuse.
+    Appelli solo da chi possiede la scheda, risposta uniforme. Le schede non
+    pubbliche non sono più deducibili dai codici di errore; la cronologia
+    pubblica non mostra eventi interni.
+  - *Area di moderazione:* chi non è moderatore riceve un normale 404 (niente
+    popup Basic); il login del moderatore funziona anche senza credenziali
+    condivise. La dashboard non chiede più il revisore: mostra "Stai
+    moderando come …" dal login.
+  - *Redirect e input:* chiusi i redirect aperti su `/login?returnTo=` e
+    `/api/locale?next=` (helper condiviso `app/lib/safe-redirect.ts`); export
+    CSV con numeri negativi corretti e guardia formula estesa; proxy tile con
+    header in allow-list e chiave di cache canonica; corpo JSON letto con
+    limite in byte; cookie lingua/tema `Secure` su https; `no-store` forzato
+    sulle risposte API personali; statistiche per pattern di rotta.
+  - *Documenti e CI:* informativa privacy (6 lingue + canonica v0.16) con
+    tutti i cookie; rimossi IP di rete locale, percorsi personali e host
+    interni dai documenti; GitHub Actions fissate per SHA; deploy solo da
+    `main`.
+
 ### Added
 
 - **Quattro nuove lingue e tema scuro (2026-11):** l'interfaccia, le pagine

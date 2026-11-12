@@ -311,3 +311,14 @@ test("public revisions exclude recusals and first-review intents", async () => {
     [["approve", "pending", "active"]],
   );
 });
+
+test("with a single active reviewer the two-person rule does not leave items stuck (owner 2026-11)", async () => {
+  // One-moderator project: deactivate every other reviewer.
+  await db.prepare("UPDATE reviewers SET active = 0 WHERE id != ?").bind(RECORD).run();
+  const cameraId = await insertCamera();
+  await insertCorrection({ cameraId, issueType: "removal" });
+
+  const only = await moderation.moderateCamera(cameraId, "approve", "verified-public-infrastructure", null, undefined, { actorId: RECORD });
+  assert.equal(only.kind, "ok", "no second reviewer exists, so the decision is final");
+  assert.equal((await cameraRow(cameraId)).status, "active");
+});

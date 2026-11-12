@@ -356,6 +356,15 @@ function parseQueueCursors(
   return { ok: true, cursors };
 }
 
+/**
+ * Demo actor selector (QA#3 F5): ONLY when BOTH the explicit
+ * MODERATION_DEMO_ACTOR_SELECTOR key AND ENVIRONMENT=development are set may
+ * an admin step in as another reviewer. Off everywhere else.
+ */
+function demoActorSelector(role: string): boolean {
+  return env.MODERATION_DEMO_ACTOR_SELECTOR === "true" && env.ENVIRONMENT === "development" && role === "admin";
+}
+
 export async function GET(request: Request) {
   // Input limits: reject absurdly long URLs before any query parsing work.
   if (urlTooLong(request)) {
@@ -392,11 +401,17 @@ export async function GET(request: Request) {
     // The queue cursors are only forwarded when present, so a first-page
     // request keeps calling the db boundary with the published cursor alone.
     const queueCursors = parsedQueueCursors.cursors;
-    return Response.json(
-      Object.keys(queueCursors).length > 0
-        ? await listPendingModerationItems(parsedCursor.cursor, queueCursors)
-        : await listPendingModerationItems(parsedCursor.cursor),
-    );
+    const queue = Object.keys(queueCursors).length > 0
+      ? await listPendingModerationItems(parsedCursor.cursor, queueCursors)
+      : await listPendingModerationItems(parsedCursor.cursor);
+    // Who the decisions will be recorded as (owner 2026-11: the dashboard
+    // must not ask — the actor is always the logged-in moderator's own
+    // reviewer profile; only the dev demo selector may pick another one).
+    const reviewer = await getReviewerByUserId(auth.user.id);
+    const actingReviewer = reviewer && reviewer.active === 1
+      ? { id: reviewer.id, displayName: reviewer.displayName, role: reviewer.role }
+      : null;
+    return Response.json({ ...queue, actingReviewer, actorSelectable: demoActorSelector(auth.user.role) });
   } catch (error) {
     console.error("GET /api/moderation failed", error);
     return Response.json(
@@ -448,7 +463,7 @@ export async function PATCH(request: Request) {
     }
 
     let actorId: number;
-    if (env.MODERATION_DEMO_ACTOR_SELECTOR === "true" && env.ENVIRONMENT === "development" && auth.user.role === "admin") {
+    if (demoActorSelector(auth.user.role)) {
       // Demo actor selector (QA#3 F5): ONLY when BOTH the explicit
       // MODERATION_DEMO_ACTOR_SELECTOR key AND ENVIRONMENT=development are
       // set may an admin step in as any reviewer. Two keys so a production

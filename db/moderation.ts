@@ -418,6 +418,19 @@ function maxSensitivity(a: QueueSensitivity, b: QueueSensitivity | undefined): Q
 const SENSITIVE_CORRECTION_ISSUE_TYPES = ["removal", "abuse"] as const;
 
 /**
+ * Is there at least one OTHER active reviewer who could give the second
+ * review? Without one the two-person rule cannot be satisfied and would leave
+ * the item stuck forever, so the first decision is final (owner 2026-11).
+ */
+async function hasOtherActiveReviewer(d1: ModerationD1, reviewerId: number | null): Promise<boolean> {
+  const row = await d1
+    .prepare("SELECT 1 AS found FROM reviewers WHERE active = 1 AND id != ? LIMIT 1")
+    .bind(reviewerId ?? -1)
+    .first<{ found: number }>();
+  return row !== null;
+}
+
+/**
  * Server-side sensitivity floor for a queue item (ADR 0009 §4 two-person
  * review). The deciding moderator used to choose `sensitivity` /
  * `requiresSecondReview` in the request body, so the two-person rule was
@@ -1042,7 +1055,10 @@ export async function moderateCamera(
   const needsSecondReview =
     context !== undefined &&
     secondReviewActions.has(action) &&
-    (queue.requiresSecondReview === 1 || queue.sensitivity !== "standard");
+    (queue.requiresSecondReview === 1 || queue.sensitivity !== "standard") &&
+    // Two-person rule needs a second person: with a single active reviewer
+    // (owner 2026-11: one-moderator project) the decision is final at once.
+    (await hasOtherActiveReviewer(d1, reviewer?.id ?? null));
 
   if (needsSecondReview && queue.state !== "second_review") {
     // First reviewer acts: record the intent; the status is not final yet.
@@ -1400,7 +1416,10 @@ export async function moderateCorrection(
   const needsSecondReview =
     context !== undefined &&
     secondReviewActions.has(action) &&
-    (queue.requiresSecondReview === 1 || queue.sensitivity !== "standard");
+    (queue.requiresSecondReview === 1 || queue.sensitivity !== "standard") &&
+    // Two-person rule needs a second person: with a single active reviewer
+    // (owner 2026-11: one-moderator project) the decision is final at once.
+    (await hasOtherActiveReviewer(d1, reviewer?.id ?? null));
 
   if (needsSecondReview && queue.state !== "second_review") {
     const results = (await d1.batch([
@@ -1644,7 +1663,10 @@ export async function moderateCameraEdit(
   const needsSecondReview =
     context !== undefined &&
     secondReviewActions.has(action) &&
-    (queue.requiresSecondReview === 1 || queue.sensitivity !== "standard");
+    (queue.requiresSecondReview === 1 || queue.sensitivity !== "standard") &&
+    // Two-person rule needs a second person: with a single active reviewer
+    // (owner 2026-11: one-moderator project) the decision is final at once.
+    (await hasOtherActiveReviewer(d1, reviewer?.id ?? null));
 
   if (needsSecondReview && queue.state !== "second_review") {
     // ONE batch: intent event + queue transition + queue readback.

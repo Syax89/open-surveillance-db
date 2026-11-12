@@ -990,6 +990,8 @@ details.locale-toggle .locale-menu button.is-active { background:var(--notice-bg
    row: what was reported on the left, the decision on the right. */
 .moderation-page>h1 { font-size:clamp(34px, 4vw, 48px); }
 .moderation-page>h1+p { margin:10px 0 16px; font-size:var(--text-lg); }
+.moderation-acting-as { margin:0; color:var(--muted); font-size:var(--text-sm); }
+.moderation-acting-as strong { color:var(--ink); }
 .moderation-toolbar { position:sticky; top:0; z-index:5; display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; margin:18px 0 0; padding:12px 16px; border:1px solid var(--line); border-radius:var(--radius-lg); background:var(--card-bg); box-shadow:0 6px 18px rgba(16,35,50,.06); }
 .moderation-toolbar label { font-weight:800; font-size:var(--text-sm); }
 .moderation-toolbar select { min-height:44px; min-width:min(320px, 100%); padding:8px 12px; border:1px solid var(--control-border); border-radius:var(--radius-md); background:var(--white); font:inherit; }

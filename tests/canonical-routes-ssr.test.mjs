@@ -215,7 +215,7 @@ test("auth/private and noindex surfaces carry NO canonical", async () => {
 
 test("the moderator dashboard is gate-protected and publishes no canonical", async () => {
   const { response, html } = await renderRoute("/moderation");
-  assert.equal(response.status, 401, "an anonymous request still hits the moderation gate (no page, nothing to index)");
+  assert.equal(response.status, 404, "an anonymous request hits the moderation gate as a plain 404 (no page, nothing to index)");
   assert.deepEqual(canonicalHrefs(html), []);
 });
 

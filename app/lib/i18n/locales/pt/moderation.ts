@@ -147,6 +147,8 @@ export const pt: Translation<typeof en> = {
   actor: "Autor",
   localModerator: "Moderador local",
   selectActor: "Revisor responsável",
+  actingAs: "Estás a moderar como",
+  noReviewerProfile: "A tua conta ainda não tem um perfil de moderador associado, por isso as decisões não podem ser registadas. Pede ao administrador que o associe.",
   actorRequired: "Seleciona o revisor que regista esta decisão.",
   actorHelp:
     "Obrigatório. As decisões são atribuídas a um revisor local identificado; cada ação é escrita no registo de auditoria só de acréscimo.",

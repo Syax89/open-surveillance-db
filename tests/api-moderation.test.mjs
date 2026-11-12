@@ -122,7 +122,23 @@ test("GET /api/moderation returns the full queue shape from the database boundar
   const response = await GET(authRequest("/api/moderation"));
   assert.equal(response.status, 200);
   const body = await responseBody(response);
-  assert.deepEqual(body, queue);
+  // Owner 2026-11: the payload also says who decisions are recorded as (the
+  // logged-in moderator's own reviewer profile) and that the actor cannot be
+  // picked outside the dev demo selector.
+  assert.deepEqual(body, {
+    ...queue,
+    actingReviewer: { id: moderatorReviewer.id, displayName: moderatorReviewer.displayName, role: moderatorReviewer.role },
+    actorSelectable: false,
+  });
+});
+
+test("GET /api/moderation reports a missing reviewer profile as actingReviewer: null", async () => {
+  stub("listPendingModerationItems", async () => ({ cameraReports: [] }));
+  stub("getReviewerByUserId", async () => null);
+  const { GET } = await route();
+  const body = await responseBody(await GET(authRequest("/api/moderation")));
+  assert.equal(body.actingReviewer, null);
+  assert.equal(body.actorSelectable, false);
 });
 
 test("GET /api/moderation returns 503 when the queue is unavailable", async () => {

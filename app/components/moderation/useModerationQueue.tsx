@@ -20,7 +20,7 @@ export function useModerationQueue() {
   const [publishedHistory, setPublishedHistory] = useState<(PublishedCursor | null)[]>([]); const [publishedLoading, setPublishedLoading] = useState(false);
   const [reviewCameras, setReviewCameras] = useState<CameraInQueue[]>([]); const [corrections, setCorrections] = useState<CorrectionInQueue[]>([]);
   const [editRequests, setEditRequests] = useState<EditRequestInQueue[]>([]); const [recentEvents, setRecentEvents] = useState<ModerationEvent[]>([]);
-  const [reviewers, setReviewers] = useState<Reviewer[]>([]); const [queueItems, setQueueItems] = useState<QueueItem[]>([]); const [actorId, setActorId] = useState("");
+  const [reviewers, setReviewers] = useState<Reviewer[]>([]); const [queueItems, setQueueItems] = useState<QueueItem[]>([]); const [actorId, setActorId] = useState(""); const [acting, setActing] = useState<{ reviewer: QueuePayload["actingReviewer"]; selectable: boolean }>({ reviewer: undefined, selectable: false });
   const [reasons, setReasons] = useState<Record<string, string>>({}); const [notes, setNotes] = useState<Record<string, string>>({});
   // Correction-only decision fields (H1, t_69891619): outcome + linked record id.
   const [outcomes, setOutcomes] = useState<Record<string, string>>({}); const [cameraIds, setCameraIds] = useState<Record<string, string>>({});
@@ -60,7 +60,7 @@ export function useModerationQueue() {
         setCameras(keepTail("pending", "camera", list(data.cameraReports))); setPublishedCameras(Array.isArray(data.publishedCameras) ? data.publishedCameras : []);
         setPublishedNextCursor(data.publishedNextCursor ?? null); setReviewCameras(keepTail("review", "camera", list(data.reviewCameras)));
         setCorrections(keepTail("corrections", "correction", list(data.correctionRequests))); setEditRequests(keepTail("edits", "camera_edit", list(data.cameraEditRequests)));
-        setRecentEvents(Array.isArray(data.recentEvents) ? data.recentEvents : []); setReviewers(Array.isArray(data.reviewers) ? data.reviewers : []);
+        setRecentEvents(Array.isArray(data.recentEvents) ? data.recentEvents : []); setReviewers(Array.isArray(data.reviewers) ? data.reviewers : []); setActing({ reviewer: data.actingReviewer ?? null, selectable: data.actorSelectable === true }); if (data.actorSelectable !== true && data.actingReviewer) setActorId(String(data.actingReviewer.id));
         setQueueItems(keepItems(list(data.queueItems))); setQueueError(""); resetBounded(data, keep);
       })
       .catch((reason: unknown) => {
@@ -161,7 +161,7 @@ export function useModerationQueue() {
   return {
     loading, message, error, queueError, summary,
     cameras, publishedCameras, reviewCameras, corrections, editRequests, recentEvents, reviewers,
-    actorId, setActorId, queuePaging: bounded.queuePaging, totals, publishedTotal: totals.published ?? publishedCameras.length,
+    actorId, setActorId, actingReviewer: acting.reviewer, actorSelectable: acting.selectable, queuePaging: bounded.queuePaging, totals, publishedTotal: totals.published ?? publishedCameras.length,
     publishedPagination: {
       previousLabel: community.previousPage, nextLabel: community.nextPage, loading: publishedLoading,
       hasPrevious: publishedHistory.length > 0, hasNext: publishedNextCursor !== null, failed: queueError !== "",

@@ -273,7 +273,7 @@ export async function requireModerationAuth(
   }
 
   // Everyone else gets a plain 404, exactly like a page that does not exist:
-  // no Basic-auth browser prompt (WWW-Authenticate) that would advertise the
+  // no Basic-auth browser prompt (no auth challenge header) that would advertise the
   // area, no "unavailable" page. Edge credentials (MODERATION_TOKEN, the
   // operator list, the legacy Basic pair) still work for scripts that SEND
   // the Authorization header up front; browsers never send it unprompted.

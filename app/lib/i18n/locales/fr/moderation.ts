@@ -148,6 +148,8 @@ export const fr: Translation<typeof en> = {
   actor: "Auteur",
   localModerator: "Modérateur local",
   selectActor: "Modérateur responsable",
+  actingAs: "Vous modérez en tant que",
+  noReviewerProfile: "Aucun profil de modérateur n’est encore associé à votre compte : les décisions ne peuvent pas être enregistrées. Demandez à l’administrateur de l’associer.",
   actorRequired: "Sélectionnez le modérateur qui enregistre cette décision.",
   actorHelp:
     "Obligatoire. Les décisions sont attribuées à un modérateur local nommé ; chaque action est inscrite dans le journal d’audit en ajout seul.",

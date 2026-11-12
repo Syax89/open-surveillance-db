@@ -62,7 +62,7 @@ const queueFixture = {
     },
   ],
   recentEvents: [],
-  reviewers: [
+  actingReviewer: { id: 2, displayName: "Fixture Reviewer", role: "moderator" }, reviewers: [
     { id: 2, displayName: "Fixture Reviewer", role: "moderator" },
   ],
   queueItems: [
@@ -72,7 +72,7 @@ const queueFixture = {
 
 const emptyQueue = {
   cameraReports: [], publishedCameras: [], reviewCameras: [], correctionRequests: [],
-  cameraEditRequests: [], recentEvents: [], reviewers: [], queueItems: [],
+  cameraEditRequests: [], recentEvents: [], actingReviewer: { id: 2, displayName: "Fixture Reviewer", role: "moderator" }, reviewers: [], queueItems: [],
 };
 
 test("moderation: renders the queue rows and accessible per-row action labels", async () => {
@@ -117,7 +117,6 @@ test("moderation: approve dispatches PATCH with entity, id, action, reason and a
   await waitFor(() => assert.ok(screen.queryByText("Fixture pending camera")));
 
   // Select the acting reviewer.
-  await user.selectOptions(screen.getByRole("combobox", { name: /^Acting reviewer/ }), "2");
   // Select a required reason for camera 7.
   await user.selectOptions(screen.getByLabelText("Required reason", { selector: "#camera-7-reason" }), "verified-public-infrastructure");
   // Now the approve button for the camera row is enabled.
@@ -162,8 +161,6 @@ test("moderation: a failed decision surfaces the server error in role=alert", as
 
   await renderWithLocale(React.createElement(ModerationDashboard));
   await waitFor(() => assert.ok(screen.queryByText("Fixture pending camera")));
-
-  await user.selectOptions(screen.getByRole("combobox", { name: /^Acting reviewer/ }), "2");
   await user.selectOptions(screen.getByLabelText("Required reason", { selector: "#camera-7-reason" }), "insufficient-evidence");
   const cameraActions = screen.getByLabelText("Decision for camera 7");
   const approve = cameraActions.querySelector('button[type="button"]');
@@ -212,8 +209,6 @@ test("moderation: hide action available on a pending camera row", async () => {
 
   await renderWithLocale(React.createElement(ModerationDashboard));
   await waitFor(() => assert.ok(screen.queryByText("Fixture pending camera")));
-
-  await user.selectOptions(screen.getByRole("combobox", { name: /^Acting reviewer/ }), "2");
   await user.selectOptions(screen.getByLabelText("Required reason", { selector: "#camera-7-reason" }), "private-or-sensitive-location");
   const cameraActions = screen.getByLabelText("Decision for camera 7");
   const hide = [...cameraActions.querySelectorAll("button")].find((button) => button.textContent === "Hide");
@@ -302,7 +297,6 @@ test("moderation: camera_edit rows render the old/new diff and decide through ca
   assert.equal(approve.disabled, true, "approve stays disabled until reason + reviewer");
 
   // Deciding dispatches entity camera_edit (approve applies the diff).
-  await user.selectOptions(screen.getByRole("combobox", { name: /^Acting reviewer/ }), "2");
   await user.selectOptions(screen.getByLabelText("Required reason", { selector: "#camera_edit-12-reason" }), "verified-public-infrastructure");
   assert.equal(approve.disabled, false);
   await user.click(approve);
@@ -369,7 +363,7 @@ const paginationBase = {
   correctionRequests: [],
   cameraEditRequests: [],
   recentEvents: [],
-  reviewers: [{ id: 2, displayName: "Fixture Reviewer", role: "moderator" }],
+  actingReviewer: { id: 2, displayName: "Fixture Reviewer", role: "moderator" }, reviewers: [{ id: 2, displayName: "Fixture Reviewer", role: "moderator" }],
   queueItems: [],
 };
 
@@ -516,7 +510,6 @@ test("moderation: a superseded delayed published success cannot overwrite the cu
 
   // Start the page-2 body read, then supersede it with a decision refresh.
   await user.click(nextButton(screen));
-  await user.selectOptions(screen.getByRole("combobox", { name: /^Acting reviewer/ }), "2");
   // The pending row lives in the Pending tab (2026-11 redesign): decide there,
   // then come back to the Published tab to observe the page.
   await user.click(screen.getByRole("tab", { name: /^Pending/ }));
@@ -556,7 +549,6 @@ test("moderation: a superseded delayed published error cannot surface on the cur
   await waitFor(() => assert.ok(screen.queryByText("Published 100")));
 
   await user.click(nextButton(screen));
-  await user.selectOptions(screen.getByRole("combobox", { name: /^Acting reviewer/ }), "2");
   // The pending row lives in the Pending tab (2026-11 redesign): decide there,
   // then come back to the Published tab to observe the page.
   await user.click(screen.getByRole("tab", { name: /^Pending/ }));
@@ -582,8 +574,6 @@ test("moderation: a rejected decision is not advertised as a page retry", async 
   window.location.hash = "published"; // 2026-11 redesign: one queue tab at a time
   await renderWithLocale(React.createElement(ModerationDashboard));
   await waitFor(() => assert.ok(screen.queryByText("Published 100")));
-
-  await user.selectOptions(screen.getByRole("combobox", { name: /^Acting reviewer/ }), "2");
   // The pending row lives in the Pending tab (2026-11 redesign): decide there,
   // then come back to the Published tab to observe the page.
   await user.click(screen.getByRole("tab", { name: /^Pending/ }));
@@ -810,4 +800,20 @@ test("moderation queue tabs: one queue at a time, counts on the tabs, arrow keys
   rtl.fireEvent.keyDown(review, { key: "End" });
   assert.equal(screen.getByRole("tab", { name: /^History/ }).getAttribute("aria-selected"), "true");
   assert.equal(screen.getByRole("tabpanel").getAttribute("aria-labelledby"), "queue-tab-history");
+});
+
+test("moderation: the acting reviewer is the logged-in moderator — shown, never asked (owner 2026-11)", async () => {
+  const { screen, waitFor } = rtl;
+  installFetchMock(() => jsonResponse(queueFixture));
+  await renderWithLocale(React.createElement(ModerationDashboard));
+  await waitFor(() => assert.ok(screen.getByText("Fixture Reviewer", { selector: ".moderation-acting-as strong" })));
+  assert.ok(screen.getByText("Moderating as"));
+  assert.equal(document.querySelector("#actor-select"), null, "no reviewer picker outside the dev demo mode");
+});
+
+test("moderation: an account without a reviewer profile is told so up front", async () => {
+  const { screen, waitFor } = rtl;
+  installFetchMock(() => jsonResponse({ ...emptyQueue, actingReviewer: null }));
+  await renderWithLocale(React.createElement(ModerationDashboard));
+  await waitFor(() => assert.match(screen.getByRole("alert").textContent, /no moderator profile/));
 });
