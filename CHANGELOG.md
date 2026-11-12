@@ -395,6 +395,18 @@ changes accumulate under `[Unreleased]`.
 
 ### Changed
 
+- **One page width + mobile menu redesign (2026-11, owner request):** every
+  page now aligns with the header, hero, map and directory
+  (`--container-standard` and `--container-readable` resolve to
+  `--container-wide`, 1320px on desktop), including the record, account,
+  report/correct, FAQ, guide, sources, legal pages and the footer; prose
+  inside the wide cards keeps a ~76ch line length (`--measure`). The
+  sign-in forms (login, register, password reset, e-mail verification,
+  record edit) keep a compact 900px card. The mobile/tablet menu is now a
+  sheet: large full-width rows with chevrons and the current page
+  highlighted, "Add a camera" as the filled primary action, the auth pair as
+  two equal buttons, a dimmed backdrop; Escape and a tap outside close it.
+
 - **Design review pass 2 (2026-11):** the mobile/tablet "Menu" button sits
   next to the language toggle with a hamburger glyph that becomes a close
   mark while open; the EN/IT toggle keeps its 44px targets with a lighter

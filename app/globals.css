@@ -165,9 +165,14 @@
   --text-auth:clamp(34px,5vw,54px);
 
   /* Container widths (F2 §3.4) */
-  --container-standard:min(1180px, calc(100% - 48px));
-  --container-readable:min(900px, calc(100% - 48px));
+  /* One page width (owner 2026-11: "many pages are narrow, bring them to the
+     same width as the others"): every page aligns with the header, the hero,
+     the map and the directory. The three tokens stay so the cascade is
+     unchanged; prose keeps a readable line length via --measure. */
   --container-wide:min(1320px, calc(100% - 48px));
+  --container-standard:var(--container-wide);
+  --container-readable:var(--container-wide);
+  --measure:76ch;
 }
 * { box-sizing:border-box; }
 /* The document itself must never become a horizontal scroll surface. This
@@ -788,6 +793,8 @@ button { cursor:pointer; }
 .record-back { width:var(--container-readable); margin:24px auto 0; }
 /* "Public record" eyebrow and the status share one line. */
 .record-detail > .eyebrow, .record-detail > .eyebrow + .card-topline { display:inline-flex; align-items:center; margin-right:18px; vertical-align:middle; }
+/* Readable line length inside the now page-wide cards. */
+.record-detail :is(p, ul, ol), .faq-section :is(p, ul, ol), .faq-resources :is(p, ul, ol) { max-width:var(--measure); }
 .record-detail { width:var(--container-readable); margin:45px auto 100px; padding:50px; border:1px solid var(--line); border-radius:var(--radius-xl); background:var(--card-bg); box-shadow:0 20px 45px rgba(25,46,52,.08); }
 .record-back + .record-detail { margin-top:14px; }
 /* /contribuisci only: its first child section has its own eyebrow+h2
@@ -960,6 +967,38 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .nav-shell:has(.menu-button) .nav-links a:focus-visible {
     outline:3px solid var(--focus); outline-offset:2px; border-radius:var(--radius-md);
   }
+  /* Mobile menu redesign (2026-11, owner: "orribile"): a proper sheet.
+     Large full-width rows with separators and a chevron, the current page
+     highlighted, "Add a camera" as the filled primary action under the
+     links, the auth pair as two equal buttons, and a dimmed backdrop that
+     closes the menu on tap (PublicNav). Layout only — same anchors. */
+  .nav-shell:has(.menu-button) { z-index:30 }
+  .nav-shell:has(.menu-button) > :not(.nav-links) { position:relative; z-index:12 }
+  .nav-shell:has(.nav-links.is-open)::after { content:""; position:fixed; inset:0; z-index:9; background:rgba(9,35,58,.38); }
+  .nav-shell:has(.nav-links.is-open) .locale-toggle { background:var(--white); }
+  .nav-shell:has(.menu-button) .nav-links { top:calc(100% - 4px); padding:8px; gap:0; border-radius:var(--radius-xl); box-shadow:0 24px 48px rgba(9,35,58,.22); }
+  .nav-shell:has(.menu-button) .nav-links > a:not(.nav-action) {
+    justify-content:space-between; min-height:52px; padding:0 14px; border-radius:var(--radius-md);
+    color:var(--ink); font-size:var(--text-lg); font-weight:700; border-bottom:1px solid var(--line);
+  }
+  .nav-shell:has(.menu-button) .nav-links > a:not(.nav-action)::after { content:"\203A"; color:var(--muted); font-size:22px; font-weight:400; line-height:1; }
+  .nav-shell:has(.menu-button) .nav-links > a:not(.nav-action):hover { background:var(--surface-muted); }
+  .nav-shell:has(.menu-button) .nav-links > a[aria-current="page"] { background:var(--notice-bg); color:var(--icon-ink); box-shadow:inset 3px 0 0 var(--accent); }
+  .nav-shell:has(.menu-button) .nav-links > .nav-action {
+    order:5; margin:14px 0 0; min-height:50px; border:0; border-radius:var(--radius-lg);
+    background:var(--accent); color:var(--white); font-size:var(--text-lg); font-weight:800;
+  }
+  .nav-shell:has(.menu-button) .nav-links > .nav-action::before { content:"+"; margin-right:8px; font-size:20px; line-height:1; }
+  .nav-shell:has(.menu-button) .nav-links > .nav-action:hover { background:rgb(32 103 64); }
+  .nav-shell:has(.menu-button) .nav-links .auth-nav-links {
+    order:6; display:grid; grid-template-columns:repeat(auto-fit,minmax(0,1fr)); gap:8px;
+    margin-top:10px; padding-top:10px; border-top:0;
+  }
+  .nav-shell:has(.menu-button) .nav-links .auth-nav-links a {
+    justify-content:center; min-height:48px; padding:0 12px; border:1px solid var(--control-border);
+    border-radius:var(--radius-lg); color:var(--ink); font-size:var(--text-base); font-weight:800; background:var(--white);
+  }
+  .nav-shell:has(.menu-button) .nav-links .auth-nav-links a.nav-action { border-color:var(--heading); background:var(--heading); color:var(--white); }
 }
 @media (max-width:700px) {
   .hero, .map-section, .records-section, .principles, .guide-overview, .report-section, .correction-section, .moderation-page, footer, .tool-section, .tool-cards, .founder-declaration { width:min(100% - 32px,1180px) }
@@ -1308,9 +1347,10 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .filters-disclosure[data-open="true"] > .filter-controls-row { padding:12px; }
 }
 /* Contributor auth (STATUS gap #1, ADR 0013): login / register / account.
-   The auth cards inherit the shared 900px readable column (.record-detail
-   width) — no narrower cap is applied here. */
-.account-card { max-width:940px; }
+   The account card uses the full page width (2026-11). The sign-in forms
+   (login, register, password reset, e-mail verification) keep a compact
+   centred card: a single form stretched to 1320px reads badly. */
+.record-detail.auth-card:not(.account-card) { width:min(900px, calc(100% - 48px)); }
 .account-card > section:not(.verify-banner):not(.auth-danger-zone) { margin-top:38px; padding-top:32px; border-top:1px solid var(--line); }
 .auth-card h1 { font-size:var(--text-auth); font-weight:800; text-wrap:balance; overflow-wrap:anywhere; }
 .auth-form { display:grid; gap:18px; margin:30px 0 8px; }
@@ -1659,15 +1699,10 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
    pattern already accepted for records/map lists.
    Single identity column (issue #435 moved the trust badge above the
    grid, see .account-trust--top below) — NOT the original 1.35/.65 split.
-   WIDTH (layout polish 2026-10-23): this card is a .record-detail, whose
-   width is var(--container-readable) = min(900px, 100% - 48px) — that is the
-   BINDING width of the page (900px on desktop, shared with the auth/record
-   routes). Both local caps are inert because .record-detail already fixes the
-   width: this 1120px cap (PR #354, .account-dashboard) and the nearest one,
-   .account-card { max-width:940px } in the auth block. They are kept as
-   safety caps so the page can never open a second, wider layout. Do not
-   "fix" the mismatch by widening the account page. */
-.account-dashboard { max-width:1120px; }
+   WIDTH (owner 2026-11): this card is a .record-detail, so it takes the
+   shared page width (var(--container-readable) = var(--container-wide),
+   1320px on desktop) like every other page; no local cap. */
+.account-dashboard { max-width:none; }
 .account-profile-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:28px; align-items:start; }
 .account-identity { min-width:0; }
 .account-logout { margin-top:18px; }
