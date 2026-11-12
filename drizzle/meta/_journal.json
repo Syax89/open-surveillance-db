@@ -330,6 +330,13 @@
       "when": 1794422706976,
       "tag": "0046_cameras_status_title_nocase_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "6",
+      "when": 1794477287379,
+      "tag": "0047_cameras_title_sort_key",
+      "breakpoints": true
     }
   ]
 }

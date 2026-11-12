@@ -1,10 +1,11 @@
 // Directory / public-list performance guards (perf pass 2026-11).
 //
 // Three measured regressions, each pinned against the REAL code:
-//   1. The default alphabetical directory page (`ORDER BY title COLLATE
-//      NOCASE ASC, id DESC`) matched no index: full scan + temp B-tree on
-//      every request. Migration 0046 adds (status, title COLLATE NOCASE,
-//      id DESC) and the shared predicate collapses to `status = ?` outside
+//   1. The default alphabetical directory page (now the natural order
+//      `ORDER BY title_sort_key ASC, id DESC`) matched no index: full scan +
+//      temp B-tree on every request. Migration 0047 adds (status,
+//      title_sort_key, id DESC) (replacing 0046's NOCASE title index) and the
+//      shared predicate collapses to `status = ?` outside
 //      development; EXPLAIN QUERY PLAN of the exact SQL the db layer issues
 //      must use that index with no "USE TEMP B-TREE".
 //   2. The per-page count aggregates (confirmationCountsFor +
@@ -18,6 +19,7 @@
 // Fixtures are fictional — no personal data.
 import assert from "node:assert/strict";
 import test from "node:test";
+import { titleSortKey } from "../scripts/import/title-sort-key.mjs";
 import { applyDrizzleMigrations, cleanupDbRuntime, loadDbRuntime } from "./helpers/db-runtime-harness.mjs";
 import { D1SqliteDatabase } from "./helpers/d1-sqlite.mjs";
 import {
@@ -62,14 +64,16 @@ async function freshRuntime() {
 
 function seedCameras(db, count) {
   const insert = db.db.prepare(
-    `INSERT INTO cameras (title, kind, publish_manufacturer, publish_observed_on, notes, latitude, longitude, status, source, updated, description, review_interval_months, created_at, last_verified_at)
-     VALUES (?, 'Fixed dome', 0, 0, '', ?, ?, 'active', 'Community report', '2026-08-01T00:00:00.000Z', '', 12, '2026-08-01T00:00:00.000Z', ?)`,
+    `INSERT INTO cameras (title, title_sort_key, kind, publish_manufacturer, publish_observed_on, notes, latitude, longitude, status, source, updated, description, review_interval_months, created_at, last_verified_at)
+     VALUES (?, ?, 'Fixed dome', 0, 0, '', ?, ?, 'active', 'Community report', '2026-08-01T00:00:00.000Z', '', 12, '2026-08-01T00:00:00.000Z', ?)`,
   );
   db.db.exec("BEGIN");
   for (let i = 0; i < count; i += 1) {
     // Mixed case + duplicate titles so NOCASE ordering and the id tiebreak matter.
     const title = `${i % 2 ? "camera" : "Camera"} ${String(i % 700).padStart(4, "0")}`;
-    insert.run(title, 44 + i * 1e-4, 12 + i * 1e-4, i % 3 === 0 ? "2026-07-01T00:00:00.000Z" : null);
+    // The key every application write path stores (raw INSERTs would get
+    // the trigger's plain lower(title) fallback instead).
+    insert.run(title, titleSortKey(title), 44 + i * 1e-4, 12 + i * 1e-4, i % 3 === 0 ? "2026-07-01T00:00:00.000Z" : null);
   }
   db.db.exec("COMMIT");
 }
@@ -78,11 +82,13 @@ function planOf(db, { sql, args }) {
   return db.db.prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...args).map((row) => row.detail);
 }
 
-test("migration 0046 creates the (status, title COLLATE NOCASE, id DESC) index", async () => {
+test("migration 0047 creates the (status, title_sort_key, id DESC) index and drops the unused NOCASE one", async () => {
   const { db } = await freshRuntime();
-  const row = db.db.prepare("SELECT sql FROM sqlite_master WHERE type = 'index' AND name = 'cameras_status_title_nocase_idx'").get();
-  assert.ok(row, "cameras_status_title_nocase_idx must exist after the migrations");
-  assert.match(row.sql, /\(\s*`status`\s*,\s*title COLLATE NOCASE\s*,\s*id DESC\s*\)/i);
+  const row = db.db.prepare("SELECT sql FROM sqlite_master WHERE type = 'index' AND name = 'cameras_status_title_sort_key_idx'").get();
+  assert.ok(row, "cameras_status_title_sort_key_idx must exist after the migrations");
+  assert.match(row.sql, /\(\s*`status`\s*,\s*`title_sort_key`\s*,\s*`id`\s*DESC\s*\)/i);
+  const old = db.db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'cameras_status_title_nocase_idx'").get();
+  assert.equal(old, undefined, "0046's NOCASE title index is dropped (no query orders by it any more)");
 });
 
 test("the alphabetical directory page (first + cursor) walks the index, no temp B-tree", async () => {
@@ -90,7 +96,7 @@ test("the alphabetical directory page (first + cursor) walks the index, no temp 
   seedCameras(db, 1500);
 
   const first = await runtime.cameras.listPublicCamerasPage({ sort: "alphabetical" }, { limit: 20, offset: 0, count: false });
-  const firstSelect = statements.find((s) => /ORDER BY title COLLATE NOCASE/.test(s.sql));
+  const firstSelect = statements.find((s) => /ORDER BY title_sort_key/.test(s.sql));
   assert.ok(firstSelect, "the page SELECT must be issued");
   const last = first.records.at(-1);
   statements.length = 0;
@@ -98,18 +104,18 @@ test("the alphabetical directory page (first + cursor) walks the index, no temp 
     { sort: "alphabetical", after: { title: last.title, id: last.id } },
     { limit: 20, offset: 0, count: false },
   );
-  const cursorSelect = statements.find((s) => /ORDER BY title COLLATE NOCASE/.test(s.sql));
+  const cursorSelect = statements.find((s) => /ORDER BY title_sort_key/.test(s.sql));
 
   for (const [label, statement] of [["first page", firstSelect], ["cursor page", cursorSelect]]) {
     const plan = planOf(db, statement).join(" | ");
-    assert.match(plan, /USING (?:COVERING )?INDEX cameras_status_title_nocase_idx/, `${label} must use the title index: ${plan}`);
+    assert.match(plan, /USING (?:COVERING )?INDEX cameras_status_title_sort_key_idx/, `${label} must use the title index: ${plan}`);
     assert.doesNotMatch(plan, /TEMP B-TREE/, `${label} must not sort in a temp B-tree: ${plan}`);
   }
-  assert.match(planOf(db, cursorSelect).join(" | "), /title>\?/, "the cursor page must SEEK to the cursor title");
+  assert.match(planOf(db, cursorSelect).join(" | "), /title_sort_key>\?/, "the cursor page must SEEK to the cursor key");
 
   // Same rows as the offset page and as an independent full sort.
   const expected = db.db
-    .prepare("SELECT id FROM cameras WHERE status = 'active' ORDER BY title COLLATE NOCASE ASC, id DESC LIMIT 40")
+    .prepare("SELECT id FROM cameras WHERE status = 'active' ORDER BY title_sort_key ASC, id DESC LIMIT 40")
     .all()
     .map((row) => row.id);
   const byOffset = await runtime.cameras.listPublicCamerasPage({ sort: "alphabetical" }, { limit: 20, offset: 20, count: false });

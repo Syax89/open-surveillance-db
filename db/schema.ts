@@ -6,6 +6,13 @@ export const cameras = sqliteTable(
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     title: text("title").notNull(),
+    // Natural-order sort key (migration 0047): titleSortKey(title) from
+    // app/lib/title-sort-key.ts — ASCII case fold + zero-padded digit runs,
+    // so "Telecamera 2" sorts before "Telecamera 10" under the default BINARY
+    // collation (D1 cannot register custom collations). Written by every
+    // path that writes `title`; backfilled by 0047. Nullable only because
+    // SQLite cannot ADD a NOT NULL column without a default.
+    titleSortKey: text("title_sort_key"),
     kind: text("kind").notNull(),
     manufacturer: text("manufacturer"),
     observedOn: text("observed_on"),
@@ -68,13 +75,6 @@ export const cameras = sqliteTable(
     index("cameras_status_kind_idx").on(table.status, table.kind),
     index("cameras_status_updated_idx").on(table.status, sql`updated DESC`),
     index("cameras_status_last_verified_idx").on(table.status, sql`last_verified_at DESC`),
-    // Directory default alphabetical sort (migration 0046): the page query is
-    // `WHERE status = ? … ORDER BY title COLLATE NOCASE ASC, id DESC` (the
-    // shared predicate collapses to one status outside development), with the
-    // keyset cursor seeking on `title COLLATE NOCASE >= ?`. This index matches
-    // the ORDER BY exactly, so SQLite walks it in order instead of a full scan
-    // plus a temp B-tree sort on every request.
-    index("cameras_status_title_nocase_idx").on(table.status, sql`title COLLATE NOCASE`, sql`id DESC`),
     // Community trust levels (ADR 0018 §3, migration 0023): the level COUNT
     // is `WHERE contributor_id = ? AND status = 'verified'`, so
     // (contributor_id, status) turns it into an index-only seek. Declared
@@ -98,6 +98,12 @@ export const cameras = sqliteTable(
       .on(table.source, table.externalId)
       .where(sql`external_id IS NOT NULL`),
     index("cameras_import_batch_idx").on(table.importBatchId),
+    // Directory "alphabetical" order + keyset cursor (migration 0047, which
+    // replaces 0046's (status, title COLLATE NOCASE, id DESC) index): the page
+    // query is `WHERE status = ? … ORDER BY title_sort_key ASC, id DESC`, so
+    // SQLite walks this index in order (no temp B-tree), the keyset cursor
+    // seeks on `title_sort_key >= ?` and the A–Z jump is a range on it.
+    index("cameras_status_title_sort_key_idx").on(table.status, table.titleSortKey, sql`id DESC`),
   ],
 );
 

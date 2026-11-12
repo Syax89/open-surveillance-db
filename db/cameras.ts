@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { classifyDuplicateMatch, textSimilarity, type MatchStrength } from "../app/lib/duplicate-detection";
 import { PUBLIC_CAMERA_STATUSES } from "../app/lib/public-status";
+import { titleSortKey } from "../app/lib/title-sort-key";
 import { confirmationCountsFor } from "./confirmations";
 import { communityActionCountsFor, type CommunityActionCounts } from "./community-actions";
 import { getImportBatchById, type ImportBatchPublic } from "./import-sources";
@@ -96,7 +97,7 @@ export type PublicCameraFilters = {
   state?: "confirmed" | "never";
   origin?: "reports" | "imported";
   sort?: "alphabetical" | "useful" | "recent" | "confirmations";
-  /** Cursor-based pagination for alphabetical sort: (title, id) of last record. */
+  /** Cursor-based pagination for alphabetical sort: (title, id) of last record; the db derives title_sort_key from the title. */
   after?: { title: string; id: number };
 };
 export const PUBLIC_CAMERA_SORT_OPTIONS = ["alphabetical", "useful", "recent", "confirmations"] as const;
@@ -145,7 +146,7 @@ export function publicCameraPredicate(nowIso: string): { sql: string; parameters
   // dropped from the BOUND whitelist, so the IN list holds one status and
   // SQLite rewrites `status IN (?)` to `status = ?`. An equality on the
   // leading column lets the (status, <sort key>) composite indexes serve the
-  // ORDER BY directly (e.g. cameras_status_title_nocase_idx for the
+  // ORDER BY directly (e.g. cameras_status_title_sort_key_idx for the
   // alphabetical directory); a two-value IN forced a temp B-tree sort. The
   // `status != 'demo'` clause stays as the fail-closed belt-and-braces gate.
   const statuses = PUBLIC_CAMERA_STATUSES.filter((status) => status !== "demo" || demoRecordsPublic());
@@ -300,22 +301,36 @@ export async function listPublicCamerasPage(
     parameters.push(needle, needle, needle, needle);
   }
   if (filters?.initial) {
-    query += " AND title COLLATE NOCASE LIKE ?";
-    parameters.push(`${filters.initial}%`);
+    // A–Z seek: a range on title_sort_key (cameras_status_title_sort_key_idx).
+    // The key starts with the ASCII-folded first character of the title, so
+    // ['x', 'y') is exactly "title starts with X or x" (the old
+    // `title COLLATE NOCASE LIKE 'X%'`), but index-backed. The route only
+    // lets a single A-Z letter through; anything else is ignored here.
+    const letter = filters.initial.toLowerCase();
+    if (/^[a-z]$/.test(letter)) {
+      query += " AND title_sort_key >= ? AND title_sort_key < ?";
+      parameters.push(letter, String.fromCharCode(letter.charCodeAt(0) + 1));
+    }
   }
   if (filters?.state === "confirmed") query += " AND last_verified_at IS NOT NULL";
   if (filters?.state === "never") query += " AND last_verified_at IS NULL";
   if (filters?.origin === "reports") query += " AND source = 'Community report'";
   if (filters?.origin === "imported") query += " AND source LIKE 'import:%'";
   
-  // Cursor-based pagination for alphabetical sort (keyset pagination).
-  // Written as `t >= ? AND (t > ? OR id < ?)` — the same row set as
-  // `t > ? OR (t = ? AND id < ?)` — so the leading range term lets SQLite
-  // SEEK cameras_status_title_nocase_idx to the cursor instead of walking the
-  // index from the first title (an OR at the top level is not seekable).
+  // Cursor-based pagination for alphabetical sort (keyset pagination) on
+  // (title_sort_key ASC, id DESC) — the same tuple as the ORDER BY below, so
+  // ties on the key are broken by id and no row is skipped or repeated
+  // across a page boundary. The wire cursor stays (after_title, after_id):
+  // the key is a pure function of the title, so the server derives it here
+  // and cursors issued before migration 0047 remain valid.
+  // Written as `k >= ? AND (k > ? OR id < ?)` — the same row set as
+  // `k > ? OR (k = ? AND id < ?)` — so the leading range term lets SQLite
+  // SEEK cameras_status_title_sort_key_idx to the cursor instead of walking
+  // the index from the first key (an OR at the top level is not seekable).
   if (filters?.after && filters.sort === "alphabetical") {
-    query += " AND title COLLATE NOCASE >= ? AND (title COLLATE NOCASE > ? OR id < ?)";
-    parameters.push(filters.after.title, filters.after.title, String(filters.after.id));
+    const afterKey = titleSortKey(filters.after.title);
+    query += " AND title_sort_key >= ? AND (title_sort_key > ? OR id < ?)";
+    parameters.push(afterKey, afterKey, String(filters.after.id));
   }
   
   let total: number | null = null;
@@ -349,7 +364,8 @@ export async function listPublicCamerasPage(
     // NULLS LAST: records never confirmed sort to the bottom (SQLite: IS NULL first).
     orderBy = "ORDER BY last_verified_at IS NULL, last_verified_at DESC, id DESC";
   } else if (filters?.sort === "alphabetical") {
-    orderBy = "ORDER BY title COLLATE NOCASE ASC, id DESC";
+    // Natural order (migration 0047): "Telecamera 2" before "Telecamera 10".
+    orderBy = "ORDER BY title_sort_key ASC, id DESC";
   }
 
   // Probe fetch: limit+1 rows when counting is disabled (see `withCount`).
@@ -462,7 +478,7 @@ export async function searchPublicCamerasNear(latitude: number, longitude: numbe
     .filter((record) => record.distanceMeters <= radiusMeters)
     .sort((first, second) => first.distanceMeters - second.distanceMeters);
 }
-export async function createPendingCamera(input: { title: string; kind: string; manufacturer: string | null; observedOn: string | null; address: string; notes: string; latitude: number; longitude: number; direction?: number | null; contributorId?: number | null }): Promise<CameraRecord> { const d1 = await getD1(); const now = new Date().toISOString(); const result = await d1.prepare("INSERT INTO cameras (title, kind, manufacturer, observed_on, publish_manufacturer, publish_observed_on, address, notes, latitude, longitude, direction, status, source, updated, description, contributor_id, created_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, 'pending', 'Community report', ?, '', ?, ?) RETURNING id, title, kind, manufacturer, observed_on AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, notes, latitude, longitude, direction, status, source, updated, description, contributor_id AS contributorId, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt").bind(input.title, input.kind, input.manufacturer, input.observedOn, input.address || null, input.notes, input.latitude, input.longitude, input.direction ?? null, now, input.contributorId ?? null, now).first<CameraRecord & { contributorId: number | null }>(); if (!result) throw new Error("Report could not be stored"); return result; }
+export async function createPendingCamera(input: { title: string; kind: string; manufacturer: string | null; observedOn: string | null; address: string; notes: string; latitude: number; longitude: number; direction?: number | null; contributorId?: number | null }): Promise<CameraRecord> { const d1 = await getD1(); const now = new Date().toISOString(); const result = await d1.prepare("INSERT INTO cameras (title, title_sort_key, kind, manufacturer, observed_on, publish_manufacturer, publish_observed_on, address, notes, latitude, longitude, direction, status, source, updated, description, contributor_id, created_at) VALUES (?, ?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, 'pending', 'Community report', ?, '', ?, ?) RETURNING id, title, kind, manufacturer, observed_on AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, notes, latitude, longitude, direction, status, source, updated, description, contributor_id AS contributorId, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt").bind(input.title, titleSortKey(input.title), input.kind, input.manufacturer, input.observedOn, input.address || null, input.notes, input.latitude, input.longitude, input.direction ?? null, now, input.contributorId ?? null, now).first<CameraRecord & { contributorId: number | null }>(); if (!result) throw new Error("Report could not be stored"); return result; }
 
 /**
  * Immediate-publication report insert (ADR 0021 §1, FASE 3 UI): a verified
@@ -477,7 +493,7 @@ export async function createPendingCamera(input: { title: string; kind: string; 
 export async function createCamera(input: { title: string; kind: string; manufacturer: string | null; observedOn: string | null; address: string; notes: string; latitude: number; longitude: number; direction?: number | null; contributorId?: number | null }): Promise<CameraRecord> {
   const d1 = await getD1();
   const now = new Date().toISOString();
-  const result = await d1.prepare("INSERT INTO cameras (title, kind, manufacturer, observed_on, publish_manufacturer, publish_observed_on, address, notes, latitude, longitude, direction, status, source, updated, description, contributor_id, created_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, 'active', 'Community report', ?, '', ?, ?) RETURNING id, title, kind, manufacturer, observed_on AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, notes, latitude, longitude, direction, status, source, updated, description, contributor_id AS contributorId, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt").bind(input.title, input.kind, input.manufacturer, input.observedOn, input.address || null, input.notes, input.latitude, input.longitude, input.direction ?? null, now, input.contributorId ?? null, now).first<CameraRecord & { contributorId: number | null }>();
+  const result = await d1.prepare("INSERT INTO cameras (title, title_sort_key, kind, manufacturer, observed_on, publish_manufacturer, publish_observed_on, address, notes, latitude, longitude, direction, status, source, updated, description, contributor_id, created_at) VALUES (?, ?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, 'active', 'Community report', ?, '', ?, ?) RETURNING id, title, kind, manufacturer, observed_on AS observedOn, publish_manufacturer AS publishManufacturer, publish_observed_on AS publishObservedOn, address, notes, latitude, longitude, direction, status, source, updated, description, contributor_id AS contributorId, last_verified_at AS lastVerifiedAt, review_due_at AS reviewDueAt, review_interval_months AS reviewIntervalMonths, created_at AS createdAt").bind(input.title, titleSortKey(input.title), input.kind, input.manufacturer, input.observedOn, input.address || null, input.notes, input.latitude, input.longitude, input.direction ?? null, now, input.contributorId ?? null, now).first<CameraRecord & { contributorId: number | null }>();
   if (!result) throw new Error("Report could not be stored");
   // Opening public lifecycle event: `published` (ADR §7.2). Unattributed —
   // the public history never carries the contributor id. Fail-open logging:

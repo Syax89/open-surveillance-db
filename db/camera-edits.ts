@@ -1,4 +1,5 @@
 import { DOME_KIND, getD1 } from "./cameras";
+import { titleSortKey } from "../app/lib/title-sort-key";
 import { recordModerationEvent } from "./moderation";
 
 /**
@@ -482,6 +483,11 @@ export async function applyCameraEdit(input: {
     for (const field of Object.keys(diff) as EditableEditField[]) {
       sets.push(`${sqlColumn(field)} = ?`);
       binds.push(storageValue(field, diff[field]));
+      // The natural-order key (migration 0047) follows every title write.
+      if (field === "title" && typeof diff.title === "string") {
+        sets.push("title_sort_key = ?");
+        binds.push(titleSortKey(diff.title));
+      }
     }
     sets.push("updated = ?");
     binds.push(input.now);

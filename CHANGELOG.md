@@ -622,6 +622,21 @@ changes accumulate under `[Unreleased]`.
 
 ### Fixed
 
+- **Directory — natural "alphabetical" order (2026-11-11):** titles now sort
+  numeric-aware ("Telecamera 1, 2, 10, 100" instead of "1, 10, 100, 2") in
+  the directory and in `GET /api/cameras?sort=alphabetical`. D1 cannot
+  register custom collations, so migration `0047_cameras_title_sort_key`
+  adds a precomputed `cameras.title_sort_key` (ASCII case fold + digit runs
+  zero-padded to 10, `app/lib/title-sort-key.ts`), backfills existing rows
+  with the same function as a recursive CTE, and indexes
+  `(status, title_sort_key, id DESC)` (dropping 0046's now-unused NOCASE
+  title index). Every title write (submissions, owner edits,
+  approved edit requests, import runner) stores the key. The keyset cursor
+  now runs on `(title_sort_key, id)`; the wire format stays
+  `after_title`/`after_id` (the key is derived server-side), so existing
+  cursors remain valid. The A–Z seek is an index range on the key. Test:
+  `tests/title-sort-key.test.mjs`.
+
 - **Moderation: a decision no longer collapses the queues loaded with "Load
   more".** The post-decision reload used to reset every queue to its first
   page, so a moderator working on page 2+ lost their place after each
