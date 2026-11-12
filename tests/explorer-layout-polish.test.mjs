@@ -121,13 +121,13 @@ test("alphabetical controls retain native button and muted-letter semantics", as
 
 test("directory and map share the desktop workspace width without changing mobile map layout", () => {
   const mapWidth = compact(declaration(ruleBlock(css, ".map-layout"), "width"));
-  assert.equal(mapWidth, "min(1440px,calc(100%-32px))", "map workspace contract is explicit");
+  assert.equal(mapWidth, "var(--container-wide)", "map workspace aligns with the header and hero container");
 
   const desktop = mediaBlocks(css, "min-width", "769px");
   assert.ok(desktop.some((block) => {
     const directory = ruleBlocks(block, ".tool-section.directory-tool")[0];
     return directory && compact(declaration(directory, "width")) === mapWidth;
-  }), "directory adopts the map workspace width only in the desktop layout");
+  }), "directory adopts the header/hero container width only in the desktop layout (design review 2026-11)");
 
   const mobile = mediaBlocks(css, "max-width", "768px");
   assert.ok(mobile.some((block) => {
