@@ -217,3 +217,51 @@ for (const route of SERVER_RENDERED_ROUTES) {
     await expectRefreshAndCookieOn(route);
   });
 }
+
+/**
+ * Security audit 2026-11: the preference cookies written client-side carry
+ * `Secure` when the page is served over https (the DOM harness runs at
+ * https://osdb.test/), keeping SameSite=Lax. The attributes are invisible
+ * when reading document.cookie back, so the setter is spied on.
+ */
+function spyCookieWrites() {
+  let proto = Object.getPrototypeOf(document);
+  let descriptor;
+  while (proto && !(descriptor = Object.getOwnPropertyDescriptor(proto, "cookie"))) {
+    proto = Object.getPrototypeOf(proto);
+  }
+  const writes = [];
+  Object.defineProperty(document, "cookie", {
+    configurable: true,
+    get: () => descriptor.get.call(document),
+    set: (value) => { writes.push(value); descriptor.set.call(document, value); },
+  });
+  return { writes, restore: () => { delete document.cookie; } };
+}
+
+test("locale and theme cookies are Secure + SameSite=Lax on https", async () => {
+  const { screen } = rtl;
+  const user = rtl.userEvent.setup();
+  assert.equal(window.location.protocol, "https:");
+  window.localStorage.setItem("opensurveillancedb-locale", "en");
+  const { ThemeToggle } = await loadDomModule("app/components/ThemeToggle.mjs");
+  const spy = spyCookieWrites();
+  try {
+    await renderWithLocale(
+      React.createElement(React.Fragment, null,
+        React.createElement(LocaleToggle),
+        React.createElement(ThemeToggle),
+      ),
+    );
+    await user.click(screen.getByText("IT"));
+    await user.click(document.querySelector("button.theme-toggle"));
+    const locale = spy.writes.find((value) => value.startsWith("opensurveillancedb-locale="));
+    assert.ok(locale, "the locale cookie is written");
+    assert.match(locale, /; samesite=lax; secure$/);
+    const theme = spy.writes.find((value) => !value.startsWith("opensurveillancedb-locale="));
+    assert.ok(theme, "the theme cookie is written");
+    assert.match(theme, /; samesite=lax; secure$/);
+  } finally {
+    spy.restore();
+  }
+});

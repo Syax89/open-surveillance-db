@@ -44,7 +44,9 @@ export function ThemeToggle() {
   const toggle = () => {
     const next: Theme = effectiveTheme() === "dark" ? "light" : "dark";
     document.documentElement.dataset.theme = next;
-    document.cookie = `${THEME_COOKIE}=${next}; path=/; max-age=31536000; samesite=lax`;
+    // Secure on https (the deployed site); plain http dev keeps working.
+    const secure = window.location.protocol === "https:" ? "; secure" : "";
+    document.cookie = `${THEME_COOKIE}=${next}; path=/; max-age=31536000; samesite=lax${secure}`;
     window.dispatchEvent(new Event(themeChangeEvent));
   };
 
