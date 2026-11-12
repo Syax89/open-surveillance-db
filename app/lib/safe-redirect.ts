@@ -22,7 +22,6 @@ export function safeRedirectTarget(value: unknown): string | null {
   if (typeof value !== "string" || value.length === 0) return null;
   if (!value.startsWith("/") || value.startsWith("//")) return null;
   if (/[\\\s]/.test(value)) return null;
-  // eslint-disable-next-line no-control-regex
   if (/[\u0000-\u001f\u007f]/.test(value)) return null;
   if (/%(?:0[9ad]|5c)/i.test(value)) return null;
   // Keep the browser inside the app: no scheme-relative or protocol values.
