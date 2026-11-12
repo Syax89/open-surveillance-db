@@ -16,10 +16,10 @@ import { publicRecords, type Camera } from "./records";
  * - Returns records for THAT page only, plus total and hasMore
  * - Each page change triggers exactly ONE request (perf pass 2026-11): the
  *   page is addressed directly with `offset=(page-1)*limit` on the same
- *   `ORDER BY title COLLATE NOCASE ASC, id DESC` the keyset cursor
+ *   `ORDER BY title_sort_key ASC, id DESC` the keyset cursor
  *   (?after_title/&after_id) walks, so the rows are identical — but
  *   /directory?page=50 no longer issues 50 serial requests. The server walks
- *   the (status, title COLLATE NOCASE, id DESC) index (migration 0046), so
+ *   the (status, title_sort_key, id DESC) index (migration 0047), so
  *   the OFFSET skip is an in-order index walk, not a sort.
  * - The full-set COUNT is requested once per filter set (`count=true` on the
  *   first request, `count=false` afterwards, reusing the known total).

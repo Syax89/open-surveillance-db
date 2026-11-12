@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { SiteHeader } from "./SiteHeader";
 import { PublicNavLinks } from "./PublicNavLinks";
 import { AuthNavLinks } from "./AuthNavLinks";
@@ -51,6 +51,21 @@ export interface PublicNavProps {
 
 export function PublicNav({ navLabel, homeLabel, brandHref = "/", brandAs = "link" }: PublicNavProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  // Open mobile menu (2026-11 redesign): Escape closes it and returns focus to
+  // the toggle; a tap outside the sheet (on the dimmed backdrop) closes it.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const toggle = () => document.querySelector<HTMLButtonElement>(".menu-button[aria-controls='main-links']");
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") { setMenuOpen(false); toggle()?.focus(); } };
+    const onPointer = (event: PointerEvent) => {
+      const target = event.target as Element | null;
+      if (target?.closest("#main-links") || target?.closest(".menu-button")) return;
+      setMenuOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPointer);
+    return () => { document.removeEventListener("keydown", onKey); document.removeEventListener("pointerdown", onPointer); };
+  }, [menuOpen]);
   return (
     <SiteHeader navLabel={navLabel} homeLabel={homeLabel} brandHref={brandHref} brandAs={brandAs} menu menuOpen={menuOpen} onMenuToggle={() => setMenuOpen((current) => !current)}>
       <div className={`nav-links ${menuOpen ? "is-open" : ""}`} id="main-links">

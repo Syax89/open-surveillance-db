@@ -32,6 +32,7 @@ import { validateStagedRow, applyRecordCap } from "./validate.mjs";
 import { pass1IntraSource, pass2CrossSource } from "./dedup.mjs";
 import { isLicenceImportable } from "./licence-gate.mjs";
 import { haversineMeters } from "./geo.mjs";
+import { titleSortKey } from "./title-sort-key.mjs";
 
 /** D1 batch statement budget — 100 statements/call → 50 rows (insert + event, one atomic batch per chunk). */
 export const D1_BATCH_CHUNK_ROWS = 50;
@@ -372,18 +373,20 @@ async function writeChunks(db, batchId, slug, inserts, report, counts, nowIso, c
     // a --force refresh reusing the batch id).
     //
     // D1 limits: ≤ 50 rows → ≤ 100 statements per batch; the INSERT binds
-    // 15 params, the event 5 — far below the 100 bound-params cap.
+    // 16 params, the event 5 — far below the 100 bound-params cap.
     const statements = [];
     for (const row of chunk) {
       statements.push(
         db
           .prepare(
-            `INSERT INTO cameras (title, kind, manufacturer, observed_on, publish_manufacturer, publish_observed_on, address, notes, latitude, longitude, direction, status, source, updated, description, last_verified_at, review_due_at, review_interval_months, external_id, import_batch_id, created_at)
-             VALUES (?, ?, ?, NULL, 0, 0, ?, ?, ?, ?, ?, 'active', ?, ?, ?, NULL, NULL, ?, ?, ?, ?)
+            `INSERT INTO cameras (title, title_sort_key, kind, manufacturer, observed_on, publish_manufacturer, publish_observed_on, address, notes, latitude, longitude, direction, status, source, updated, description, last_verified_at, review_due_at, review_interval_months, external_id, import_batch_id, created_at)
+             VALUES (?, ?, ?, ?, NULL, 0, 0, ?, ?, ?, ?, ?, 'active', ?, ?, ?, NULL, NULL, ?, ?, ?, ?)
              ON CONFLICT (source, external_id) WHERE external_id IS NOT NULL DO NOTHING`,
           )
           .bind(
             row.title,
+            // Natural-order directory key (migration 0047).
+            titleSortKey(row.title),
             row.kind,
             row.manufacturer ?? null,
             row.address ?? null,

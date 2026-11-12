@@ -188,6 +188,21 @@ async function buildDbModules() {
   ).outputText;
   await writeFile(path.join(tree, "app", "lib", "public-status.mjs"), compiledPublicStatus);
 
+  // db/cameras.ts, db/camera-edits.ts and db/moderation.ts import
+  // ../app/lib/title-sort-key (pure natural-order key, migration 0047).
+  const compiledTitleSortKey = ts.transpileModule(
+    await readFile(path.join(appLibDir, "title-sort-key.ts"), "utf8"),
+    {
+      compilerOptions: {
+        module: ts.ModuleKind.ESNext,
+        target: ts.ScriptTarget.ESNext,
+        moduleResolution: ts.ModuleResolutionKind.Bundler,
+      },
+      fileName: path.join(appLibDir, "title-sort-key.ts"),
+    },
+  ).outputText;
+  await writeFile(path.join(tree, "app", "lib", "title-sort-key.mjs"), compiledTitleSortKey);
+
   // db/confirmations.ts imports ../app/lib/trust-levels (pure deriveLevel,
   // ADR 0018 §3) for the action weight snapshot (ADR 0021 §3.4); mirror it
   // too so the rewritten import resolves in this tree as well.

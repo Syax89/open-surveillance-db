@@ -395,6 +395,26 @@ changes accumulate under `[Unreleased]`.
 
 ### Changed
 
+- **Consistency pass on content pages (2026-11):** every content section
+  heading (FAQ "Still have questions?", contacts, guide publication model,
+  rules) uses the same bold display style — some rendered at weight 400 or
+  as 16px body text — and the copy under a section heading no longer touches
+  it. On phones the 270px card min-height (a desktop row-alignment aid) and
+  the empty grid rows are dropped, so manifesto/rules/guide cards fit their
+  content.
+
+- **One page width + mobile menu redesign (2026-11, owner request):** every
+  page now aligns with the header, hero, map and directory
+  (`--container-standard` and `--container-readable` resolve to
+  `--container-wide`, 1320px on desktop), including the record, account,
+  report/correct, FAQ, guide, sources, legal pages and the footer; prose
+  inside the wide cards keeps a ~76ch line length (`--measure`). The
+  sign-in forms (login, register, password reset, e-mail verification,
+  record edit) keep a compact 900px card. The mobile/tablet menu is now a
+  sheet: large full-width rows with chevrons and the current page
+  highlighted, "Add a camera" as the filled primary action, the auth pair as
+  two equal buttons, a dimmed backdrop; Escape and a tap outside close it.
+
 - **Design review pass 2 (2026-11):** the mobile/tablet "Menu" button sits
   next to the language toggle with a hamburger glyph that becomes a close
   mark while open; the EN/IT toggle keeps its 44px targets with a lighter
@@ -621,6 +641,21 @@ changes accumulate under `[Unreleased]`.
   bucket deletion was performed, only the code that read them is gone.
 
 ### Fixed
+
+- **Directory — natural "alphabetical" order (2026-11-11):** titles now sort
+  numeric-aware ("Telecamera 1, 2, 10, 100" instead of "1, 10, 100, 2") in
+  the directory and in `GET /api/cameras?sort=alphabetical`. D1 cannot
+  register custom collations, so migration `0047_cameras_title_sort_key`
+  adds a precomputed `cameras.title_sort_key` (ASCII case fold + digit runs
+  zero-padded to 10, `app/lib/title-sort-key.ts`), backfills existing rows
+  with the same function as a recursive CTE, and indexes
+  `(status, title_sort_key, id DESC)` (dropping 0046's now-unused NOCASE
+  title index). Every title write (submissions, owner edits,
+  approved edit requests, import runner) stores the key. The keyset cursor
+  now runs on `(title_sort_key, id)`; the wire format stays
+  `after_title`/`after_id` (the key is derived server-side), so existing
+  cursors remain valid. The A–Z seek is an index range on the key. Test:
+  `tests/title-sort-key.test.mjs`.
 
 - **Moderation: a decision no longer collapses the queues loaded with "Load
   more".** The post-decision reload used to reset every queue to its first

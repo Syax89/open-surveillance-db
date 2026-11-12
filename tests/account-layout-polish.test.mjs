@@ -236,19 +236,15 @@ test("A03 — the phone profile is compacted locally, without touching the share
     "the compaction never hides dashboard content");
 });
 
-test("A04 — the account keeps its 900px readable width and the passkey cap is gone", () => {
+test("A04 — the account uses the shared page width (owner 2026-11) and the passkey cap is gone", () => {
   assert.equal(compact(declaration(ruleBlock(baseCss, ".record-detail"), "width")), "var(--container-readable)",
-    "the outer width comes from the shared readable column");
+    "the outer width comes from the shared column");
   const token = ruleBlock(baseCss, ":root");
-  assert.match(token, /--container-readable\s*:\s*min\(900px,\s*calc\(100%\s*-\s*48px\)\)/,
-    "that column is 900px on desktop — unchanged");
+  assert.match(token, /--container-wide\s*:\s*min\(1320px,\s*calc\(100%\s*-\s*48px\)\)/, "the page width is 1320px on desktop");
+  assert.match(token, /--container-readable\s*:\s*var\(--container-wide\)/, "the readable column IS the page width");
   assert.doesNotMatch(css, /passkeys-disclosure\s*\{[^}]*max-width\s*:\s*720px/, "the 720px passkey cap must be removed");
-  const dash = ruleBlock(baseCss, ".account-dashboard");
-  assert.equal(compact(declaration(dash, "max-width")), "1120px", "no new width choice is introduced");
-  assert.match(css, /inert/, "the misleading 1120px rule is documented as inert");
-  assert.match(css, /BINDING width of the page/, "the comment names var(--container-readable) as the binding width");
-  assert.match(css, /\.account-card \{ max-width:940px \}/, "…and names the nearest inert cap too");
-  assert.equal(compact(declaration(ruleBlock(baseCss, ".account-card"), "max-width")), "940px");
+  assert.equal(compact(declaration(ruleBlock(baseCss, ".account-dashboard"), "max-width")), "none", "no narrower account cap");
+  assert.doesNotMatch(baseCss, /\.account-card\s*\{[^}]*max-width/, "the old 940px account cap is gone");
 });
 
 test("A05 — one explicit heading scale reaches all four dashboard sections, danger zone stays distinct", () => {

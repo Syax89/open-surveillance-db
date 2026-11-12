@@ -2,6 +2,7 @@ import type { D1PreparedStatement } from "cloudflare:workers";
 import { getD1, type CameraRecord } from "./cameras";
 import type { CorrectionRequest } from "./corrections";
 import { computeReviewDueAt } from "./freshness";
+import { titleSortKey } from "../app/lib/title-sort-key";
 
 /**
  * Informational review-clock interval (ADR 0021 § 9.2): after the community
@@ -1456,10 +1457,10 @@ export async function moderateCameraEdit(
 
   const current = await d1
     .prepare(
-      "SELECT id, camera_id AS cameraId, contributor_id AS contributorId, status, created_at AS createdAt, updated_at AS updatedAt FROM camera_edit_requests WHERE id = ?",
+      "SELECT id, camera_id AS cameraId, contributor_id AS contributorId, status, proposed_title AS proposedTitle, created_at AS createdAt, updated_at AS updatedAt FROM camera_edit_requests WHERE id = ?",
     )
     .bind(id)
-    .first<{ id: number; cameraId: number | null; contributorId: number | null; status: string; createdAt: string; updatedAt: string }>();
+    .first<{ id: number; cameraId: number | null; contributorId: number | null; status: string; proposedTitle: string | null; createdAt: string; updatedAt: string }>();
   if (!current) return { kind: "not_found" };
 
   const queue = context
@@ -1589,6 +1590,7 @@ export async function moderateCameraEdit(
         .prepare(
           `UPDATE cameras SET
              title = COALESCE((SELECT proposed_title FROM camera_edit_requests WHERE id = ?), title),
+             title_sort_key = COALESCE(?, title_sort_key),
              kind = COALESCE((SELECT proposed_kind FROM camera_edit_requests WHERE id = ?), kind),
              address = COALESCE((SELECT proposed_address FROM camera_edit_requests WHERE id = ?), address),
              notes = COALESCE((SELECT proposed_notes FROM camera_edit_requests WHERE id = ?), notes),
@@ -1605,7 +1607,10 @@ export async function moderateCameraEdit(
              updated = ?
            WHERE id = ?`,
         )
-        .bind(id, id, id, id, id, id, id, id, id, id, id, nowIso, current.cameraId),
+        // title_sort_key (migration 0047) is derived in JS from the
+        // request's proposed title (read above; immutable once submitted) —
+        // NULL keeps the stored key, exactly like the COALESCE on title.
+        .bind(id, current.proposedTitle !== null ? titleSortKey(current.proposedTitle) : null, id, id, id, id, id, id, id, id, id, id, nowIso, current.cameraId),
     );
   }
 

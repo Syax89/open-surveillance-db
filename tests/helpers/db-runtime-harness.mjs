@@ -44,6 +44,9 @@ const DB_MODULES = [
   // db/cameras.ts and db/freshness.ts import ../app/lib/public-status (pure,
   // shared public-status whitelist); mirror it into the temp tree as well.
   { source: "app/lib/public-status.ts", output: "app/lib/public-status.mjs" },
+  // db/cameras.ts, db/camera-edits.ts and db/moderation.ts import
+  // ../app/lib/title-sort-key (pure natural-order key, migration 0047).
+  { source: "app/lib/title-sort-key.ts", output: "app/lib/title-sort-key.mjs" },
   // db/confirmations.ts imports ../app/lib/trust-levels (pure deriveLevel,
   // ADR 0018 §3) for the action weight snapshot (ADR 0021 §3.4); mirror it.
   { source: "app/lib/trust-levels.ts", output: "app/lib/trust-levels.mjs" },

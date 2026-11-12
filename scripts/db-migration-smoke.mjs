@@ -133,9 +133,6 @@ const expectedIndexes = [
   "cameras_status_kind_idx",
   "cameras_status_updated_idx",
   "cameras_status_last_verified_idx",
-  // Directory alphabetical sort (0046): (status, title COLLATE NOCASE,
-  // id DESC) serves `ORDER BY title COLLATE NOCASE, id DESC` without a sort.
-  "cameras_status_title_nocase_idx",
   // Community actions (0036, ADR 0021 §3): UNIQUE (camera, contributor) —
   // ONE active action per pair (switch, never a second row); (camera_id,
   // action_type) serves the threshold evaluation (GROUP BY + COUNT(DISTINCT
@@ -213,6 +210,10 @@ const expectedIndexes = [
   "api_keys_key_hash_unique",
   "api_keys_contributor_idx",
   "api_keys_liveness_idx",
+  // Natural "alphabetical" directory order (0047, replaces 0046's NOCASE
+  // title index): ORDER BY title_sort_key ASC, id DESC + the keyset cursor
+  // + the A–Z seek, all behind the `status = ?` equality.
+  "cameras_status_title_sort_key_idx",
 ];
 // Tables that are not application schema but legitimately appear in a local
 // D1 database. Anything outside this set is an unexpected schema change.

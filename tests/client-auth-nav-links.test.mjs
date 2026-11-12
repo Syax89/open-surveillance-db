@@ -270,3 +270,31 @@ test("auth header: a transient 429 on the session read is retried, then resolves
   await waitFor(() => assert.ok(screen.getByRole("link", { name: "Log in" })), { timeout: 4000 });
   assert.equal(calls, 2, "the 429 must be retried once, then the 401 resolves to the anonymous links");
 });
+
+test("PublicNav mobile menu (2026-11 redesign): Escape closes it and refocuses the toggle; a tap outside closes it; a tap inside does not", async () => {
+  const { screen, waitFor } = rtl;
+  const user = rtl.userEvent.setup();
+  installFetchMock(meHandler(401, { error: "Not authenticated." }));
+  await setNavState({ pathname: "/" });
+  const view = await renderWithLocale(
+    React.createElement(PublicNav, { navLabel: "Main navigation", homeLabel: "OpenSurveillanceDB home" }),
+  );
+  const links = view.container.querySelector("#main-links");
+  const toggle = view.container.querySelector(".menu-button");
+  const isOpen = () => links.classList.contains("is-open");
+
+  await user.click(toggle);
+  assert.ok(isOpen(), "the toggle opens the sheet");
+  assert.equal(toggle.getAttribute("aria-expanded"), "true");
+  await user.keyboard("{Escape}");
+  await waitFor(() => assert.equal(isOpen(), false, "Escape closes the sheet"));
+  assert.equal(document.activeElement, toggle, "focus returns to the toggle");
+
+  await user.click(toggle);
+  await waitFor(() => assert.ok(screen.getByRole("link", { name: "Log in" })));
+  await user.pointer({ keys: "[MouseLeft]", target: links });
+  assert.ok(isOpen(), "a tap inside the sheet keeps it open");
+  await user.pointer({ keys: "[MouseLeft]", target: document.body });
+  await waitFor(() => assert.equal(isOpen(), false, "a tap outside (the dimmed backdrop) closes it"));
+  assert.equal(toggle.getAttribute("aria-expanded"), "false");
+});

@@ -43,13 +43,10 @@ function mediaBlocks(css, bound) {
   return blocks;
 }
 
-test("shared readable column: --container-readable stays 900px and cards inherit it", async () => {
+test("one page width: --container-readable is the 1320px page width and cards inherit it", async () => {
   const css = await cssPromise;
-  assert.match(
-    css,
-    /--container-readable:\s*min\(900px,\s*calc\(100%\s*-\s*48px\)\)/,
-    "the readable container token must be 900px",
-  );
+  assert.match(css, /--container-readable:\s*var\(--container-wide\)/, "the readable token IS the page width (owner 2026-11)");
+  assert.match(css, /--container-standard:\s*var\(--container-wide\)/, "so is the standard one: header, pages and footer align");
   assert.match(
     css,
     /\.record-detail\s*\{[^}]*width:\s*var\(--container-readable\)/,
@@ -59,7 +56,7 @@ test("shared readable column: --container-readable stays 900px and cards inherit
   assert.doesNotMatch(
     css,
     /\.auth-card\s*\{[^}]*max-width/,
-    "the auth card must not cap its width below the shared 900px column",
+    "the auth card has no max-width cap (sign-in forms set an explicit compact width instead)",
   );
   // Brand accent is green (semantic warning/danger colours stay distinct).
   assert.match(css, /--accent:\s*rgb\(40 125 78\)/, "the brand accent token must be the green rgb(40 125 78)");
