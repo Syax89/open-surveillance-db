@@ -112,3 +112,53 @@ export function formatDistance(radiusMeters: number): string {
   const rounded = Math.round(kilometres * 10) / 10;
   return `${Number.isInteger(rounded) ? rounded : rounded.toFixed(1)} km`;
 }
+
+/**
+ * LIKE wildcard escaping (audit 2026-11): user text reaches SQL `LIKE ?`
+ * as a bound parameter (never inlined), but `%` and `_` inside it are still
+ * LIKE wildcards — "100%" would match every title containing "100", and a
+ * lone "_" matched every row. Escape them (and the escape character
+ * itself) with a backslash; every query using the pattern must declare
+ * `ESCAPE '\'` (see LIKE_ESCAPE_CLAUSE).
+ */
+export function escapeLikePattern(text: string): string {
+  return text.replace(/[\\%_]/g, (character) => `\\${character}`);
+}
+
+/** `%text%` with the wildcards inside `text` escaped (pair with LIKE_ESCAPE_CLAUSE). */
+export function likeContainsPattern(text: string): string {
+  return `%${escapeLikePattern(text)}%`;
+}
+
+/** The SQL clause that makes escapeLikePattern's backslash the escape character. */
+export const LIKE_ESCAPE_CLAUSE = "ESCAPE '\\'";
+
+/**
+ * Search-as-you-type suggestions (GET /api/cameras/suggest, 2026-11): our
+ * own public records only — never a third party. The client waits for a
+ * pause (SUGGEST_DEBOUNCE_MS) and at least SUGGEST_MIN_QUERY_LENGTH
+ * characters; the server enforces the same minimum and the shared
+ * maxQueryLength bound, and caps the list at SUGGEST_MAX_LIMIT.
+ */
+export const SUGGEST_MIN_QUERY_LENGTH = 2;
+export const SUGGEST_DEFAULT_LIMIT = 5;
+export const SUGGEST_MAX_LIMIT = 10;
+export const SUGGEST_DEBOUNCE_MS = 300;
+/** Longest address excerpt a suggestion carries (a short locality line). */
+export const SUGGEST_ADDRESS_MAX_LENGTH = 80;
+
+/** One record suggestion: public fields only (no coordinates, no notes). */
+export type RecordSuggestion = {
+  id: number;
+  title: string;
+  kind: string;
+  address: string | null;
+};
+
+/**
+ * Normalise suggestion text: trim and collapse inner whitespace, so
+ * "  via   roma " and "via roma" share one cache entry (client and server).
+ */
+export function normalizeSuggestQuery(text: string): string {
+  return text.trim().replace(/\s+/g, " ");
+}

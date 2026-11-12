@@ -65,6 +65,7 @@ export const API_ROUTE_PATTERNS = [
   "/api/cameras/nearby",
   "/api/cameras/revisions",
   "/api/cameras/search",
+  "/api/cameras/suggest",
   "/api/corrections",
   "/api/geocode",
   "/api/geocode/reverse",

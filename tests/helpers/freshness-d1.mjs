@@ -203,6 +203,21 @@ async function buildDbModules() {
   ).outputText;
   await writeFile(path.join(tree, "app", "lib", "title-sort-key.mjs"), compiledTitleSortKey);
 
+  // db/cameras.ts imports ../app/lib/search (pure LIKE escaping and the
+  // suggestion bounds, 2026-11); mirror it too.
+  const compiledSearch = ts.transpileModule(
+    await readFile(path.join(appLibDir, "search.ts"), "utf8"),
+    {
+      compilerOptions: {
+        module: ts.ModuleKind.ESNext,
+        target: ts.ScriptTarget.ESNext,
+        moduleResolution: ts.ModuleResolutionKind.Bundler,
+      },
+      fileName: path.join(appLibDir, "search.ts"),
+    },
+  ).outputText;
+  await writeFile(path.join(tree, "app", "lib", "search.mjs"), compiledSearch);
+
   // db/confirmations.ts imports ../app/lib/trust-levels (pure deriveLevel,
   // ADR 0018 §3) for the action weight snapshot (ADR 0021 §3.4); mirror it
   // too so the rewritten import resolves in this tree as well.

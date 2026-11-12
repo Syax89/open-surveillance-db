@@ -37,6 +37,7 @@ export const {
   getPublicCameraKinds,
   listPublicCamerasInBbox,
   listPublicCamerasInBboxPage,
+  suggestPublicCameras,
   getD1,
 } = makeMock({
   listPublicCameras: "listPublicCameras",
@@ -53,5 +54,6 @@ export const {
   getPublicCameraKinds: "getPublicCameraKinds",
   listPublicCamerasInBbox: "listPublicCamerasInBbox",
   listPublicCamerasInBboxPage: "listPublicCamerasInBboxPage",
+  suggestPublicCameras: "suggestPublicCameras",
   getD1: "getD1",
 });
