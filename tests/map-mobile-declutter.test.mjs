@@ -262,20 +262,19 @@ test("the coordinate picker keeps its own balloon (none of the hidden blocks)", 
 // 3) Search label — short in both languages, both functions kept
 // ---------------------------------------------------------------------------
 
-test("the map search label is short in EN and IT and nothing else changed", async () => {
+test("the map search label is short in EN and IT and states the privacy promise", async () => {
   const { en, it } = mapBundle;
-  assert.equal(en.listSearchLabel, "Filter points or find a place");
-  assert.equal(it.listSearchLabel, "Filtra punti o cerca un luogo");
+  assert.equal(en.listSearchLabel, "Find a place");
+  assert.equal(it.listSearchLabel, "Cerca un luogo");
   assert.ok(en.listSearchLabel.length < 40 && it.listSearchLabel.length < 40, "the label fits one line on a phone");
 
-  // Both functions are still named, and the caveat that picking a place
-  // clears the typed filter is still carried by the help + visible caption.
-  assert.match(en.listSearchHelp, /filters those points/);
-  assert.match(en.listSearchHelp, /suggests matching places/);
-  assert.match(en.listSearchCaption, /clears the filter/);
-  assert.match(it.listSearchHelp, /filtra quei punti/);
-  assert.match(it.listSearchHelp, /suggerisce luoghi/);
-  assert.match(it.listSearchCaption, /azzera il filtro/);
+  // One purpose (privacy pass 2026-11): places, addresses, coordinates and
+  // #record numbers on Enter; nothing is sent while typing.
+  assert.match(en.listSearchHelp, /coordinates/);
+  assert.match(en.listSearchHelp, /#6302/);
+  assert.match(en.listSearchCaption, /Nothing is sent while you type/);
+  assert.match(it.listSearchHelp, /coordinate/);
+  assert.match(it.listSearchCaption, /non viene inviato nulla/);
 
   // The shortened key is map-only: exactly one consumer, no other widget.
   const geocode = await readSource("app/components/home/GeocodeSearch.tsx");

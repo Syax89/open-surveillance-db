@@ -422,6 +422,11 @@
   .map-card > .filters-panel .filters-disclosure:not([data-open="true"]) > .filters-disclosure-toggle {
     width:auto; gap:8px; padding:0 14px; border:1px solid var(--map-input-border); border-radius:var(--radius-md); background:var(--white); color:var(--ink);
   }
+  /* The phone keyboard shows a Search key (enterkeyhint): the button shrinks
+     to a 44px arrow so the field keeps its width; its text stays the
+     accessible name. */
+  .map-list-search > .place-search-button { width:44px; padding:0; font-size:0; justify-content:center; }
+  .map-list-search > .place-search-button::after { content:"\2192"; font-size:18px; line-height:1; }
   .map-explorer-search .map-list-search label { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
   .map-explorer-search .map-list-search:not(:focus-within) .map-list-search-hint { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
 }

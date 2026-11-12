@@ -116,8 +116,9 @@ test("fetches the canonical upstream with an identifying User-Agent, forwarded R
   // with no {s} subdomains.
   assert.equal(captured.url, "https://tile.openstreetmap.org/13/4250/2900.png");
   assert.match(captured.init.headers.get("User-Agent"), /OpenSurveillanceDB\/0\.1/);
-  // Policy §3.4: proxied requests must keep the Referer accurate end-to-end.
-  assert.equal(captured.init.headers.get("Referer"), "https://osdb.test/records");
+  // Policy §3.4: never stripped or blanked — but only the site ORIGIN goes
+  // upstream (privacy 2026-11): the page path/query stay with us.
+  assert.equal(captured.init.headers.get("Referer"), "https://osdb.test/");
 });
 
 test("omits the Referer header upstream when the client request has none", async () => {
@@ -392,7 +393,7 @@ test("CR/LF header injection via Referer is rejected (WHATWG guard) and fails cl
   }
 });
 
-test("passes through a benign Referer verbatim (no mangling, no CR/LF injection upstream)", async () => {
+test("reduces a benign Referer to its origin (no page path/query, no CR/LF injection upstream)", async () => {
   let capturedReferer;
   stubFetch(async (url, init) => {
     capturedReferer = init.headers.get("Referer");
@@ -401,7 +402,7 @@ test("passes through a benign Referer verbatim (no mangling, no CR/LF injection 
   const weirdReferer = "https://osdb.test/records?from=tile%2F13%0d%0a";
   const response = await getTile({ z: "13", x: "4250", y: "2900" }, { headers: { Referer: weirdReferer } });
   assert.equal(response.status, 200);
-  assert.equal(capturedReferer, weirdReferer, "the Referer must be forwarded byte-for-byte");
+  assert.equal(capturedReferer, "https://osdb.test/", "only the origin is forwarded — never the page path or query");
 });
 
 test("passes through a non-image upstream Content-Type unchanged (documented current behavior)", async () => {

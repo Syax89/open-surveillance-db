@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import { originOnlyReferer } from "../../../../../lib/upstream-referer";
 import { limitsFor } from "../../../../../lib/rate-limit";
 import { rateLimitResponse } from "../../../../../lib/rate-limit-response";
 
@@ -10,7 +11,8 @@ import { rateLimitResponse } from "../../../../../lib/rate-limit-response";
  * route fetches the upstream tile with:
  *
  *   - a stable, contactable User-Agent naming the app (policy §3.1/§3.4/§5);
- *   - the end user's Referer forwarded verbatim, never stripped or blanked
+ *   - the end user's Referer reduced to its origin (never stripped or
+ *     blanked, but no page path or query — app/lib/upstream-referer.ts)
  *     (policy §3.4 — "If you proxy tile requests through your servers or a
  *     CDN, do not strip or blank the Referer");
  *   - server-side caching honouring upstream cache headers, or a 7-day
@@ -203,7 +205,9 @@ export async function GET(request: Request, context: { params: Promise<TileParam
       "User-Agent": TILE_USER_AGENT,
       Accept: TILE_ACCEPT,
     });
-    const referer = request.headers.get("Referer");
+    // Origin only (app/lib/upstream-referer.ts): a valid, never-blank
+    // Referer that does not reveal the page, the place or the person.
+    const referer = originOnlyReferer(request.headers.get("Referer"));
     if (referer) headers.set("Referer", referer);
     // Abort a slow or hung upstream after TILE_UPSTREAM_TIMEOUT_MS (default
     // 5s) so the worker never pins a request until the platform timeout;

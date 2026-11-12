@@ -4,10 +4,16 @@
 // the /segnala AddressSearch (issue #432) and shared with the home hero
 // directory search. It owns ONLY the proven input/dropdown mechanics:
 //
-//   - controlled text with a 250 ms debounce and in-flight cancellation
-//     (AbortController) — no fetch before the debounce fires;
+//   - privacy (2026-11): NOTHING is sent while typing. A search runs only on
+//     Enter or the search button. Coordinates ("41.9, 12.48") are resolved
+//     locally first (app/lib/local-place-query.ts) and never leave the
+//     browser; only a real place query reaches /api/geocode (our proxy →
+//     Nominatim, OSM Foundation), which also matches Nominatim's usage
+//     policy (no as-you-type autocomplete on the public instance);
 //   - same-origin /api/geocode requests (limit=5, current locale) with a
-//     429 Retry-After cooldown;
+//     429 Retry-After cooldown and in-flight cancellation;
+//   - results inside the optional `view` box are listed first (ranked in the
+//     browser: the map position is never sent);
 //   - ARIA combobox + listbox with arrow-key navigation, Enter selects the
 //     highlighted option (or the first), Escape closes, click/touch outside
 //     closes, honest no-results / rate-limited / error states announced via
@@ -25,8 +31,8 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useLocale } from "../LocaleProvider";
 import type { GeocodeSuggestion } from "./GeocodeSearch";
+import { parseLocalPlaceQuery, rankByViewport } from "../../lib/local-place-query";
 
-const GEOCODE_DEBOUNCE_MS = 250;
 const GEOCODE_LIMIT = 5;
 
 export type PlaceAutocompleteCopy = {
@@ -39,6 +45,8 @@ export type PlaceAutocompleteCopy = {
   rateLimited: (seconds: number) => string;
   unavailable: string;
   attribution: string;
+  /** Visible label of the search button (omit to render no button). */
+  searchButton?: string;
 };
 
 type Props = {
@@ -59,6 +67,14 @@ type Props = {
       (default true). Pass false to leave plain Enter alone so it submits
       the enclosing form (the hero's GET directory search). */
   selectFirstOnEnter?: boolean;
+  /** Current map view: results inside it are listed first (browser-only). */
+  view?: { south: number; north: number; west: number; east: number } | null;
+  /** "#123" opens that record (the map); without it "#123" is not a place. */
+  onRecordSelect?: (id: number) => void;
+  /** Rendered right after the input (e.g. the map's visible caption). */
+  afterInput?: ReactNode;
+  /** Extra ids for the input's aria-describedby. */
+  describedBy?: string;
 };
 
 function retryAfterSeconds(response: Response): number {
@@ -66,7 +82,7 @@ function retryAfterSeconds(response: Response): number {
   return Number.isFinite(parsed) && parsed >= 1 ? Math.min(parsed, 120) : 1;
 }
 
-export function PlaceAutocomplete({ inputId, copy, name, onPlaceSelect, className, label, selectFirstOnEnter = true }: Props) {
+export function PlaceAutocomplete({ inputId, copy, name, onPlaceSelect, className, label, selectFirstOnEnter = true, view = null, onRecordSelect, afterInput, describedBy }: Props) {
   const { locale } = useLocale();
 
   const [draft, setDraft] = useState("");
@@ -77,9 +93,10 @@ export function PlaceAutocomplete({ inputId, copy, name, onPlaceSelect, classNam
   const [activeIndex, setActiveIndex] = useState(-1);
   const [lastQuery, setLastQuery] = useState("");
   const wrapRef = useRef<HTMLDivElement | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
   const cooldownUntilRef = useRef(0);
+  const viewRef = useRef(view);
+  useEffect(() => { viewRef.current = view; }, [view]);
   const listboxId = `${inputId}-listbox`;
 
   const closeDropdown = useCallback(() => {
@@ -101,13 +118,8 @@ export function PlaceAutocomplete({ inputId, copy, name, onPlaceSelect, classNam
     };
   }, [open, closeDropdown]);
 
-  // Unmount: cancel the debounce and any in-flight request.
-  useEffect(() => {
-    return () => {
-      if (timerRef.current !== null) clearTimeout(timerRef.current);
-      controllerRef.current?.abort();
-    };
-  }, []);
+  // Unmount: cancel any in-flight request.
+  useEffect(() => () => controllerRef.current?.abort(), []);
 
   const runGeocode = useCallback((query: string) => {
     controllerRef.current?.abort();
@@ -148,7 +160,7 @@ export function PlaceAutocomplete({ inputId, copy, name, onPlaceSelect, classNam
         if (!response.ok) throw new Error(`geocode HTTP ${response.status}`);
         const data = (await response.json()) as { results?: GeocodeSuggestion[] };
         if (controller.signal.aborted) return;
-        const next = data.results ?? [];
+        const next = rankByViewport(data.results ?? [], viewRef.current);
         setResults(next);
         setRetryAfter(null);
         setStatus(next.length > 0 ? "results" : "empty");
@@ -168,34 +180,21 @@ export function PlaceAutocomplete({ inputId, copy, name, onPlaceSelect, classNam
       });
   }, [locale]);
 
+  // Typing only edits the draft: stale results close, nothing is fetched.
   const handleChange = useCallback((value: string) => {
     setDraft(value);
-    if (timerRef.current !== null) clearTimeout(timerRef.current);
     controllerRef.current?.abort();
-    if (value.trim() === "") {
-      setResults([]);
-      setRetryAfter(null);
-      setStatus("idle");
-      setOpen(false);
-      setActiveIndex(-1);
-      return;
-    }
-    timerRef.current = setTimeout(() => {
-      timerRef.current = null;
-      setLastQuery(value.trim());
-      runGeocode(value);
-    }, GEOCODE_DEBOUNCE_MS);
-  }, [runGeocode]);
+    setResults([]);
+    setRetryAfter(null);
+    setStatus("idle");
+    setOpen(false);
+    setActiveIndex(-1);
+  }, []);
 
   const selectSuggestion = useCallback((result: GeocodeSuggestion) => {
-    // A pointer choice wins over any queued/in-flight query: cancel the
-    // pending debounce and abort the active request, then reset the stale
+    // A choice wins over any in-flight query: abort it and reset the stale
     // result/status/retry state so a late reply cannot reopen the dropdown
     // or clobber the selection.
-    if (timerRef.current !== null) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
     controllerRef.current?.abort();
     controllerRef.current = null;
     setResults([]);
@@ -209,9 +208,43 @@ export function PlaceAutocomplete({ inputId, copy, name, onPlaceSelect, classNam
     closeDropdown();
   }, [onPlaceSelect, closeDropdown]);
 
+  /** Explicit search (Enter / button): local coordinates first, then the geocoder. */
+  const submitSearch = useCallback(() => {
+    const query = draft.trim();
+    if (!query) return;
+    const local = parseLocalPlaceQuery(query);
+    if (local?.kind === "coordinates") {
+      const lat = local.latitude.toFixed(5);
+      const lng = local.longitude.toFixed(5);
+      selectSuggestion({ display_name: `${lat}, ${lng}`, lat: local.latitude, lng: local.longitude, type: "coordinates", boundingbox: [lat, lat, lng, lng] });
+      return;
+    }
+    if (local?.kind === "record") {
+      if (onRecordSelect) {
+        closeDropdown();
+        onRecordSelect(local.id);
+        return;
+      }
+      // "#123" is never a place: answer locally instead of asking the geocoder.
+      setLastQuery(query);
+      setResults([]);
+      setStatus("empty");
+      setOpen(true);
+      return;
+    }
+    setLastQuery(query);
+    runGeocode(query);
+  }, [draft, runGeocode, selectSuggestion, onRecordSelect, closeDropdown]);
+
   const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!open) {
+    if (!open || status !== "results") {
       if (event.key === "Escape") closeDropdown();
+      // Enter with no list open runs the search, unless the consumer wants
+      // plain Enter to submit its enclosing form.
+      if (event.key === "Enter" && selectFirstOnEnter) {
+        event.preventDefault();
+        submitSearch();
+      }
       return;
     }
     if (event.key === "ArrowDown") {
@@ -234,7 +267,7 @@ export function PlaceAutocomplete({ inputId, copy, name, onPlaceSelect, classNam
       event.preventDefault();
       closeDropdown();
     }
-  }, [open, results, activeIndex, selectFirstOnEnter, selectSuggestion, closeDropdown]);
+  }, [open, status, results, activeIndex, selectFirstOnEnter, selectSuggestion, closeDropdown, submitSearch]);
 
   const showOptions = open && status === "results";
   const showStatus = open && (status === "empty" || status === "error" || status === "rate-limited");
@@ -259,8 +292,13 @@ export function PlaceAutocomplete({ inputId, copy, name, onPlaceSelect, classNam
         }}
         placeholder={copy.placeholder}
         autoComplete="off"
-        aria-describedby={`${inputId}-help`}
+        enterKeyHint="search"
+        aria-describedby={describedBy ? `${inputId}-help ${describedBy}` : `${inputId}-help`}
       />
+      {copy.searchButton ? (
+        <button type="button" className="button detail-outline place-search-button" onClick={submitSearch}>{copy.searchButton}</button>
+      ) : null}
+      {afterInput}
       <p id={`${inputId}-help`} className="sr-only">{copy.help}</p>
       {open && (
         <div className="geocode-dropdown">

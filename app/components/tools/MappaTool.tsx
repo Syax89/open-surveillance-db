@@ -14,6 +14,7 @@ import {
   exploreMapHref,
   serverFiltersFrom,
   useCameraFilters,
+  mapHrefWithFocus,
 } from "../../lib/use-camera-filters";
 import { MapPanel } from "../home/MapPanel";
 import { GeocodeSearch, type GeocodeSuggestion } from "../home/GeocodeSearch";
@@ -232,6 +233,13 @@ export function MappaTool() {
   // the first visible point so the marker/list pair stays synchronized.
   // This is EXPLICIT user intent (a selection from the geocode list), so
   // the popup that follows is intended.
+  // "#123" in the place search: open that record through the existing
+  // ?focus= deep-link path (resolves it even outside the loaded area). A full
+  // navigation, not router.replace (see the vinext "digest" note above).
+  const handleRecordSelect = useCallback((id: number) => {
+    window.location.assign(mapHrefWithFocus(filters, id));
+  }, [filters]);
+
   const handlePlaceSelect = useCallback((result: GeocodeSuggestion) => {
     setPlaceFocus({ latitude: result.lat, longitude: result.lng });
     // B01: validate the Nominatim box ([south,north,west,east] strings); a
@@ -339,7 +347,7 @@ export function MappaTool() {
             </div>
           </div>
           <div className="map-explorer-search">
-            <GeocodeSearch search={qInput} onSearchChange={setQ} onPlaceSelect={handlePlaceSelect} />
+            <GeocodeSearch onPlaceSelect={handlePlaceSelect} onRecordSelect={handleRecordSelect} view={viewportBounds} />
           </div>
           <FiltersBar variant="panel" hideSearch showCommunitySort stateFilter={filters.state} setStateFilter={setState} originFilter={filters.origin} setOriginFilter={setOrigin} cameraKinds={cameraKinds} search={qInput} setSearch={setQ} kindFilter={filters.type} setKindFilter={setType} freshnessFilter={filters.freshness} setFreshnessFilter={setFreshness} sortOrder={filters.sort} setSortOrder={setSort} resultCount={visibleRecords.length} onReset={reset} />
           {/* Map-always-visible (t_b9666d09): MapPanel renders the map AND

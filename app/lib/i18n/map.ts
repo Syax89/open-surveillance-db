@@ -81,24 +81,19 @@ export const en = {
   offlineTitle: "You are offline",
   offlineBody: "Showing the last loaded records.",
   offlineAction: "Try again",
-  // Viewport-synced sidebar list (/mappa redesign, t_702c10af): the left
-  // column shows only the points inside the current map view. The search
-  // field is DUAL-FUNCTION (t_b9666d09): it filters those points by
-  // title/address/type as before AND, while typing, suggests places through
-  // the same-origin Nominatim geocoder (/api/geocode) in a dropdown below
-  // the field. Selecting a suggestion pans the map to the place; the list
-  // then follows the new viewport.
-  // Visible on a phone: short, both functions kept (help below has the rest).
-  listSearchLabel: "Filter points or find a place",
-  listSearchPlaceholder: "Search a place or filter the points in view",
+  // Map place search (privacy pass 2026-11): ONE purpose — find a place,
+  // an address, coordinates or a record number. Nothing is sent while
+  // typing; Enter (or the button) searches. Coordinates and "#123" are
+  // resolved in the browser; only real place names reach our geocoder proxy.
+  // Typing no longer filters the points (the directory search does that).
+  listSearchLabel: "Find a place",
+  listSearchPlaceholder: "Place, address, coordinates or #record",
   listSearchHelp:
-    "The list shows only the points inside the current map view. Searching filters those points by title, address or type and suggests matching places from OpenStreetMap below the field; picking a place moves the map there.",
-  // Always-visible caption under the search field (sighted users): picking a
-  // suggestion is destructive for the typed filter — a fact the sr-only
-  // listSearchHelp above never surfaces visually. Deliberately DISTINCT
-  // wording, so the two texts are not duplicates of each other.
+    "Type a place, an address, coordinates such as 41.9068, 12.4808, or a record number such as #6302, then press Enter. Results inside the current map view are listed first.",
+  listSearchButton: "Search",
+  // Visible caption under the field: the privacy promise, in plain words.
   listSearchCaption:
-    "Picking a place suggestion moves the map and clears the filter you typed.",
+    "Nothing is sent while you type. Coordinates and #record numbers never leave your browser.",
   // Geocode autocomplete dropdown (t_b9666d09): the listbox under the
   // sidebar search field. Attribution is required by the ODbL for
   // Nominatim-derived place data (see docs/OSM_INTEGRATION.md §8).
@@ -107,7 +102,7 @@ export const en = {
   geocodeAttribution: "Places © OpenStreetMap contributors",
   geocodeUnavailable: "Place search is temporarily unavailable.",
   geocodeRateLimited: (seconds: number) =>
-    `Place search has reached its short request limit. Try again in about ${seconds} seconds; filtering the points already on the map still works.`,
+    `Place search has reached its short request limit. Try again in about ${seconds} seconds; coordinates and #record numbers still work.`,
   listTitle: "Points in the current view",
   // Points disclosure row (mobile, ID 2): the WHOLE header row is ONE button
   // carrying ONE compact label — the verb plus the current in-view count. The
@@ -241,24 +236,15 @@ export const it: Translation<typeof en> = {
   offlineTitle: "Sei offline",
   offlineBody: "Mostriamo gli ultimi record caricati.",
   offlineAction: "Riprova",
-  // Elenco laterale sincronizzato col viewport (redesign /mappa, t_702c10af):
-  // la colonna sinistra mostra solo i punti dentro la vista corrente. Il
-  // campo di ricerca è DOPPIA FUNZIONE (t_b9666d09): filtra quei punti per
-  // titolo, indirizzo o tipo come prima E, mentre si digita, suggerisce
-  // luoghi tramite il geocoder Nominatim same-origin (/api/geocode) in un
-  // menu a tendina sotto il campo. Selezionando un suggerimento la mappa si
-  // sposta sul luogo; l'elenco segue poi la nuova vista.
-  // Visibile su telefono: breve, entrambe le funzioni (il resto è in listSearchHelp).
-  listSearchLabel: "Filtra punti o cerca un luogo",
-  listSearchPlaceholder: "Cerca un luogo o filtra i punti in vista",
+  // Ricerca luoghi della mappa (privacy 2026-11): UN solo scopo. Niente
+  // viene inviato mentre si scrive; si cerca con Invio o col pulsante.
+  listSearchLabel: "Cerca un luogo",
+  listSearchPlaceholder: "Luogo, indirizzo, coordinate o #scheda",
   listSearchHelp:
-    "L'elenco mostra solo i punti dentro la vista corrente della mappa. La ricerca filtra quei punti per titolo, indirizzo o tipo e suggerisce luoghi corrispondenti da OpenStreetMap sotto il campo; scegliendo un luogo la mappa si sposta lì.",
-  // Didascalia sempre visibile sotto il campo di ricerca (utenti vedenti):
-  // scegliere un suggerimento è distruttivo per il filtro digitato — un fatto
-  // che il solo listSearchHelp sr-only sopra non rende mai visibile. Testo
-  // volutamente DISTINTO, così i due testi non sono duplicati.
+    "Scrivi un luogo, un indirizzo, delle coordinate come 41.9068, 12.4808 o un numero di scheda come #6302, poi premi Invio. I risultati dentro la vista attuale della mappa compaiono per primi.",
+  listSearchButton: "Cerca",
   listSearchCaption:
-    "Scegliere un suggerimento di luogo sposta la mappa e azzera il filtro digitato.",
+    "Mentre scrivi non viene inviato nulla. Coordinate e #numeri di scheda non lasciano il tuo browser.",
   // Menu a tendina del geocoding (t_b9666d09): la listbox sotto il campo di
   // ricerca della sidebar. L'attribuzione è richiesta da ODbL per i dati dei
   // luoghi derivati da Nominatim (vedi docs/OSM_INTEGRATION.md §8).
@@ -267,7 +253,7 @@ export const it: Translation<typeof en> = {
   geocodeAttribution: "Luoghi © OpenStreetMap contributors",
   geocodeUnavailable: "La ricerca dei luoghi non è al momento disponibile.",
   geocodeRateLimited: (seconds: number) =>
-    `La ricerca dei luoghi ha raggiunto il limite temporaneo di richieste. Riprova tra circa ${seconds} secondi; puoi comunque filtrare i punti già presenti sulla mappa.`,
+    `La ricerca dei luoghi ha raggiunto il limite temporaneo di richieste. Riprova tra circa ${seconds} secondi; coordinate e #numeri di scheda funzionano comunque.`,
   listTitle: "Punti nella vista corrente",
   // Riga di apertura dei punti (mobile, ID 2): l'INTERA riga di intestazione è
   // un unico pulsante con UNA etichetta compatta (verbo + conteggio nella

@@ -47,9 +47,10 @@ export const en = {
   // row pairs a debounced place search (same-origin /api/geocode proxy)
   // with the one-tap geolocation button on its right.
   addressSearchLabel: "Search an address",
-  addressSearchPlaceholder: "Street, square or place…",
+  addressSearchPlaceholder: "Street, place or coordinates…",
   addressSearchHelp:
-    "Type to search places; the arrow keys move through the suggestions and Enter selects one.",
+    "Type a street, square or place, or paste coordinates (e.g. 41.9068, 12.4808), then press Enter or Search. Nothing is sent while you type.",
+  addressSearchButton: "Search",
   addressSearchNoResults: (query: string) => `No places found for “${query}”.`,
   addressSearchRateLimited: (seconds: number) =>
     `Too many searches. Try again in ${seconds} second${seconds === 1 ? "" : "s"}.`,
@@ -176,9 +177,10 @@ export const it: Translation<typeof en> = {
   // di /segnala affianca la ricerca luoghi (proxy same-origin /api/geocode)
   // al bottone di geolocalizzazione a destra.
   addressSearchLabel: "Cerca un indirizzo",
-  addressSearchPlaceholder: "Via, piazza o luogo…",
+  addressSearchPlaceholder: "Via, luogo o coordinate…",
   addressSearchHelp:
-    "Digita per cercare luoghi; le frecce scorrono i suggerimenti e Invio seleziona.",
+    "Scrivi una via, una piazza o un luogo, oppure incolla delle coordinate (es. 41.9068, 12.4808), poi premi Invio o Cerca. Mentre scrivi non viene inviato nulla.",
+  addressSearchButton: "Cerca",
   addressSearchNoResults: (query: string) => `Nessun luogo trovato per “${query}”.`,
   addressSearchRateLimited: (seconds: number) =>
     `Troppe ricerche. Riprova tra ${seconds} second${seconds === 1 ? "o" : "i"}.`,

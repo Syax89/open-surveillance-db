@@ -395,6 +395,27 @@ changes accumulate under `[Unreleased]`.
 
 ### Changed
 
+- **Search sends as little as possible to third parties (2026-11, owner
+  request — "as little data as possible should reach other companies"):**
+  - Nothing is sent while typing in any search box. The map and report-form
+    place searches query the geocoder only on Enter or the Search button
+    (this also matches Nominatim's usage policy, which forbids as-you-type
+    autocomplete on the public instance). The home hero search is a plain
+    form to the directory and never calls a geocoder.
+  - Coordinates ("41.9068, 12.4808", "41,9068; 12,4808", "geo:…", N/S/E/W/O)
+    and `#record` numbers are resolved in the browser and never leave it
+    (`app/lib/local-place-query.ts`); `#6302` on the map opens that record.
+  - Results inside the current map view are ranked first, in the browser —
+    the map position is never sent.
+  - Our tile and geocode proxies forward only the site ORIGIN as Referer
+    (`app/lib/upstream-referer.ts`): never stripped or blank (OSM policy),
+    but no longer the full page URL, which could reveal the place a visitor
+    was looking at (`/mappa?lat=…&lng=…`). The visitor's IP never reached
+    OSM and still does not; no new third-party service is used.
+  - The map field has one purpose ("Find a place"): typing no longer filters
+    the points (which emptied the map while people looked for a place);
+    searching cameras by name stays in the directory.
+
 - **Mobile map chrome + legible clusters (2026-11, owner request):** on
   phones the search field and a compact "Filters" pill share one row
   (filters stay closed by default and open below the row); the search field
