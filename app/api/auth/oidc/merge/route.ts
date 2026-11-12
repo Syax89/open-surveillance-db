@@ -8,6 +8,7 @@ import {
   loginLockoutKey,
   normalizeEmail,
   recordFailedLogin,
+  verifyPasswordDummy,
 } from "../../../../../db/auth";
 import {
   getOidcMergeRequest,
@@ -100,6 +101,10 @@ export async function POST(request: Request) {
     const emailKey = await loginLockoutKey(email);
     const lockout = await getLoginLockout(emailKey, policy);
     if (lockout.locked) {
+      // Same timing equalisation as POST /api/auth/login (QA#3 F1): the
+      // locked branch returns before any hashing, so pay the dummy PBKDF2
+      // derivation — the 429 must not be distinguishable by response time.
+      await verifyPasswordDummy(password);
       console.warn(`POST /api/auth/oidc/merge rejected: account locked (emailKey ${emailKey})`);
       return Response.json(
         { error: "Too many failed login attempts. Please try again later." },

@@ -10,6 +10,7 @@
 import { useState } from "react";
 import { useDomainMessages } from "../lib/use-domain-messages";
 import { authByLocale } from "../lib/i18n/auth";
+import { readCsrfToken } from "../lib/csrf";
 
 type Props = {
   /** contributor.emailVerifiedAt from the profile read (null = unverified). */
@@ -25,7 +26,11 @@ export function VerifyEmailBanner({ emailVerifiedAt }: Props) {
     setResendingVerification(true);
     setVerificationMessage(null);
     try {
-      const response = await fetch("/api/auth/verify-email/resend", { method: "POST" });
+      const csrfToken = readCsrfToken();
+      const response = await fetch("/api/auth/verify-email/resend", {
+        method: "POST",
+        headers: csrfToken ? { "x-csrf-token": csrfToken } : {},
+      });
       if (response.ok) {
         setVerificationMessage(t.verifyBannerResent);
         return;

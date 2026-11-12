@@ -16,6 +16,9 @@ import { createHash } from "node:crypto";
 import { after, beforeEach, test } from "node:test";
 import { apiRequest, cleanupRouteTree, loadLibModule, loadRoute, loadTreeModule, responseBody } from "./helpers/api-harness.mjs";
 import { callArgs, resetMockState, stub } from "./helpers/mock-state.mjs";
+// Same module instance the transpiled routes resolve through the tree's
+// node_modules symlink (Node resolves it to the real path).
+import { runWithExecutionContext } from "vinext/shims/request-context";
 
 let rateLimit;
 
@@ -1148,11 +1151,26 @@ test("resend requires a live session (401 anonymous)", async () => {
   assert.equal(callArgs("createVerificationToken").length, 0);
 });
 
+test("resend requires the X-CSRF-Token double-submit (403, nothing minted or reserved)", async () => {
+  stub("findSessionByToken", async () => ({ ...session, contributor }));
+  const { POST } = await resendRoute();
+  for (const headers of [{}, { "x-csrf-token": "wrong-token" }]) {
+    const response = await POST(
+      sessionRequest("/api/auth/verify-email/resend", "raw-session-token-abc123", { method: "POST", headers }),
+    );
+    assert.equal(response.status, 403);
+    assert.equal(response.headers.get("cache-control"), "no-store");
+    assert.equal((await responseBody(response)).error, "Invalid CSRF token. Refresh the page and try again.");
+  }
+  assert.equal(callArgs("reserveAuthEmail").length, 0, "no mail budget spent");
+  assert.equal(callArgs("createVerificationToken").length, 0, "no token minted (the live link survives)");
+});
+
 test("resend on an already-verified account is a no-op success", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor: verifiedContributor }));
   const { POST } = await resendRoute();
   const response = await POST(
-    sessionRequest("/api/auth/verify-email/resend", "raw-session-token-abc123", { method: "POST" }),
+    sessionRequest("/api/auth/verify-email/resend", "raw-session-token-abc123", { method: "POST", headers: { "x-csrf-token": "csrf-token-123" } }),
   );
   assert.equal(response.status, 200);
   assert.deepEqual((await responseBody(response)).verified, true);
@@ -1168,7 +1186,7 @@ test("resend mints a fresh verify token and sends it through the canonical maile
   stub("sendAuthEmail", async () => ({ ok: true, messageId: "m1" }));
   const { POST } = await resendRoute();
   const response = await POST(
-    sessionRequest("/api/auth/verify-email/resend", "raw-session-token-abc123", { method: "POST" }),
+    sessionRequest("/api/auth/verify-email/resend", "raw-session-token-abc123", { method: "POST", headers: { "x-csrf-token": "csrf-token-123" } }),
   );
   assert.equal(response.status, 200);
   const body = await responseBody(response);
@@ -1198,7 +1216,7 @@ test("resend answers 429 with Retry-After when the atomic reservation is rate_li
   stub("reserveAuthEmail", async () => ({ ok: false, reason: "rate_limited", retryAfterSeconds: 300 }));
   const { POST } = await resendRoute();
   const response = await POST(
-    sessionRequest("/api/auth/verify-email/resend", "raw-session-token-abc123", { method: "POST" }),
+    sessionRequest("/api/auth/verify-email/resend", "raw-session-token-abc123", { method: "POST", headers: { "x-csrf-token": "csrf-token-123" } }),
   );
   assert.equal(response.status, 429);
   assert.equal(response.headers.get("retry-after"), "300");
@@ -1219,7 +1237,7 @@ test("resend releases the EXACT reservation when createVerificationToken throws 
   stub("releaseEmailReservation", async () => {});
   const { POST } = await resendRoute();
   const response = await POST(
-    sessionRequest("/api/auth/verify-email/resend", "raw-session-token-abc123", { method: "POST" }),
+    sessionRequest("/api/auth/verify-email/resend", "raw-session-token-abc123", { method: "POST", headers: { "x-csrf-token": "csrf-token-123" } }),
   );
   // Behaviour mapping: the mint failure is a server-side 503, honest error.
   assert.equal(response.status, 503);
@@ -1248,7 +1266,7 @@ test("resend answers 503 on a provider failure and logs only the fixed generic e
   try {
     const { POST } = await resendRoute();
     const response = await POST(
-      sessionRequest("/api/auth/verify-email/resend", "raw-session-token-abc123", { method: "POST" }),
+      sessionRequest("/api/auth/verify-email/resend", "raw-session-token-abc123", { method: "POST", headers: { "x-csrf-token": "csrf-token-123" } }),
     );
     assert.equal(response.status, 503);
     assert.equal((await responseBody(response)).error, "Unable to resend the verification email");
@@ -1315,6 +1333,53 @@ test("reset request mints a reset token for a known email and never echoes it", 
   assert.equal(mailArgs[0].reservationId, 88);
   assert.equal(mailArgs[0].kind, "reset");
   assert.equal(mailArgs[0].rawToken, "reset-token-789");
+});
+
+test("reset request on Workers answers BEFORE the known-account mail work (ctx.waitUntil, timing anti-enumeration)", async () => {
+  stub("findContributorByEmail", async () => contributor);
+  let releaseSend;
+  const sendGate = new Promise((resolve) => { releaseSend = resolve; });
+  stub("reserveAuthEmail", async () => ({ ok: true, reservationId: 91 }));
+  stub("createVerificationToken", async () => ({ rawToken: "reset-token-bg", expiresAt: "2026-08-02T10:00:00.000Z" }));
+  stub("sendAuthEmail", async () => { await sendGate; return { ok: true, messageId: "m-bg" }; });
+  const background = [];
+  const ctx = { waitUntil: (promise) => background.push(promise) };
+  const { POST } = await resetRequestRoute();
+  const response = await runWithExecutionContext(ctx, () => POST(
+    apiRequest("/api/auth/reset-password/request", { method: "POST", body: { email: "contributor@example.org" } }),
+  ));
+  // The response is already the generic 200 while the provider send is
+  // still pending: a known address costs the same request-path work as an
+  // unknown one (a single contributor lookup).
+  assert.equal(response.status, 200);
+  assert.deepEqual(await responseBody(response), { sent: true });
+  assert.equal(background.length, 1, "the send was handed to waitUntil");
+  releaseSend();
+  await Promise.all(background);
+  assert.equal(callArgs("reserveAuthEmail").length, 1);
+  assert.equal(callArgs("sendAuthEmail")[0][0].reservationId, 91, "reservation semantics unchanged in the background");
+});
+
+test("reset request on Workers: a background mint failure releases the reservation and still answers 200", async () => {
+  stub("findContributorByEmail", async () => contributor);
+  stub("reserveAuthEmail", async () => ({ ok: true, reservationId: 92 }));
+  stub("createVerificationToken", async () => { throw new Error("mint failed"); });
+  stub("releaseEmailReservation", async () => true);
+  const background = [];
+  const ctx = { waitUntil: (promise) => background.push(promise) };
+  const { POST } = await resetRequestRoute();
+  const originalError = console.error;
+  console.error = () => {};
+  try {
+    const response = await runWithExecutionContext(ctx, () => POST(
+      apiRequest("/api/auth/reset-password/request", { method: "POST", body: { email: "contributor@example.org" } }),
+    ));
+    assert.equal(response.status, 200, "no 503 oracle for known addresses");
+    await Promise.all(background);
+  } finally {
+    console.error = originalError;
+  }
+  assert.deepEqual(callArgs("releaseEmailReservation")[0], [92, 7, "reset"]);
 });
 
 test("reset request keeps answering 200 {sent:true} when the atomic reservation is rate_limited (no token, no mail)", async () => {

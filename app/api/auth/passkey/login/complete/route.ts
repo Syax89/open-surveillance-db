@@ -157,10 +157,11 @@ export async function POST(request: Request) {
     // whose email is not yet verified must NOT open a session — same generic
     // 401 as every other failure (anti-enumeration), enforced AFTER the full
     // verification cost (challenge consume, signature, counter), no lockout
-    // (a valid assertion is not a credential failure), no session. The
-    // passkey stays enrolled and becomes usable once the account verifies —
-    // enrollment is deliberately allowed pre-verification (register/begin
-    // documents the choice). Shared choke-point: sessionGate.
+    // (a valid assertion is not a credential failure), no session. Since the
+    // pre-registration takeover fix, enrollment itself is refused for an
+    // unverified account (register/begin) and the first verification purges
+    // any legacy pre-verification passkey, so this gate is now defence in
+    // depth. Shared choke-point: sessionGate.
     const denied = sessionGate(contributor, "Passkey verification failed.");
     if (denied) return denied;
 

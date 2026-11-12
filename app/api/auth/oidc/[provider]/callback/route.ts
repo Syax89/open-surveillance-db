@@ -6,14 +6,18 @@ import {
   createOidcMergeRequest,
   findContributorByExternalIdentity,
 } from "../../../../../../db/oidc";
-import { sessionCookieHeaders, sessionTtlSeconds } from "../../../../../lib/auth-session";
+import { cookieSecure, sessionCookieHeaders, sessionTtlSeconds } from "../../../../../lib/auth-session";
+import { readCookie } from "../../../../../lib/csrf";
 import {
   cookieHeaderInit,
 } from "../../../../../lib/auth-route-helpers";
 import {
+  clearOidcBindingCookie,
   fetchOidcIdentity,
   exchangeCodeForToken,
   isKnownOidcProvider,
+  oidcBindingCookieName,
+  oidcBindingMatches,
   oidcProviderConfig,
   publicOrigin,
 } from "../../../../../lib/oidc";
@@ -23,6 +27,12 @@ import {
  * browser here after the user consents (Fase D, ADR 0020 decision 4).
  *
  * Steps:
+ *   0. Browser binding (login-CSRF defence): the `state` must be the one
+ *      derived from this browser's binding cookie set at /start
+ *      (app/lib/oidc.ts, "Browser binding"). A missing or mismatching
+ *      cookie redirects to /login?oidc_error=1 WITHOUT consuming the state
+ *      row, so a victim's browser can never complete a flow an attacker
+ *      started. Every redirect from here on clears the binding cookie.
  *   1. Consume the PKCE state row atomically (single-use, 10-min TTL). A
  *      missing/expired/replayed state answers 400 — the row is hashed, so a
  *      DB leak cannot forge one.
@@ -63,7 +73,7 @@ export async function GET(request: Request) {
   // Provider-side denial/cancel comes back as ?error=... without a code:
   // land the user back on /login (the state row expires on its own).
   if (url.searchParams.has("error")) {
-    return Response.redirect(`${publicOrigin(request, env)}/login`, 302);
+    return redirectClearingBinding(`${publicOrigin(request, env)}/login`, cookieSecure(env));
   }
 
   const code = url.searchParams.get("code") ?? "";
@@ -72,9 +82,19 @@ export async function GET(request: Request) {
     return Response.json({ error: "Missing OIDC authorization code." }, { status: 400 });
   }
 
+  const secure = cookieSecure(env);
+  const loginError = `${publicOrigin(request, env)}/login?oidc_error=1`;
+  if (!(await oidcBindingMatches(readCookie(request, oidcBindingCookieName(secure)), state))) {
+    console.warn(`GET /api/auth/oidc/${provider}/callback rejected: state not bound to this browser`);
+    return redirectClearingBinding(loginError, secure);
+  }
+
   const stateRow = await consumeOidcState(state, provider);
   if (!stateRow) {
-    return Response.json({ error: "Invalid or expired OIDC state." }, { status: 400 });
+    return Response.json(
+      { error: "Invalid or expired OIDC state." },
+      { status: 400, headers: { "Cache-Control": "no-store", "Set-Cookie": clearOidcBindingCookie(secure) } },
+    );
   }
   const redirectTo = new URL(stateRow.redirectTo, publicOrigin(request, env)).toString();
 
@@ -87,7 +107,7 @@ export async function GET(request: Request) {
     identity = await fetchOidcIdentity(provider, accessToken);
   } catch (error) {
     console.error(`GET /api/auth/oidc/${provider}/callback: provider exchange failed`, error);
-    return Response.redirect(`${publicOrigin(request, env)}/login?oidc_error=1`, 302);
+    return redirectClearingBinding(loginError, secure);
   }
 
   try {
@@ -108,7 +128,10 @@ export async function GET(request: Request) {
           contributorId: matched.id,
           emailVerified: identity.emailVerified,
         });
-        return Response.redirect(`${publicOrigin(request, env)}/login?merge=${encodeURIComponent(rawToken)}`, 302);
+        return redirectClearingBinding(
+          `${publicOrigin(request, env)}/login?merge=${encodeURIComponent(rawToken)}`,
+          secure,
+        );
       }
     }
 
@@ -123,8 +146,15 @@ export async function GET(request: Request) {
     return openSessionAndRedirect(redirectTo, created.id);
   } catch (error) {
     console.error(`GET /api/auth/oidc/${provider}/callback failed`, error);
-    return Response.redirect(`${publicOrigin(request, env)}/login?oidc_error=1`, 302);
+    return redirectClearingBinding(loginError, secure);
   }
+}
+
+/** 302 to `location` that also deletes the single-flow binding cookie. */
+function redirectClearingBinding(location: string, secure: boolean): Response {
+  const headers = new Headers({ Location: location, "Cache-Control": "no-store" });
+  headers.append("Set-Cookie", clearOidcBindingCookie(secure));
+  return new Response(null, { status: 302, headers });
 }
 
 /** Open a contributor session and 302 to the state's redirect target. */
@@ -145,5 +175,6 @@ async function openSessionAndRedirect(
   for (const [name, value] of cookieHeaderInit(sessionCookieHeaders(rawToken, csrfToken, env))) {
     headers.append(name, value);
   }
+  headers.append("Set-Cookie", clearOidcBindingCookie(cookieSecure(env)));
   return new Response(null, { status: 302, headers });
 }

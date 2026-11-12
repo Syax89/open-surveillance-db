@@ -102,14 +102,18 @@ conclusion for three reasons:
   /api/auth/passkey/login/complete` (passkey) and `POST /api/auth/recovery`
   (one-time code) all refuse an unverified account with the same generic
   401 as their other failures, after the full credential verification and
-  without touching any lockout counter. **Passkey enrollment is
-  deliberately allowed pre-verification** (register/begin): the enrolled
-  credential is *inert* until the email is verified — login/complete is
-  gated, so no session can be opened with it, and the write gate (403)
-  blocks every write — and the user can set up their second factor in the
-  same read-only session where they verify. The same applies to the 10
-  recovery codes issued at enrollment: redemption on an unverified account
-  answers 401 (the valid single-use code is still consumed). OIDC remains
+  without touching any lockout counter. **Passkey enrollment requires a
+  verified email** (security fix, supersedes the earlier "enrollment
+  allowed pre-verification" choice): an "inert until verified" credential
+  was a pre-registration account takeover — an attacker registering
+  someone else's address could enroll a passkey (and receive the 10
+  recovery codes) that went live the moment the real mailbox owner
+  verified the address or completed a password reset. register/begin and
+  register/complete now answer 403 `{ code: "email_unverified" }` for an
+  unverified account. Defence in depth: the FIRST verification purges any
+  passkey / recovery code / API key bound before it, and every password
+  reset deletes all passkeys and recovery codes and revokes all API keys
+  in the same atomic batch as the hash rotation. OIDC remains
   exempt by construction: linked accounts are born verified from the
   provider flag (decision 4).
 

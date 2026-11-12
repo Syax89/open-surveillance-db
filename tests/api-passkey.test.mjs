@@ -185,13 +185,10 @@ test("register/begin excludes the contributor's existing passkeys from re-enroll
   ]);
 });
 
-test("register/begin allows enrollment for an UNVERIFIED account (documented choice, t_f940482b)", async () => {
-  // CEO decision (a): the LOGIN is blocked pre-verification, but enrollment
-  // stays open — the enrolled passkey is INERT until the email is verified
-  // (login/complete is gated by sessionGate), so allowing it is harmless and
-  // lets the user set up their second factor in the same read-only register
-  // session where they verify. The write gate (403) blocks every write
-  // regardless. See the route comment and ADR 0020 decision 2.
+test("register/begin REFUSES enrollment for an UNVERIFIED account (pre-registration takeover guard)", async () => {
+  // Security fix superseding t_f940482b "CEO decision (a)": an attacker who
+  // pre-registers someone else's address must not be able to bind a passkey
+  // that would go live once the real owner verifies (or resets) the email.
   stub("findSessionByToken", async () => ({
     ...session,
     contributor: { ...contributor, emailVerifiedAt: null },
@@ -201,8 +198,11 @@ test("register/begin allows enrollment for an UNVERIFIED account (documented cho
   stub("createWebAuthnChallenge", async () => ({ id: 1 }));
   const { POST } = await registerBeginRoute();
   const response = await POST(authedRequest("/api/auth/passkey/register/begin", { method: "POST" }));
-  assert.equal(response.status, 200);
-  assert.ok((await responseBody(response)).options, "a register ceremony can start for an unverified account");
+  assert.equal(response.status, 403);
+  const body = await responseBody(response);
+  assert.equal(body.code, "email_unverified");
+  assert.equal(body.options, undefined);
+  assert.equal(callArgs("createWebAuthnChallenge").length, 0, "no challenge minted for an unverified account");
 });
 
 // ---------------------------------------------------------------------------
@@ -227,6 +227,26 @@ test("register/complete requires a valid CSRF token", async () => {
     }),
   );
   assert.equal(response.status, 403);
+});
+
+test("register/complete REFUSES an UNVERIFIED account: no passkey, no recovery codes, challenge not burned", async () => {
+  stub("findSessionByToken", async () => ({
+    ...session,
+    contributor: { ...contributor, emailVerifiedAt: null },
+  }));
+  stub("consumeWebAuthnChallenge", async () => ({ id: 1, kind: "register", contributorId: 7 }));
+  const { POST } = await registerCompleteRoute();
+  const response = await POST(
+    authedRequest("/api/auth/passkey/register/complete", {
+      method: "POST",
+      body: { challenge: "c1", response: { id: "cred-x", response: {} } },
+    }),
+  );
+  assert.equal(response.status, 403);
+  assert.equal((await responseBody(response)).code, "email_unverified");
+  assert.equal(callArgs("consumeWebAuthnChallenge").length, 0);
+  assert.equal(callArgs("createPasskey").length, 0);
+  assert.equal(callArgs("issueRecoveryCodes").length, 0);
 });
 
 test("register/complete rejects a malformed payload", async () => {
@@ -341,20 +361,66 @@ test("login/begin with a known email narrows the ceremony to that account's pass
   assert.equal(challengeArgs[0].userHandle, passkeyLib.userHandleForContributor(7));
 });
 
-test("login/begin with an unknown email is indistinguishable from no email (anti-enumeration)", async () => {
+/** Shape of an allowCredentials list with the ids blanked to their byte length. */
+function credentialShape(list) {
+  return list.map((entry) => ({
+    keys: Object.keys(entry).sort(),
+    type: entry.type,
+    bytes: Buffer.from(entry.id, "base64url").length,
+    base64url: /^[A-Za-z0-9_-]+$/.test(entry.id),
+  }));
+}
+
+async function loginBeginFor(email, { known, passkeys = [] }) {
+  resetMockState();
+  rateLimit.resetRateLimitState();
   stub("sweepExpiredWebAuthnChallenges", async () => 0);
-  stub("findContributorByEmail", async () => null);
+  stub("findContributorByEmail", async () => (known ? contributor : null));
+  stub("listPasskeys", async () => passkeys);
   stub("createWebAuthnChallenge", async () => ({ id: 1 }));
   const { POST } = await loginBeginRoute();
   const response = await POST(
-    apiRequest("/api/auth/passkey/login/begin", {
-      method: "POST",
-      body: { email: "ghost@example.org" },
-    }),
+    apiRequest("/api/auth/passkey/login/begin", { method: "POST", body: { email } }),
   );
   assert.equal(response.status, 200);
-  const body = await responseBody(response);
-  assert.deepEqual(body.options.allowCredentials, []);
+  return (await responseBody(response)).options;
+}
+
+test("login/begin with an unknown email answers decoy credentials shaped like a real account's (anti-enumeration)", async () => {
+  const unknown = await loginBeginFor("ghost@example.org", { known: false });
+  assert.ok(unknown.allowCredentials.length >= 1 && unknown.allowCredentials.length <= 2,
+    "an unknown email no longer answers an empty list (that was the oracle)");
+  for (const entry of unknown.allowCredentials) {
+    assert.equal(entry.type, "public-key");
+    assert.ok([16, 20, 32].includes(Buffer.from(entry.id, "base64url").length));
+    assert.match(entry.id, /^[A-Za-z0-9_-]+$/);
+  }
+  // Deterministic: the same email answers the same decoys (a repeated probe
+  // cannot spot per-request randomness), a different email different ones.
+  const again = await loginBeginFor("GHOST@example.org", { known: false });
+  assert.deepEqual(again.allowCredentials, unknown.allowCredentials);
+  const other = await loginBeginFor("phantom@example.org", { known: false });
+  assert.notDeepEqual(other.allowCredentials, unknown.allowCredentials);
+  // Same top-level option keys as a real account's ceremony.
+  const real = await loginBeginFor("contributor@example.org", {
+    known: true,
+    passkeys: [{ credentialId: Buffer.alloc(32, 7).toString("base64url"), transports: null }],
+  });
+  assert.deepEqual(Object.keys(unknown).sort(), Object.keys(real).sort());
+  assert.deepEqual(
+    credentialShape(real.allowCredentials)[0].keys,
+    credentialShape(unknown.allowCredentials)[0].keys,
+    "decoy entries carry exactly the fields of a real transport-less entry",
+  );
+});
+
+test("login/begin for a KNOWN account without passkeys also answers decoys, not an empty list", async () => {
+  const options = await loginBeginFor("contributor@example.org", { known: true, passkeys: [] });
+  assert.ok(options.allowCredentials.length >= 1);
+  const [challengeArgs] = callArgs("createWebAuthnChallenge");
+  const passkeyLib = await loadLibModule("passkey");
+  assert.equal(challengeArgs[0].userHandle, passkeyLib.userHandleForContributor(7),
+    "the server-side handle binding is unchanged");
 });
 
 test("login/begin rejects cross-origin requests", async () => {
@@ -599,6 +665,7 @@ test("credentials GET requires a session", async () => {
   const { GET } = await credentialsRoute();
   const response = await GET(apiRequest("/api/auth/passkey/credentials"));
   assert.equal(response.status, 401);
+  assert.equal(response.headers.get("cache-control"), "no-store");
 });
 
 test("credentials GET lists only the public descriptors", async () => {
@@ -616,6 +683,7 @@ test("credentials GET lists only the public descriptors", async () => {
     { id: 3, credentialId: "cred-1", transports: '["usb"]', createdAt: "2026-08-01T08:00:00.000Z" },
   ]);
   assert.deepEqual(callArgs("listPasskeys")[0], [7]);
+  assert.equal(response.headers.get("cache-control"), "no-store", "personal data is never cached");
 });
 
 test("credentials DELETE requires a session", async () => {

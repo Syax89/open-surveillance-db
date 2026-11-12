@@ -3,7 +3,7 @@ import { localeFromCookieHeader } from "../../../../lib/i18n/types";
 import { createVerificationToken } from "../../../../../db/auth";
 import { resolveOptionalContributor } from "../../../../lib/auth-session";
 import { authLimit } from "../../../../lib/auth-route-helpers";
-import { sameOrigin } from "../../../../lib/csrf";
+import { csrfVerified, sameOrigin } from "../../../../lib/csrf";
 import { releaseEmailReservation, reserveAuthEmail, sendAuthEmail } from "../../../../../db/mailer";
 import { urlTooLong } from "../../../../lib/input-limits";
 
@@ -33,8 +33,10 @@ import { urlTooLong } from "../../../../lib/input-limits";
  * duplicate-mail burst — see db/mailer.ts).
  *
  * Guard order mirrors the other auth mutations: urlTooLong -> sameOrigin ->
- * auth rate-limit -> session (401) -> atomic budget reservation (429) ->
- * token+mail.
+ * auth rate-limit -> session (401) -> X-CSRF-Token double-submit (403) ->
+ * atomic budget reservation (429) -> token+mail. The CSRF check makes this
+ * session mutation consistent with every other one (it mints a token,
+ * revokes the previous link and spends the shared mail budget).
  */
 export async function POST(request: Request) {
   if (urlTooLong(request)) {
@@ -52,6 +54,12 @@ export async function POST(request: Request) {
     const resolved = await resolveOptionalContributor(request);
     if (!resolved) {
       return Response.json({ error: "Not authenticated." }, { status: 401, headers: NO_STORE_HEADERS });
+    }
+    if (!csrfVerified(request, resolved.session.csrfToken)) {
+      return Response.json(
+        { error: "Invalid CSRF token. Refresh the page and try again." },
+        { status: 403, headers: NO_STORE_HEADERS },
+      );
     }
     if (resolved.contributor.emailVerifiedAt) {
       // Already verified: no-op success, nothing to send.

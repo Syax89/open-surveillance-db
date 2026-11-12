@@ -159,21 +159,38 @@ export async function countVerificationTokensSentSince(
  * write gate (Fase E1) reads the column on every state-changing write.
  * Returns the refreshed public profile, or null when the account no longer
  * exists (erased between the token consume and this update).
+ *
+ * Pre-registration takeover purge (security fix): on the FIRST verification
+ * only (the account is still `email_verified_at IS NULL` when the batch
+ * runs), every passkey and recovery code is deleted and every live API key
+ * revoked, in the SAME atomic batch as the flip. Anything bound to the
+ * account before its mailbox was proven may belong to whoever
+ * pre-registered the address, not to the mailbox owner now verifying it.
+ * The enrolment routes refuse unverified accounts, so this only ever finds
+ * legacy rows. A repeat verification (already verified) touches nothing.
  */
 export async function markContributorEmailVerified(
   contributorId: number,
   now: string = new Date().toISOString(),
 ): Promise<PublicContributor | null> {
   const d1 = await getD1();
-  return d1
-    .prepare(
+  const stillUnverified =
+    "EXISTS (SELECT 1 FROM contributors WHERE id = ? AND email_verified_at IS NULL)";
+  const results = (await d1.batch([
+    d1.prepare(`DELETE FROM passkeys WHERE contributor_id = ? AND ${stillUnverified}`).bind(contributorId, contributorId),
+    d1.prepare(`DELETE FROM recovery_codes WHERE contributor_id = ? AND ${stillUnverified}`).bind(contributorId, contributorId),
+    d1.prepare(
+      `UPDATE api_keys SET revoked_at = ? WHERE contributor_id = ? AND revoked_at IS NULL AND ${stillUnverified}`,
+    ).bind(now, contributorId, contributorId),
+    d1.prepare(
       `UPDATE contributors
        SET email_verified_at = COALESCE(email_verified_at, ?), updated_at = ?
        WHERE id = ?
        RETURNING ${publicContributorColumns}`,
-    )
-    .bind(now, now, contributorId)
-    .first<PublicContributor>();
+    ).bind(now, now, contributorId),
+  ])) as D1BatchResult[];
+  const contributor = results[3]?.results?.[0] as PublicContributor | undefined;
+  return contributor ?? null;
 }
 
 /**
@@ -222,7 +239,13 @@ type D1BatchResult = {
 
 /**
  * Apply a completed password reset (Fase B confirm): rotate the hash, revoke
- * EVERY live session, and mark the email verified — in ONE atomic batch. A
+ * EVERY live session, delete EVERY passkey and recovery code, revoke EVERY
+ * live API key, and mark the email verified — in ONE atomic batch. A reset
+ * means "I lost control of this account": any credential that survived it
+ * (including one planted by whoever pre-registered the address before the
+ * real mailbox owner proved control) would defeat the reset, so all
+ * alternative credentials die with the old password. The user re-enrols
+ * passkeys and mints new keys from /account afterwards. A
  * crash cannot leave the hash rotated but sessions live, or sessions dead but
  * the hash old. `consumeVerificationToken` stays a separate single-use gate by
  * design: the token is consumed (and so single-use) before this write, and the
@@ -240,8 +263,11 @@ export async function applyPasswordReset(
   const results = (await d1.batch([
     d1.prepare("UPDATE contributors SET password_hash = ?, updated_at = ? WHERE id = ?").bind(passwordHash, now, contributorId),
     d1.prepare("UPDATE sessions SET revoked_at = ? WHERE contributor_id = ? AND revoked_at IS NULL").bind(now, contributorId),
+    d1.prepare("DELETE FROM passkeys WHERE contributor_id = ?").bind(contributorId),
+    d1.prepare("DELETE FROM recovery_codes WHERE contributor_id = ?").bind(contributorId),
+    d1.prepare("UPDATE api_keys SET revoked_at = ? WHERE contributor_id = ? AND revoked_at IS NULL").bind(now, contributorId),
     d1.prepare(`UPDATE contributors SET email_verified_at = COALESCE(email_verified_at, ?), updated_at = ? WHERE id = ? RETURNING ${publicContributorColumns}`).bind(now, now, contributorId),
   ])) as D1BatchResult[];
-  const contributor = results[2]?.results?.[0] as PublicContributor | undefined;
+  const contributor = results[5]?.results?.[0] as PublicContributor | undefined;
   return contributor ?? null;
 }
