@@ -71,8 +71,12 @@ export type StatusLabels = Parameters<typeof publicStatusLabel>[0];
 export const POPUP_CHROME_X = 46;
 /** The balloon tip (the 12px tail below the box). Vertical only. */
 export const POPUP_TIP_Y = 12;
-/** Accepted balloon widths (unchanged where they actually fit). */
-const CONTENT_MAX = 300;
+/**
+ * Accepted balloon widths. Desktop 340 (design review 2026-11): at 300 the
+ * three community buttons split "Confirm" over two lines and the
+ * coordinates wrapped. Narrow maps keep 260.
+ */
+const CONTENT_MAX = 340;
 const CONTENT_MAX_NARROW = 260;
 /** Below this MAP width (not viewport) the narrow balloon is preferred. */
 const NARROW_SURFACE = 520;

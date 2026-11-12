@@ -395,6 +395,14 @@ changes accumulate under `[Unreleased]`.
 
 ### Changed
 
+- **Map popup and link rows (2026-11):** the desktop marker popup is up to
+  340px wide (was 300) and its short facts stay on one line, so the
+  coordinates no longer wrap and "Confirm" no longer splits as "Confir/m"
+  (toolbar labels never break mid-word). Phones keep the 260px balloon.
+  Inline link rows (contacts, rules, guide, directory exports) wrap as whole
+  links on phones without orphaned "·" separators; the 24px export-row inset
+  added in #547 is scoped back to the directory only.
+
 - **Consistency pass on content pages (2026-11):** every content section
   heading (FAQ "Still have questions?", contacts, guide publication model,
   rules) uses the same bold display style — some rendered at weight 400 or

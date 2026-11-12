@@ -91,10 +91,10 @@ test("popup geometry keeps the accepted phone/desktop widths where they fit", ()
   const phone = popupGeometryFor({ x: 358, y: 520 });
   assert.equal(phone.maxWidth, 358 - phone.autoPanPadding[0] - 60 - POPUP_CHROME_X, "the balloon shrinks by the reserved right lane");
   assert.equal(phone.minWidth, 220, "the accepted floor still fits");
-  // Desktop surface (split workspace): unchanged 300px + the generous,
+  // Desktop surface (split workspace): 340px + the generous,
   // still SYMMETRIC padding — no lane is reserved when there is room.
   const desktop = popupGeometryFor({ x: 900, y: 700 });
-  assert.equal(desktop.maxWidth, 300, "desktop keeps the 300px balloon");
+  assert.equal(desktop.maxWidth, 340, "desktop keeps the 340px balloon");
   assert.equal(desktop.minWidth, 220, "desktop keeps the 220px floor");
   assert.deepEqual(desktop.autoPanPadding, [60, 48], "desktop keeps the accepted autopan padding");
   assert.deepEqual(desktop.autoPanPaddingBottomRight, desktop.autoPanPadding, "desktop stays symmetric");
@@ -120,7 +120,7 @@ test("popup geometry never trusts an unmeasured surface", () => {
   // layout still renders — with the SAME symmetric padding as before.
   for (const size of [{ x: 0, y: 0 }, undefined, null]) {
     const geometry = popupGeometryFor(size);
-    assert.equal(geometry.maxWidth, 300);
+    assert.equal(geometry.maxWidth, 340);
     assert.equal(geometry.minWidth, 220);
     assert.deepEqual(geometry.autoPanPaddingBottomRight, geometry.autoPanPadding, "an unmeasured surface reserves no lane");
     assert.ok(Number.isFinite(geometry.maxHeight) && geometry.maxHeight > 0);
@@ -332,7 +332,7 @@ test("the resize callback (a Leaflet event, not a Map) re-fits the OPEN picker",
   map.fire("resize", { type: "resize", target: map, oldSize: { x: 286, y: 340 }, newSize: { x: 900, y: 700 } });
 
   const wide = popupGeometryFor({ x: 900, y: 700 });
-  assert.equal(wide.maxWidth, 300, "the fixture really changed surface (desktop balloon)");
+  assert.equal(wide.maxWidth, 340, "the fixture really changed surface (desktop balloon)");
   assert.deepEqual(pickerOptions(map), {
     maxWidth: wide.maxWidth,
     minWidth: wide.minWidth,
@@ -341,7 +341,7 @@ test("the resize callback (a Leaflet event, not a Map) re-fits the OPEN picker",
     autoPanPaddingBottomRight: wide.autoPanPaddingBottomRight,
     keepInView: true,
   }, "every picker option (width, minWidth, autoPan + both paddings) is refreshed from the new surface");
-  assert.equal(map.popup.options.maxWidth, 300, "the balloon actually grew with the map");
+  assert.equal(map.popup.options.maxWidth, 340, "the balloon actually grew with the map");
   assert.equal(map.popup.updates, updatesBefore + 1, "the open picker is re-laid out in place (one update)");
   assert.equal(map.popup.isOpen(), true, "the picker stays open across the resize");
   assert.equal((map.events.popupopen ?? []).length, opensBefore, "no reopen: the resize never opens a popup");

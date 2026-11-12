@@ -125,7 +125,7 @@ test("marker and picker popups size themselves on the map surface, not the viewp
   assert.equal(withPopup.popupOpts.maxWidth, phone.maxWidth, "the marker popup uses the same phone balloon");
   assert.deepEqual(withPopup.popupOpts.autoPanPaddingBottomRight, map.popupOpts.autoPanPaddingBottomRight, "the picker and the markers reserve the same lanes");
 
-  // A wide desktop surface (split workspace): unchanged 300px balloon, and
+  // A wide desktop surface (split workspace): the 340px balloon, and
   // no lane is reserved — the padding stays symmetric.
   await renderMapWithCameras();
   const mapsDesktop = await leafletMaps();
@@ -134,7 +134,7 @@ test("marker and picker popups size themselves on the map surface, not the viewp
   desktop.fire("resize");
   const clickDesktop = desktop.handlers.click?.[0];
   clickDesktop({ latlng: { lat: 41.9, lng: 12.49 } });
-  assert.equal(desktop.popupOpts?.maxWidth, 300, "desktop keeps the 300px popup width");
+  assert.equal(desktop.popupOpts?.maxWidth, 340, "desktop keeps the 340px popup width");
   assert.deepEqual(desktop.popupOpts?.autoPanPadding, [60, 48], "desktop keeps the accepted 60/48 autopan padding");
   assert.deepEqual(desktop.popupOpts?.autoPanPaddingBottomRight, [60, 48], "desktop reserves no lane");
 });
