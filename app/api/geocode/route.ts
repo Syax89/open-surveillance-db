@@ -35,7 +35,8 @@ import { maxQueryLength } from "../../lib/search";
  * Privacy/safety by design: the response carries ONLY the fields the
  * dropdown needs (display_name, lat, lng, type, boundingbox) — the many
  * Nominatim metadata fields are dropped server-side. The cache stores the
- * geocoder reply keyed by the (place-text) query URL, never requestor data.
+ * geocoder reply keyed by the canonical (place-text) query, never requestor
+ * data.
  *
  * The upstream is not hard-coded: `GEOCODER_BASE_URL` (already used by
  * db/geocode.ts for the locality search) points the route at an approved
@@ -185,6 +186,16 @@ function parseQuery(url: URL): GeocodeQuery | null {
   return { query, limit, countrycodes, language };
 }
 
+/** Canonical same-origin URL for the reply cache (validated params only). */
+function canonicalCacheUrl(requestUrl: URL, parsed: GeocodeQuery): string {
+  const key = new URL("/api/geocode", requestUrl.origin);
+  key.searchParams.set("q", parsed.query);
+  key.searchParams.set("limit", String(parsed.limit));
+  if (parsed.countrycodes) key.searchParams.set("countrycodes", parsed.countrycodes);
+  if (parsed.language) key.searchParams.set("lang", parsed.language);
+  return key.toString();
+}
+
 /** Map a Nominatim result to the minimized dropdown shape (lat/lon → lat/lng). */
 function toSuggestion(raw: {
   display_name?: unknown;
@@ -220,9 +231,12 @@ export async function GET(request: Request) {
   }
 
   const cache = geocodeCache();
-  // Cache key = the exact request URL (same pattern as the tile proxy); a
-  // plain Request built from the URL is the stable, portable cache key.
-  const cacheKey = new Request(request.url);
+  // Canonical cache key built from the VALIDATED parameters only (security
+  // audit 2026-11): junk query parameters, parameter order, case and
+  // whitespace variants of the same search share one entry, so a caller
+  // cannot multiply cache entries for one upstream query. A plain Request
+  // built from the URL is the stable, portable cache key.
+  const cacheKey = new Request(canonicalCacheUrl(url, parsed));
   if (cache) {
     try {
       const cached = await cache.match(cacheKey);

@@ -282,7 +282,7 @@ test("caches non-empty replies for 24 hours and stores them in the edge cache", 
   assert.equal(response.headers.get("cache-control"), "public, max-age=86400");
   assert.equal(response.headers.get("x-geocode-cache"), "miss");
   assert.equal(cacheState.putCalls.length, 1);
-  assert.equal(cacheState.putCalls[0].url, "https://osdb.test/api/geocode?q=Ferrara");
+  assert.equal(cacheState.putCalls[0].url, "https://osdb.test/api/geocode?q=Ferrara&limit=5", "canonical key from the validated parameters");
 });
 
 test("caches empty replies for only 1 hour so a typo that becomes a real place resolves quickly", async () => {
@@ -333,8 +333,46 @@ test("cache keys are per query URL: two different queries never share an entry",
   assert.equal((await dispatch("roma")).headers.get("x-geocode-cache"), "hit");
 
   assert.equal(upstreamCalls, 2, "each distinct query fetches the upstream exactly once");
-  assert.deepEqual(state.missFor.sort(), ["https://osdb.test/api/geocode?q=ferrara", "https://osdb.test/api/geocode?q=roma"]);
-  assert.deepEqual(state.hitFor.sort(), ["https://osdb.test/api/geocode?q=ferrara", "https://osdb.test/api/geocode?q=roma"]);
+  assert.deepEqual(state.missFor.sort(), ["https://osdb.test/api/geocode?q=ferrara&limit=5", "https://osdb.test/api/geocode?q=roma&limit=5"]);
+  assert.deepEqual(state.hitFor.sort(), ["https://osdb.test/api/geocode?q=ferrara&limit=5", "https://osdb.test/api/geocode?q=roma&limit=5"]);
+});
+
+test("cache key is canonical: junk params, order and whitespace variants share one entry (security audit 2026-11)", async () => {
+  const store = new Map();
+  const putUrls = [];
+  globalThis.caches = {
+    default: {
+      async match(request) {
+        const cached = store.get(String(request.url));
+        return cached
+          ? new Response(JSON.stringify(cached), { status: 200, headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=86400" } })
+          : null;
+      },
+      async put(request, response) {
+        putUrls.push(String(request.url));
+        store.set(String(request.url), await response.clone().json());
+      },
+      async delete() {},
+    },
+  };
+  let upstreamCalls = 0;
+  stubFetch(async () => {
+    upstreamCalls += 1;
+    return upstreamResponse([nominatimResult]);
+  });
+
+  const { GET } = await geocodeRoute();
+  const cacheStatus = async (query) => (await GET(apiRequest(`/api/geocode?${query}`))).headers.get("x-geocode-cache");
+
+  assert.equal(await cacheStatus("q=ferrara&limit=3&countrycodes=it&lang=it"), "miss");
+  assert.equal(await cacheStatus("lang=it&countrycodes=IT&limit=3&q=%20ferrara%20&junk=1"), "hit");
+  assert.equal(await cacheStatus("q=ferrara&limit=3&countrycodes=it&lang=it&cachebust=2"), "hit");
+  assert.equal(await cacheStatus("q=ferrara&limit=3&countrycodes=it&lang=xx"), "miss", "an ignored lang is a different (language-less) query");
+  assert.equal(upstreamCalls, 2);
+  assert.deepEqual(putUrls, [
+    "https://osdb.test/api/geocode?q=ferrara&limit=3&countrycodes=it&lang=it",
+    "https://osdb.test/api/geocode?q=ferrara&limit=3&countrycodes=it",
+  ]);
 });
 
 // ---------------------------------------------------------------------------

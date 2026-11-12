@@ -80,6 +80,17 @@ test("cache miss: live lookup + the address is persisted under the rounded key",
   assert.equal(row.address, "Via Roma 12, Ferrara, Italia");
 });
 
+test("cache miss: sends the caller-supplied origin Referer upstream, and none when absent", async () => {
+  const referers = [];
+  stubFetch((url, init) => {
+    referers.push(new Headers(init.headers).get("Referer"));
+    return nominatimReply("Via Roma 12, Ferrara, Italia");
+  });
+  await reverseGeocode.reverseGeocode(await freshDb(), 41.90282, 12.49638, { referer: "https://osdb.test/" });
+  await reverseGeocode.reverseGeocode(await freshDb(), 41.90282, 12.49638);
+  assert.deepEqual(referers, ["https://osdb.test/", null]);
+});
+
 test("cache hit: a nearby record (~11 m) reuses the stored address with ZERO network calls", async () => {
   stubFetch(() => nominatimReply("Via Roma 12, Ferrara, Italia"));
   const db = await freshDb();

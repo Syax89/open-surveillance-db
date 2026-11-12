@@ -55,6 +55,15 @@ export async function reverseGeocode(
   db: Awaited<ReturnType<typeof getD1>>,
   latitude: number,
   longitude: number,
+  options: {
+    /**
+     * Referer to send upstream, ALREADY reduced to an origin by the caller
+     * (app/lib/upstream-referer.ts originOnlyReferer) — same posture as the
+     * forward geocode and tile proxies (OSM policy: never strip or blank it,
+     * but no page path or query). Omitted when null/absent.
+     */
+    referer?: string | null;
+  } = {},
 ): Promise<ReverseGeocodeResult | null> {
   const [latKey, lngKey] = cacheKey(latitude, longitude);
   const cached = await db
@@ -69,7 +78,7 @@ export async function reverseGeocode(
   // merely for the cache. Browser/device coordinates can be sub-metre; an
   // approximate public-infrastructure address needs ~11m precision and the
   // published privacy notice promises Nominatim never sees more than that.
-  const address = await fetchReverseAddress(latKey, lngKey);
+  const address = await fetchReverseAddress(latKey, lngKey, options.referer ?? null);
   if (!address) return null;
 
   await db
@@ -82,12 +91,14 @@ export async function reverseGeocode(
   return { address, cached: false };
 }
 
-async function fetchReverseAddress(latitude: number, longitude: number): Promise<string | null> {
+async function fetchReverseAddress(latitude: number, longitude: number, referer: string | null): Promise<string | null> {
   const base = String(env.GEOCODER_BASE_URL ?? UPSTREAM_DEFAULT);
   const url = `${base}/reverse?lat=${latitude}&lon=${longitude}&format=jsonv2&zoom=18`;
   try {
+    const headers: Record<string, string> = { "User-Agent": REVERSE_UA, Accept: REVERSE_ACCEPT };
+    if (referer) headers.Referer = referer;
     const response = await fetch(url, {
-      headers: { "User-Agent": REVERSE_UA, Accept: REVERSE_ACCEPT },
+      headers,
       signal: AbortSignal.timeout(REVERSE_TIMEOUT_MS),
     });
     if (!response.ok) return null;
