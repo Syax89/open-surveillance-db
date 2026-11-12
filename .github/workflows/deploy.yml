@@ -53,6 +53,12 @@ permissions:
 jobs:
   deploy:
     name: Deploy Worker + D1 (production)
+    # Solo da main: workflow_dispatch consente di scegliere qualsiasi branch,
+    # e anche un dry-run da un branch non revisionato girerebbe con i secrets
+    # dell'environment production. Da main restano disponibili sia dry-run
+    # sia deploy. Va affiancato alle regole dell'Environment (required
+    # reviewers + deployment branches: main, docs/OPERATIONS.md §7).
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production
     timeout-minutes: 20
