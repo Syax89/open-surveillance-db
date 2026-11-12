@@ -58,7 +58,8 @@ test("/segnala: only the tool variant overrides the reusable desktop report grid
     /grid-template-columns:\s*minmax\(0,\s*1fr\)/,
     "/segnala must resolve to one flexible desktop column",
   );
-  assert.match(toolRule[1], /max-width:\s*920px/, "the long form keeps a readable desktop measure");
+  assert.match(toolRule[1], /max-width:\s*none/, "the form spans the page width (2026-11); readability comes from the two-column form on wide screens");
+  assert.match(css, /\.report-section--tool \.report-form \{ grid-template-columns:minmax\(0,1\.2fr\) minmax\(0,1fr\)/, "wide screens split the form into two readable columns");
 
   const tablet = mediaBlocks(css).find((block) => block.width === 980 && /\.report-section/.test(block.body));
   assert.ok(tablet, "expected the generic tablet breakpoint carrying the report grid");

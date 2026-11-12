@@ -395,6 +395,17 @@ changes accumulate under `[Unreleased]`.
 
 ### Changed
 
+- **Report form and account polish (2026-11):** on wide screens `/segnala`
+  splits into two columns (step 1, map + coordinates, on the left across two
+  rows; steps 2 and 3 on the right) instead of a 920px block centred under a
+  left-aligned heading. The account profile facts use a content-sized label
+  column instead of a 50/50 split, and "Member since" / passkey dates use the
+  site's long, locale-aware date ("12 November 2026") instead of the
+  browser default ("11/12/2026"). `/correggi` follows the same pattern: the
+  privacy note sits above and the form spans the page, steps 1–2 on the left
+  and contact + send on the right, instead of a form pushed right next to an
+  empty half-page.
+
 - **Map popup and link rows (2026-11):** the desktop marker popup is up to
   340px wide (was 300) and its short facts stay on one line, so the
   coordinates no longer wrap and "Confirm" no longer splits as "Confir/m"

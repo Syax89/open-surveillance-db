@@ -8,6 +8,8 @@
 // so the handler comes from the parent.
 
 import { useDomainMessages } from "../lib/use-domain-messages";
+import { formatPublicDate } from "../lib/format-date";
+import { useLocale } from "../components/LocaleProvider";
 import { authByLocale } from "../lib/i18n/auth";
 import { ModerationShortcutLink } from "../components/moderation/ModerationShortcutLink";
 import { DisplayNameField } from "./DisplayNameField";
@@ -23,7 +25,10 @@ type Props = {
 
 export function ProfileSection({ contributor, role, onContributorUpdated, onLogout }: Props) {
   const t = useDomainMessages(authByLocale);
-  const memberSince = new Date(contributor.createdAt).toLocaleDateString();
+  const { locale } = useLocale();
+  // Same long, locale-aware, UTC date as the rest of the site (was the
+  // browser default "11/12/2026": US order, ambiguous for Italian readers).
+  const memberSince = formatPublicDate(contributor.createdAt, locale);
 
   return (
     <section aria-labelledby="profile-title" className="account-profile-grid">
