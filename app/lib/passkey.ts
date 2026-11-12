@@ -114,3 +114,23 @@ export function isCounterAdvancementOk(newCounter: number, storedCounter: number
   if (newCounter === 0 && storedCounter === 0) return true;
   return newCounter > storedCounter;
 }
+
+/**
+ * Machine-readable marker for the "email not verified" refusal of the
+ * passkey enrolment routes (register/begin + register/complete). A 403 like
+ * the CSRF rejection, so the client must read `code` to tell them apart.
+ */
+export const EMAIL_UNVERIFIED_CODE = "email_unverified";
+
+/**
+ * 403 answered by passkey enrolment while the account's email is
+ * unverified (pre-registration account-takeover guard): a credential is only
+ * ever bound to an account whose mailbox control has been proven.
+ */
+export function emailUnverifiedResponse(): Response {
+  return Response.json(
+    { error: "Verify your email address before adding a passkey.", code: EMAIL_UNVERIFIED_CODE },
+    { status: 403, headers: { "Cache-Control": "no-store" } },
+  );
+}
+

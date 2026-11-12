@@ -185,13 +185,10 @@ test("register/begin excludes the contributor's existing passkeys from re-enroll
   ]);
 });
 
-test("register/begin allows enrollment for an UNVERIFIED account (documented choice, t_f940482b)", async () => {
-  // CEO decision (a): the LOGIN is blocked pre-verification, but enrollment
-  // stays open — the enrolled passkey is INERT until the email is verified
-  // (login/complete is gated by sessionGate), so allowing it is harmless and
-  // lets the user set up their second factor in the same read-only register
-  // session where they verify. The write gate (403) blocks every write
-  // regardless. See the route comment and ADR 0020 decision 2.
+test("register/begin REFUSES enrollment for an UNVERIFIED account (pre-registration takeover guard)", async () => {
+  // Security fix superseding t_f940482b "CEO decision (a)": an attacker who
+  // pre-registers someone else's address must not be able to bind a passkey
+  // that would go live once the real owner verifies (or resets) the email.
   stub("findSessionByToken", async () => ({
     ...session,
     contributor: { ...contributor, emailVerifiedAt: null },
@@ -201,8 +198,11 @@ test("register/begin allows enrollment for an UNVERIFIED account (documented cho
   stub("createWebAuthnChallenge", async () => ({ id: 1 }));
   const { POST } = await registerBeginRoute();
   const response = await POST(authedRequest("/api/auth/passkey/register/begin", { method: "POST" }));
-  assert.equal(response.status, 200);
-  assert.ok((await responseBody(response)).options, "a register ceremony can start for an unverified account");
+  assert.equal(response.status, 403);
+  const body = await responseBody(response);
+  assert.equal(body.code, "email_unverified");
+  assert.equal(body.options, undefined);
+  assert.equal(callArgs("createWebAuthnChallenge").length, 0, "no challenge minted for an unverified account");
 });
 
 // ---------------------------------------------------------------------------
@@ -227,6 +227,26 @@ test("register/complete requires a valid CSRF token", async () => {
     }),
   );
   assert.equal(response.status, 403);
+});
+
+test("register/complete REFUSES an UNVERIFIED account: no passkey, no recovery codes, challenge not burned", async () => {
+  stub("findSessionByToken", async () => ({
+    ...session,
+    contributor: { ...contributor, emailVerifiedAt: null },
+  }));
+  stub("consumeWebAuthnChallenge", async () => ({ id: 1, kind: "register", contributorId: 7 }));
+  const { POST } = await registerCompleteRoute();
+  const response = await POST(
+    authedRequest("/api/auth/passkey/register/complete", {
+      method: "POST",
+      body: { challenge: "c1", response: { id: "cred-x", response: {} } },
+    }),
+  );
+  assert.equal(response.status, 403);
+  assert.equal((await responseBody(response)).code, "email_unverified");
+  assert.equal(callArgs("consumeWebAuthnChallenge").length, 0);
+  assert.equal(callArgs("createPasskey").length, 0);
+  assert.equal(callArgs("issueRecoveryCodes").length, 0);
 });
 
 test("register/complete rejects a malformed payload", async () => {

@@ -9,7 +9,7 @@ import { resolveOptionalContributor } from "../../../../../lib/auth-session";
 import { authLimit } from "../../../../../lib/auth-route-helpers";
 import { csrfVerified, sameOrigin } from "../../../../../lib/csrf";
 import { urlTooLong } from "../../../../../lib/input-limits";
-import { userHandleForContributor, webauthnRpConfig } from "../../../../../lib/passkey";
+import { emailUnverifiedResponse, userHandleForContributor, webauthnRpConfig } from "../../../../../lib/passkey";
 
 /**
  * POST /api/auth/passkey/register/begin — start a WebAuthn registration
@@ -26,14 +26,21 @@ import { userHandleForContributor, webauthnRpConfig } from "../../../../../lib/p
  * keeps the ceremony privacy-preserving (no device attestation is
  * collected — AUTH_OPTIONS.md §3: verification is enough).
  *
- * Enrollment is deliberately open to UNVERIFIED accounts (t_f940482b,
- * CEO decision (a)): an account holding the read-only register session may
- * enroll a passkey here, but the passkey is INERT until the email is
- * verified — login/complete refuses it with the same generic 401 as any
- * other failure (sessionGate), so no session can be opened with it, and the
- * write gate (403) blocks every write. Allowing the enrollment means the
- * user can set up their second factor during the same session where they
- * verify; the login gate stays the enforcement point.
+ * Enrollment REQUIRES A VERIFIED EMAIL (security fix, supersedes the
+ * earlier t_f940482b "CEO decision (a)" open enrolment). The old design let
+ * the read-only register session of an UNVERIFIED account enroll a passkey
+ * (and receive recovery codes), reasoning that the credential stayed inert
+ * until verification. That was a pre-registration account takeover: an
+ * attacker registers victim@example.org, enrolls a passkey, then waits —
+ * when the real mailbox owner later verifies the address or completes a
+ * password reset (which also sets `email_verified_at`), the attacker's
+ * passkey and recovery codes become live credentials on the victim's
+ * account. A credential may now only be bound to an account whose mailbox
+ * control has been proven, so begin AND complete answer 403
+ * `{ code: "email_unverified" }` for an unverified account (the /account
+ * client maps the code to the "verify your email" copy). Defence in depth
+ * for legacy rows: the first verification and every password reset purge
+ * pre-existing passkeys, recovery codes and API keys (db/auth/email-tokens).
  */
 export async function POST(request: Request) {
   if (urlTooLong(request)) {
@@ -57,6 +64,9 @@ export async function POST(request: Request) {
     }
 
     const { contributor } = resolved;
+    // Pre-registration takeover guard: no credential enrolment before the
+    // mailbox is proven (see the doc comment above).
+    if (!contributor.emailVerifiedAt) return emailUnverifiedResponse();
     const rp = webauthnRpConfig(env);
 
     // Opportunistic expiry sweep (bounded by the 10-minute TTL).

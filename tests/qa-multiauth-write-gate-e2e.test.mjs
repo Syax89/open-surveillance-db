@@ -385,18 +385,15 @@ test("passkey: enroll reale → login reale → write 201, e il counter replay �
 });
 
 // ---------------------------------------------------------------------------
-// 2c. Passkey + verification gate (t_f940482b): enroll pre-verifica è
-//     permesso (scelta documentata) ma login è bloccato finché l'email non
-//     è verificata — CEO decision (a) estesa a TUTTI i metodi di login
+// 2c. Passkey + verification gate: l'enrollment pre-verifica è RIFIUTATO
+//     (403 email_unverified — fix del pre-registration account takeover,
+//     supera la vecchia CEO decision (a)); dopo la verifica l'enrollment e il
+//     login funzionano; righe legacy pre-verifica vengono purgate alla
+//     prima verifica.
 // ---------------------------------------------------------------------------
 
-/**
- * register reale (NON verificato) + cerimonia di enrollment passkey reale
- * (attestation firmata) → passkey nel DB, 10 recovery codes emessi, l'account
- * è ancora email_verified_at NULL. Ritorna tutto ciò che il test del gate
- * serve per la seconda metà (verify via mail + login passkey).
- */
-async function registerUnverifiedAndEnrollPasskey() {
+/** register reale (NON verificato): sessione read-only + token di verifica. */
+async function registerUnverified() {
   const email = `qa-gate-${crypto.randomUUID()}@example.org`;
   const response = await registerRoute.POST(apiRequest("/api/auth/register", {
     method: "POST",
@@ -406,23 +403,20 @@ async function registerUnverifiedAndEnrollPasskey() {
   const session = sessionHeaders(response);
   const rawVerifyToken = mailToken();
   assert.ok(rawVerifyToken, "captured mail carries the raw verification token");
-
   const contributorId = (await env.DB.prepare(
     "SELECT id FROM contributors WHERE email = ?",
   ).bind(email).first()).id;
-  const keypair = generateKeypair();
-  const credentialId = crypto.randomUUID().replaceAll("-", "");
+  return { email, session, rawVerifyToken, contributorId };
+}
 
-  // Enrollment con account NON verificato: PERMESSO (scelta documentata in
-  // register/begin e ADR 0020 decision 2 — la passkey è inerte finché
-  // l'email non è verificata).
+async function enrollPasskey(session, keypair, credentialId) {
   const begin = await passkeyRegisterBeginRoute.POST(
     apiRequest("/api/auth/passkey/register/begin", {
       method: "POST",
       headers: { cookie: session.cookie, "x-csrf-token": session.csrfToken },
     }),
   );
-  assert.equal(begin.status, 200, "enrollment can start on an unverified account");
+  if (begin.status !== 200) return { begin };
   const beginBody = await responseBody(begin);
   const complete = await passkeyRegisterCompleteRoute.POST(
     apiRequest("/api/auth/passkey/register/complete", {
@@ -439,115 +433,95 @@ async function registerUnverifiedAndEnrollPasskey() {
       },
     }),
   );
-  assert.equal(complete.status, 200, "attestation valida deve superare verifyRegistrationResponse reale");
-  const completeBody = await responseBody(complete);
-  assert.equal(completeBody.recoveryCodes.length, 10, "enrollment emette esattamente 10 recovery codes");
-
-  const stillUnverified = await env.DB.prepare(
-    "SELECT email_verified_at FROM contributors WHERE id = ?",
-  ).bind(contributorId).first();
-  assert.equal(stillUnverified.email_verified_at, null, "the account is still unverified after enrollment");
-
-  return { email, session, rawVerifyToken, contributorId, credentialId, keypair, recoveryCodes: completeBody.recoveryCodes };
+  return { begin, complete };
 }
 
-test("passkey: enroll (unverified) → login 401 → verify → login 200 — lo stesso credenziale (t_f940482b)", async () => {
-  const { email, rawVerifyToken, contributorId, credentialId, keypair } =
-    await registerUnverifiedAndEnrollPasskey();
+test("passkey: enroll RIFIUTATO su account non verificato (403) → verify → enroll → login 200", async () => {
+  const { email, session, rawVerifyToken, contributorId } = await registerUnverified();
+  const keypair = generateKeypair();
+  const credentialId = crypto.randomUUID().replaceAll("-", "");
 
-  // --- Login passkey PRIMA della verifica: l'asserzione firmata è valida
-  //     (tutte le verifiche reali passano), ma il gate risponde lo STESSO
-  //     401 generico di ogni altro fallimento — nessuna sessione. ---
-  const loginBegin = await passkeyLoginBeginRoute.POST(
-    apiRequest("/api/auth/passkey/login/begin", { method: "POST", body: { email } }),
-  );
-  assert.equal(loginBegin.status, 200);
-  const loginBeginBody = await responseBody(loginBegin);
-  const assertion = buildAuthenticationResponse({
-    challenge: loginBeginBody.options.challenge,
-    credentialId,
-    keypair,
-    signCount: 2, // counter: 1 (enroll) → 2
-    userHandle: Buffer.from(String(contributorId)).toString("base64url"),
-  });
-  const denied = await passkeyLoginCompleteRoute.POST(
-    apiRequest("/api/auth/passkey/login/complete", {
+  // Pre-verifica: begin E complete rifiutano con 403 email_unverified.
+  const refused = await enrollPasskey(session, keypair, credentialId);
+  assert.equal(refused.begin.status, 403, "no passkey enrolment before the mailbox is proven");
+  assert.equal((await responseBody(refused.begin)).code, "email_unverified");
+  const refusedComplete = await passkeyRegisterCompleteRoute.POST(
+    apiRequest("/api/auth/passkey/register/complete", {
       method: "POST",
-      body: { challenge: loginBeginBody.options.challenge, response: assertion },
+      headers: { cookie: session.cookie, "x-csrf-token": session.csrfToken },
+      body: { challenge: "forged-challenge", response: { id: credentialId, response: {} } },
     }),
   );
-  assert.equal(denied.status, 401, "a valid assertion for an UNVERIFIED account must NOT open a session");
-  assert.deepEqual(await responseBody(denied), { error: "Passkey verification failed." });
-  assert.equal(denied.headers.getSetCookie().length, 0, "no session cookie before verification");
-  // Il counter è comunque avanzato: l'asserzione era valida (stesso
-  // principio del PBKDF2 pagato prima del gate su /login).
-  const counterAfterDenied = (await env.DB.prepare(
-    "SELECT counter FROM passkeys WHERE credential_id = ?",
-  ).bind(credentialId).first()).counter;
-  assert.equal(counterAfterDenied, 2, "the counter advances on a valid-but-gated assertion");
+  assert.equal(refusedComplete.status, 403);
+  assert.equal((await responseBody(refusedComplete)).code, "email_unverified");
+  const stored = await env.DB.prepare(
+    "SELECT (SELECT COUNT(*) FROM passkeys WHERE contributor_id = ?) AS passkeys, (SELECT COUNT(*) FROM recovery_codes WHERE contributor_id = ?) AS codes",
+  ).bind(contributorId, contributorId).first();
+  assert.deepEqual({ ...stored }, { passkeys: 0, codes: 0 }, "nothing bound to the unverified account");
 
-  // --- Verifica reale via link email, poi la STESSA passkey apre una
-  //     sessione che scrive. ---
+  // Verifica reale, poi la STESSA sessione può fare l'enrollment.
   const verify = await verifyEmailRoute.GET(
     apiRequest(`/api/auth/verify-email?token=${encodeURIComponent(rawVerifyToken)}`),
   );
   assert.equal(verify.status, 200);
+  const enrolled = await enrollPasskey(session, keypair, credentialId);
+  assert.equal(enrolled.begin.status, 200);
+  assert.equal(enrolled.complete.status, 200, "attestation valida deve superare verifyRegistrationResponse reale");
+  assert.equal((await responseBody(enrolled.complete)).recoveryCodes.length, 10);
 
-  const loginBegin2 = await passkeyLoginBeginRoute.POST(
+  const loginBegin = await passkeyLoginBeginRoute.POST(
     apiRequest("/api/auth/passkey/login/begin", { method: "POST", body: { email } }),
   );
-  const loginBegin2Body = await responseBody(loginBegin2);
-  const assertion2 = buildAuthenticationResponse({
-    challenge: loginBegin2Body.options.challenge,
-    credentialId,
-    keypair,
-    signCount: 3, // counter: 2 (tentativo gated) → 3 — NON 2, che sarebbe replay
-    userHandle: Buffer.from(String(contributorId)).toString("base64url"),
-  });
+  const loginBeginBody = await responseBody(loginBegin);
   const allowed = await passkeyLoginCompleteRoute.POST(
     apiRequest("/api/auth/passkey/login/complete", {
       method: "POST",
-      body: { challenge: loginBegin2Body.options.challenge, response: assertion2 },
+      body: {
+        challenge: loginBeginBody.options.challenge,
+        response: buildAuthenticationResponse({
+          challenge: loginBeginBody.options.challenge,
+          credentialId,
+          keypair,
+          signCount: 2,
+          userHandle: Buffer.from(String(contributorId)).toString("base64url"),
+        }),
+      },
     }),
   );
-  assert.equal(allowed.status, 200, "after verification the SAME passkey logs in");
-  const passkeySession = sessionHeaders(allowed);
-  assert.ok(passkeySession.cookie.includes("osdb_session="), "a session is issued after verification");
-
-  const accepted = await camerasRoute.POST(writeWith(passkeySession));
+  assert.equal(allowed.status, 200, "after verification the enrolled passkey logs in");
+  const accepted = await camerasRoute.POST(writeWith(sessionHeaders(allowed)));
   assert.equal(accepted.status, 201, "passkey-opened session must pass the write gate after verification");
 });
 
-test("recovery: riscatto bloccato su account non verificato (401), dopo verify apre una sessione che scrive (t_f940482b)", async () => {
-  const { email, rawVerifyToken, recoveryCodes } = await registerUnverifiedAndEnrollPasskey();
+test("legacy: passkey + recovery codes legati PRIMA della verifica sono purgati alla prima verifica (takeover)", async () => {
+  const { email, rawVerifyToken, contributorId } = await registerUnverified();
+  // Righe legacy (pre-fix): un attaccante che ha pre-registrato l'indirizzo
+  // ha legato passkey e recovery codes mentre l'account era non verificato.
+  const passkeys = await loadE2EModule("db/passkeys.mjs");
+  await env.DB.prepare(
+    "INSERT INTO passkeys (contributor_id, credential_id, public_key, counter, transports, created_at) VALUES (?, ?, ?, 0, NULL, ?)",
+  ).bind(contributorId, "attacker-cred", "attacker-cose-key", new Date().toISOString()).run();
+  const recoveryCodes = await passkeys.issueRecoveryCodes(contributorId);
 
-  // Riscatto PRIMA della verifica: lo STESSO 401 generico di un codice
-  // errato, nessuna sessione (il codice valido è comunque consumato —
-  // single-use, l'account state è ciò che blocca la sessione).
+  // Il vero proprietario della mailbox verifica: le credenziali
+  // dell'attaccante spariscono nello stesso batch atomico.
+  const verify = await verifyEmailRoute.GET(
+    apiRequest(`/api/auth/verify-email?token=${encodeURIComponent(rawVerifyToken)}`),
+  );
+  assert.equal(verify.status, 200);
+  const left = await env.DB.prepare(
+    "SELECT (SELECT COUNT(*) FROM passkeys WHERE contributor_id = ?) AS passkeys, (SELECT COUNT(*) FROM recovery_codes WHERE contributor_id = ?) AS codes",
+  ).bind(contributorId, contributorId).first();
+  assert.deepEqual({ ...left }, { passkeys: 0, codes: 0 });
+
+  // Il codice dell'attaccante non apre più nessuna sessione.
   const denied = await recoveryRoute.POST(apiRequest("/api/auth/recovery", {
     method: "POST",
     body: { email, code: recoveryCodes[0] },
   }));
-  assert.equal(denied.status, 401, "a valid code for an UNVERIFIED account must NOT open a session");
+  assert.equal(denied.status, 401);
   assert.deepEqual(await responseBody(denied), { error: "Invalid recovery code." });
-  assert.equal(denied.headers.getSetCookie().length, 0, "no session cookie before verification");
-
-  // Dopo la verifica, un ALTRO codice apre una sessione che scrive.
-  const verify = await verifyEmailRoute.GET(
-    apiRequest(`/api/auth/verify-email?token=${encodeURIComponent(rawVerifyToken)}`),
-  );
-  assert.equal(verify.status, 200);
-
-  const redeemed = await recoveryRoute.POST(apiRequest("/api/auth/recovery", {
-    method: "POST",
-    body: { email, code: recoveryCodes[1] },
-  }));
-  assert.equal(redeemed.status, 200);
-  assert.equal((await responseBody(redeemed)).recoveryUsed, true);
-  const recoveryHeaders = sessionHeaders(redeemed);
-
-  const accepted = await camerasRoute.POST(writeWith(recoveryHeaders));
-  assert.equal(accepted.status, 201, "recovery-opened session must pass the write gate after verification");
+  assert.equal(denied.headers.getSetCookie().length, 0);
 });
 
 test("verify-email: un token oltre il TTL di 24h risponde 410 (link morto)", async () => {

@@ -7,6 +7,7 @@
 // is covered by tests/api-auth.test.mjs with db/auth mocked.
 
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { after, beforeEach, test } from "node:test";
 import { D1SqliteDatabase } from "./helpers/d1-sqlite.mjs";
 import {
@@ -857,6 +858,99 @@ test("markContributorEmailVerified is idempotent — the first timestamp wins", 
   const reVerified = await auth.markContributorEmailVerified(contributor.id, "2026-08-01T00:10:00.000Z");
   assert.equal(reVerified.emailVerifiedAt, "2026-08-01T00:05:00.000Z", "COALESCE keeps the original timestamp");
   assert.equal(await auth.markContributorEmailVerified(999), null, "unknown account -> null");
+});
+
+/** Bind a passkey, recovery codes and a live API key to a contributor (real db layer). */
+async function bindAlternativeCredentials(contributorId, tag) {
+  const { passkeys, apiKeys } = runtime;
+  await passkeys.createPasskey({
+    contributorId,
+    credentialId: `cred-${tag}`,
+    publicKey: "cose-public-key",
+    counter: 0,
+    transports: undefined,
+    now: NOW,
+  });
+  await passkeys.issueRecoveryCodes(contributorId);
+  const minted = await apiKeys.createApiKey({ contributorId, name: `key-${tag}`, now: NOW });
+  return minted.rawKey;
+}
+
+async function credentialCounts(contributorId) {
+  const count = async (sql) =>
+    (await runtime.env.DB.prepare(sql).bind(contributorId).first()).n;
+  return {
+    passkeys: await count("SELECT COUNT(*) AS n FROM passkeys WHERE contributor_id = ?"),
+    recoveryCodes: await count("SELECT COUNT(*) AS n FROM recovery_codes WHERE contributor_id = ?"),
+    liveApiKeys: await count("SELECT COUNT(*) AS n FROM api_keys WHERE contributor_id = ? AND revoked_at IS NULL"),
+    apiKeys: await count("SELECT COUNT(*) AS n FROM api_keys WHERE contributor_id = ?"),
+  };
+}
+
+test("the FIRST email verification purges credentials bound before verification (pre-registration takeover)", async () => {
+  const { auth } = runtime;
+  const contributor = await makeContributor(auth, "pre-registered@example.org");
+  // Legacy rows: an attacker who pre-registered the address enrolled these
+  // while the account was unverified (the routes now refuse that).
+  await bindAlternativeCredentials(contributor.id, "attacker");
+  const other = await makeContributor(auth, "bystander@example.org");
+  await bindAlternativeCredentials(other.id, "bystander");
+
+  const verified = await auth.markContributorEmailVerified(contributor.id, "2026-08-01T00:05:00.000Z");
+  assert.equal(verified.emailVerifiedAt, "2026-08-01T00:05:00.000Z");
+  assert.deepEqual(await credentialCounts(contributor.id), {
+    passkeys: 0,
+    recoveryCodes: 0,
+    liveApiKeys: 0,
+    apiKeys: 1, // soft-revoked (D9), not deleted
+  });
+  assert.deepEqual(
+    await credentialCounts(other.id),
+    { passkeys: 1, recoveryCodes: 10, liveApiKeys: 1, apiKeys: 1 },
+    "another account's credentials are untouched",
+  );
+});
+
+test("a REPEAT verification of an already-verified account keeps its credentials", async () => {
+  const { auth } = runtime;
+  const contributor = await makeContributor(auth, "verified-owner@example.org");
+  await auth.markContributorEmailVerified(contributor.id, "2026-08-01T00:05:00.000Z");
+  // Bound AFTER verification by the proven mailbox owner: legitimate.
+  await bindAlternativeCredentials(contributor.id, "owner");
+
+  await auth.markContributorEmailVerified(contributor.id, "2026-08-01T00:10:00.000Z");
+  assert.deepEqual(await credentialCounts(contributor.id), {
+    passkeys: 1,
+    recoveryCodes: 10,
+    liveApiKeys: 1,
+    apiKeys: 1,
+  });
+});
+
+test("applyPasswordReset deletes passkeys + recovery codes and revokes API keys atomically with the rotation", async () => {
+  const { auth, apiKeys } = runtime;
+  const contributor = await makeContributor(auth, "lost-control@example.org");
+  await auth.markContributorEmailVerified(contributor.id, NOW);
+  const rawKey = await bindAlternativeCredentials(contributor.id, "lost");
+  const other = await makeContributor(auth, "unrelated@example.org");
+  await auth.markContributorEmailVerified(other.id, NOW);
+  await bindAlternativeCredentials(other.id, "unrelated");
+
+  const profile = await auth.applyPasswordReset(contributor.id, "brand-new-password1", NOW);
+  assert.equal(profile.id, contributor.id, "the refreshed profile is still returned");
+  assert.deepEqual(await credentialCounts(contributor.id), {
+    passkeys: 0,
+    recoveryCodes: 0,
+    liveApiKeys: 0,
+    apiKeys: 1,
+  });
+  const keyHash = createHash("sha256").update(rawKey).digest("hex");
+  assert.equal(await apiKeys.findApiKeyByHash(keyHash, NOW), null, "the revoked key no longer authenticates");
+  assert.deepEqual(
+    await credentialCounts(other.id),
+    { passkeys: 1, recoveryCodes: 10, liveApiKeys: 1, apiKeys: 1 },
+    "another account's credentials are untouched",
+  );
 });
 
 test("resetContributorPassword rotates the hash; the old password stops working", async () => {

@@ -877,6 +877,37 @@ test("account: a 403 on enroll begin (expired CSRF) shows the actionable securit
   assert.equal(screen.queryByRole("alertdialog"), null);
 });
 
+test("account: a 403 email_unverified on enroll begin shows the verify-your-email copy, not the CSRF error", async () => {
+  const { screen, waitFor } = rtl;
+  const user = rtl.userEvent.setup();
+  installFetchMock((input, init) => {
+    if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
+    if (input === "/api/auth/me") return jsonResponse(profileFixture);
+    if (typeof input === "string" && input.startsWith("/api/auth/me/contributions")) {
+      return jsonResponse(contributionsFixture);
+    }
+    if (input === "/api/auth/passkey/credentials") return jsonResponse({ credentials: [] });
+    if (input === "/api/auth/passkey/register/begin") {
+      return jsonResponse(
+        { error: "Verify your email address before adding a passkey.", code: "email_unverified" },
+        { status: 403 },
+      );
+    }
+    return jsonResponse({ error: "unexpected route" }, { status: 404 });
+  });
+  installWebAuthnGlobals(() => fakeRegistrationCredential(), () => { throw new Error("unused"); });
+  document.cookie = "osdb_csrf=fixture-csrf-token; path=/";
+
+  await renderWithLocale(React.createElement(AccountPage));
+  await waitFor(() => assert.ok(screen.queryAllByText("Fixture Contributor").length >= 1));
+  await user.click(screen.getByRole("button", { name: "Add passkey" }));
+
+  await waitFor(() => assert.ok(screen.getByRole("alert")));
+  assert.ok(screen.getByText("Your account is not verified yet. Check your inbox for the confirmation link, or resend it."));
+  assert.equal(screen.queryByText("Your security token expired. Refresh the page and try again."), null);
+  assert.equal(screen.queryByRole("alertdialog"), null);
+});
+
 test("account: an unverified contributor sees the verification banner with a working resend", async () => {
   const { screen, waitFor } = rtl;
   const user = rtl.userEvent.setup();
