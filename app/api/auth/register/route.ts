@@ -1,20 +1,18 @@
 import { env } from "cloudflare:workers";
+import { getRequestExecutionContext } from "vinext/shims/request-context";
 import { localeFromCookieHeader } from "../../../lib/i18n/types";
 import {
   createContributor,
-  createSession,
   createVerificationToken,
   deleteRegistrationAttempt,
+  findContributorByEmail,
   isValidEmail,
   normalizeEmail,
   recordRegistrationAttempt,
   registrationIpHash,
-  type PublicContributor,
 } from "../../../../db/auth";
-import { sessionCookieHeaders, sessionTtlSeconds } from "../../../lib/auth-session";
 import {
   authLimit,
-  cookieHeaderInit,
   isValidPassword,
   parseDisplayName,
 } from "../../../lib/auth-route-helpers";
@@ -26,38 +24,47 @@ import { callerKey, registrationIpLimits } from "../../../lib/rate-limit";
 import { releaseEmailReservation, reserveAuthEmail, sendAuthEmail } from "../../../../db/mailer";
 
 /**
- * POST /api/auth/register — create a contributor account and open a
- * READ-ONLY session (multi-method auth Fase B).
+ * POST /api/auth/register — create a contributor account (multi-method auth
+ * Fase B), WITHOUT revealing whether the address already has one.
  *
- * Registration now proves mailbox control before the account can write:
- *   1. the contributor is created with `email_verified_at = NULL`;
- *   2. a single-use, 24h verification token is minted (hash-only in D1) and
- *      emailed via the Cloudflare `send_email` binding (canonical mailer
- *      db/mailer.ts, ADR 0020 — atomic reservation → render → send → settle);
- *   3. a session is opened exactly as before — but it is READ-ONLY until
- *      `email_verified_at` is set: the write gate (Fase E1) refuses every
- *      state-changing write for unverified accounts (403). GET /api/auth/me
- *      exposes `contributor.emailVerifiedAt` so the client can show the
- *      "verify your email" state.
+ * Anti-enumeration (owner decision, ethics/privacy): on a site that maps
+ * surveillance cameras, confirming that someone — an activist, a
+ * journalist — has an account can expose them. So a valid request answers
+ * the SAME 202 `{ ok: true, status: "check_email" }`, with the same
+ * headers (no Set-Cookie, `Cache-Control: no-store`), whether the address
+ * is new or already registered. What happens next is told only to the
+ * mailbox owner:
  *
- * The mailer budget (1 email per 5 minutes per contributor, issue #440 —
- * shared with resend and password reset) is admitted ATOMICALLY BEFORE the
- * token is minted: `reserveAuthEmail` INSERTs the `email_send_log` row only
- * while the in-window count is below the limit, and a fresh account (zero
- * rows) always wins its slot. The reservation row is kept when the provider
- * accepts the email and rolled back on a deterministic pre-delivery failure,
- * so a deterministic failure never burns the budget (an ambiguous provider
- * outcome keeps the short reservation to avoid a duplicate-mail burst — see
- * db/mailer.ts).
+ *   - NEW address: the contributor is created with `email_verified_at =
+ *     NULL` and a single-use, 24h verification link is emailed (canonical
+ *     mailer db/mailer.ts, ADR 0020 — atomic reservation → mint → send →
+ *     settle). NO session is opened any more: a Set-Cookie on the new-account
+ *     branch only would be an existence oracle. The user verifies through
+ *     the link, then signs in (the login gate refuses unverified accounts).
+ *   - EXISTING address: nothing is created or changed; the owner receives
+ *     an "account exists" notice (sign in / reset password links, no token).
+ *     The notice shares the per-contributor mail window AND has its own
+ *     daily cap (ACCOUNT_EXISTS_EMAIL_DAILY_MAX, db/mailer.ts), so the
+ *     public form cannot be used to flood someone's inbox. Past the cap the
+ *     route still answers the generic 202 and sends nothing.
  *
- * Mail is best-effort and NEVER fails registration: a mail outage still
- * returns 201 (the user can re-send from the session via
- * POST /api/auth/verify-email/resend). `verification.sent` is true ONLY
- * when the provider accepted the email; the raw token NEVER appears in the
- * response (it lives only in the email — fail-closed, no dev-link echo).
+ * Timing: both branches pay the same PBKDF2 hashing (createContributor
+ * hashes BEFORE the INSERT, and the unique email index — never a pre-check
+ * SELECT — is what detects an existing address), and the mail work
+ * (reservation, token mint, provider send) runs AFTER the response inside
+ * the Worker's `ctx.waitUntil` (vinext exposes the request ExecutionContext
+ * through `getRequestExecutionContext`), the same pattern as
+ * POST /api/auth/reset-password/request. Without an ExecutionContext
+ * (plain-Node dev server, tests) the mail work runs inline; its failures
+ * are logged and never change the response (mail is best-effort).
  *
- * The email+password contract from ADR 0013 is unchanged (PBKDF2 hashing,
- * no magic links, cookies `osdb_session` + `osdb_csrf`).
+ * The per-IP registration attempt is kept for BOTH branches (it is only
+ * rolled back on a validation / server error): rolling it back for one
+ * branch only would make the cap itself an oracle.
+ *
+ * The raw verification token NEVER appears in the response (it lives only
+ * in the email — fail-closed, no dev-link echo). The email+password
+ * contract from ADR 0013 is unchanged (PBKDF2 hashing, no magic links).
  */
 export async function POST(request: Request) {
   // Input limits: reject absurdly long URLs before any parsing work.
@@ -84,9 +91,10 @@ export async function POST(request: Request) {
   // ONE batch (atomic, so concurrent registrations cannot race past a stale
   // count); the request that brings the count to the cap answers 429 with the
   // generic anti-enumeration body (no email/IP echo) and its reservation row
-  // STAYS so the cap keeps holding. On any non-201 exit the reservation is
-  // rolled back (no account was created -> the budget is not consumed and the
-  // malformed-body "no write" contract holds). The stored key is
+  // STAYS so the cap keeps holding. On a validation or server error the
+  // reservation is rolled back (the malformed-body "no write" contract
+  // holds); a valid request keeps it whether or not the address was new (see
+  // the doc comment). The stored key is
   // `registrationIpHash(callerKey, REGISTRATION_IP_HMAC_KEY)` — a keyed HMAC
   // (or truncated SHA-256 when the key is absent, local prototype/tests),
   // never the raw IP and never an invertible hash (privacy by design,
@@ -117,20 +125,9 @@ export async function POST(request: Request) {
     );
   }
 
-  // Reservation of the verification-email slot, tracked across the try so an
-  // early failure (token mint / session) rolls it back and does not burn the
-  // mail budget (issue #440). sendAuthEmail settles the reservation itself
-  // (kept on success, released on a deterministic failure, retained on an
-  // ambiguous provider outcome) and the id is cleared the moment it returns,
-  // so the catch below covers ONLY token-mint / pre-send exceptions and can
-  // never delete the send-log row of an email the provider already accepted.
-  let mailReservation: { reservationId: number; contributorId: number; kind: "verify" } | null = null;
-
   try {
     const payload: unknown = await readJsonBody(request, env);
     if (!isRecord(payload)) {
-      // Generic body shared with the 409 below: register is a public
-      // endpoint and must not reveal why it failed (account enumeration).
       await rollbackAttempt();
       return Response.json(
         { error: "Unable to register with this email." },
@@ -149,96 +146,32 @@ export async function POST(request: Request) {
     }
 
     // No pre-check for an existing email: the unique email index is the
-    // single source of truth. A pre-check SELECT would be both a redundant
-    // query and a timing oracle (existing email answered in ~ms vs ~100ms of
-    // PBKDF2 hashing for a new one), which would let a caller enumerate
-    // accounts by response time. The constraint error below maps to the same
-    // generic 409.
-    let contributor: PublicContributor;
+    // single source of truth. createContributor hashes the password BEFORE
+    // the INSERT, so an existing address pays the same PBKDF2 cost as a new
+    // one (a pre-check SELECT would be a timing oracle).
+    let mailTask: () => Promise<void>;
     try {
-      contributor = await createContributor({ email, displayName, password: payload.password });
+      const contributor = await createContributor({ email, displayName, password: payload.password });
+      mailTask = () => sendVerificationEmail(contributor, locale(request));
     } catch (error) {
-      // The unique email index is the last line of defence against a
-      // register race; map the constraint error to the same generic 409
-      // (body identical to the 400 above so responses stay indistinguishable).
-      if (error instanceof Error && error.message.includes("UNIQUE constraint failed")) {
-        await rollbackAttempt();
-        return Response.json({ error: "Unable to register with this email." }, { status: 409 });
-      }
-      throw error;
+      if (!(error instanceof Error && error.message.includes("UNIQUE constraint failed"))) throw error;
+      // Existing address: create nothing, tell only the mailbox owner.
+      mailTask = () => sendAccountExistsEmail(email, locale(request));
     }
 
-    // Verification link (Fase B): ATOMIC budget admission → mint → mail.
-    // The reservation INSERT lands only while the in-window count is below
-    // the limit (INSERT ... SELECT ... WHERE ... < ? RETURNING id, one
-    // statement — no race with concurrent sends for the same contributor)
-    // and runs BEFORE the token is minted, so a blocked request never
-    // creates a token it cannot mail. The raw token lives only in the email
-    // (hash-only in D1); the mailer swallows send failures so a mail outage
-    // never breaks registration.
-    const now = new Date().toISOString();
-    const reservation = await reserveAuthEmail(contributor.id, "verify", now, env);
-    let verification;
-    if (reservation.ok) {
-      mailReservation = {
-        reservationId: reservation.reservationId,
-        contributorId: contributor.id,
-        kind: "verify",
-      };
-      const { rawToken } = await createVerificationToken(contributor.id, "verify", now);
-      try {
-        const mail = await sendAuthEmail({
-          locale: localeFromCookieHeader(request.headers.get("Cookie")),
-          reservationId: reservation.reservationId,
-          contributorId: contributor.id,
-          to: contributor.email,
-          kind: "verify",
-          rawToken,
-        });
-        // sent = the provider accepted the email (and the reservation row is
-        // now the permanent send-log row).
-        verification = { sent: mail.ok };
-      } finally {
-        // sendAuthEmail settled the reservation (kept on success, released on
-        // a deterministic failure, retained on an ambiguous outcome) — the
-        // route must not touch it again, even if createSession below throws.
-        mailReservation = null;
-      }
-    } else {
-      // A fresh account cannot normally lose the window (zero rows); if it
-      // ever does (pre-existing rows for a re-registered email), register
-      // still succeeds without mail — the user can resend from the session.
-      verification = { sent: false };
-    }
-
-    const { rawToken: sessionRawToken, csrfToken } = await createSession(contributor.id, {
-      // The DB expires_at must match the cookie Max-Age exactly: both derive
-      // from the same sessionTtlSeconds(env) (audit t_5ca60ab2, P2 — a
-      // divergent TTL would let a token stay valid server-side after the
-      // cookie is gone, or expire sessions the client still holds).
-      ttlSeconds: sessionTtlSeconds(env),
+    const ctx = getRequestExecutionContext();
+    const background = mailTask().catch((error: unknown) => {
+      console.error("POST /api/auth/register background mail failed", error);
     });
-    // No devLink, ever: the token is only in the mail channel, so a
-    // misconfigured deployment (missing EMAIL binding / VERIFY_BASE_URL)
-    // cannot leak it through the API.
-    return Response.json(
-      { contributor, verification },
-      { status: 201, headers: cookieHeaderInit(sessionCookieHeaders(sessionRawToken, csrfToken, env)) },
-    );
-  } catch (error) {
-    // An exception after the reservation (token mint / session failure)
-    // must roll the exact mail reservation back so the budget is not burned.
-    // By this point the id is non-null ONLY for token-mint / pre-send
-    // exceptions: sendAuthEmail settled (and the route cleared) the
-    // reservation the moment it returned, so a delivered email's send-log
-    // row is never deleted here.
-    if (mailReservation) {
-      await releaseEmailReservation(
-        mailReservation.reservationId,
-        mailReservation.contributorId,
-        mailReservation.kind,
-      );
+    if (ctx) {
+      // Production (Workers): answer now, mail after the response (timing
+      // anti-enumeration, see the doc comment).
+      ctx.waitUntil(background);
+    } else {
+      await background;
     }
+    return checkEmail();
+  } catch (error) {
     if (error instanceof BodyReadError) {
       console.warn("POST /api/auth/register payload rejected: body too large or not valid JSON");
       await rollbackAttempt();
@@ -248,4 +181,71 @@ export async function POST(request: Request) {
     await rollbackAttempt();
     return Response.json({ error: "Unable to create account" }, { status: 500 });
   }
+}
+
+/** The one answer for every valid registration request (new or existing). */
+function checkEmail(): Response {
+  return Response.json(
+    { ok: true, status: "check_email" },
+    { status: 202, headers: { "Cache-Control": "no-store" } },
+  );
+}
+
+function locale(request: Request) {
+  return localeFromCookieHeader(request.headers.get("Cookie"));
+}
+
+type MailLocale = ReturnType<typeof localeFromCookieHeader>;
+
+/**
+ * New account: ATOMIC budget admission → mint → mail (issue #440). The
+ * reservation runs BEFORE the token is minted, so a blocked request never
+ * creates a token it cannot mail; a fresh account (zero rows) always wins
+ * its slot. sendAuthEmail settles the reservation itself (kept on success,
+ * released on a deterministic failure, retained on an ambiguous provider
+ * outcome); only a mint failure is released here.
+ */
+async function sendVerificationEmail(
+  contributor: { id: number; email: string },
+  mailLocale: MailLocale,
+): Promise<void> {
+  const now = new Date().toISOString();
+  const reservation = await reserveAuthEmail(contributor.id, "verify", now, env);
+  if (!reservation.ok) return;
+  let rawToken: string;
+  try {
+    ({ rawToken } = await createVerificationToken(contributor.id, "verify", now));
+  } catch (error) {
+    await releaseEmailReservation(reservation.reservationId, contributor.id, "verify");
+    throw error;
+  }
+  await sendAuthEmail({
+    locale: mailLocale,
+    reservationId: reservation.reservationId,
+    contributorId: contributor.id,
+    to: contributor.email,
+    kind: "verify",
+    rawToken,
+  });
+}
+
+/**
+ * Existing account: mail the owner the token-less account-exists notice,
+ * under the shared window + the per-kind daily cap (db/mailer.ts). Past the
+ * cap nothing is sent (the response is already the generic 202).
+ */
+async function sendAccountExistsEmail(email: string, mailLocale: MailLocale): Promise<void> {
+  const existing = await findContributorByEmail(email);
+  // Erased between the INSERT and this lookup: nothing to notify.
+  if (!existing) return;
+  const now = new Date().toISOString();
+  const reservation = await reserveAuthEmail(existing.id, "account_exists", now, env);
+  if (!reservation.ok) return;
+  await sendAuthEmail({
+    locale: mailLocale,
+    reservationId: reservation.reservationId,
+    contributorId: existing.id,
+    to: existing.email,
+    kind: "account_exists",
+  });
 }

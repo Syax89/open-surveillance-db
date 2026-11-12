@@ -59,7 +59,11 @@ export const pt: Translation<typeof en> = {
   loggedOutTitle: "Terminaste a sessão",
   loggedOutBody: "A tua sessão terminou. Podes fechar esta janela ou iniciar sessão novamente.",
   errorInvalidCredentials: "Credenciais inválidas.",
-  errorEmailTaken: "Já existe uma conta com este email.",
+  // Register confirmation: shown after EVERY accepted submit, new address or
+  // not — the API answers the same for both (no account enumeration).
+  registerCheckEmailTitle: "Verifica o teu email",
+  registerCheckEmailBody:
+    "Se este endereço puder ser usado, enviámos-te um email com o passo seguinte. Verifica a tua caixa de entrada (e o spam).",
   errorGeneric: "Algo correu mal. Tenta novamente.",
   errorCrossOrigin: "Pedido entre sites rejeitado.",
   // Static copy on /login (t_6dc1c96f — CEO feedback 2026-08-03): login is

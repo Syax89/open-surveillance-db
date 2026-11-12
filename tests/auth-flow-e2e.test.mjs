@@ -1368,7 +1368,7 @@ async function registerContributor() {
     method: "POST",
     body: { email: AUTH_EMAIL, password: AUTH_PASSWORD, displayName: "Lockout E2E" },
   }));
-  assert.equal(response.status, 201, "register must create the account");
+  assert.equal(response.status, 202, "register must accept the request (same answer for new and existing addresses)");
   return response;
 }
 

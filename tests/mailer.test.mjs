@@ -663,3 +663,132 @@ test("mailerFromAddress and emailSendLimits honour env defaults", () => {
     windowSeconds: 7200,
   });
 });
+
+// ---------------------------------------------------------------------------
+// Account-exists notice (register anti-enumeration): the register endpoint
+// answers the same for a new and an existing address; the owner of an
+// existing address gets this token-less notice instead, capped per day.
+// ---------------------------------------------------------------------------
+
+const ACCOUNT_EXISTS_LINKS = {
+  actionUrl: "https://opensurveillancedb.org/login",
+  secondaryActionUrl: "https://opensurveillancedb.org/forgot-password",
+};
+
+// A phrase of the intro, both button labels and a phrase of the ignore line
+// per locale: proves every language ships its OWN copy (not the English one).
+const ACCOUNT_EXISTS_COPY = {
+  en: ["Someone tried to create an account on OpenSurveillanceDB", "Sign in", "Reset password", "nothing has changed"],
+  it: ["Qualcuno ha provato a creare un account su OpenSurveillanceDB", "Accedi", "Reimposta la password", "non è cambiato nulla"],
+  fr: ["Quelqu’un a essayé de créer un compte sur OpenSurveillanceDB", "Se connecter", "Réinitialiser le mot de passe", "rien n’a changé"],
+  de: ["Jemand hat versucht, mit dieser E-Mail-Adresse ein Konto bei OpenSurveillanceDB zu erstellen", "Anmelden", "Passwort zurücksetzen", "es hat sich nichts geändert"],
+  es: ["Alguien ha intentado crear una cuenta en OpenSurveillanceDB", "Iniciar sesión", "Restablecer la contraseña", "no ha cambiado nada"],
+  pt: ["Alguém tentou criar uma conta no OpenSurveillanceDB", "Iniciar sessão", "Redefinir palavra-passe", "nada foi alterado"],
+};
+
+test("buildAccountExistsUrls: sign-in + forgot-password pages, no token, trailing slashes stripped", () => {
+  const { emailTemplates } = runtime;
+  assert.deepEqual(emailTemplates.buildAccountExistsUrls("https://osdb.example/"), {
+    actionUrl: "https://osdb.example/login",
+    secondaryActionUrl: "https://osdb.example/forgot-password",
+  });
+});
+
+test("account-exists notice renders in EVERY locale (EN pilot + requester's language) with HTML + plain text", () => {
+  const { emailTemplates } = runtime;
+  for (const [code, phrases] of Object.entries(ACCOUNT_EXISTS_COPY)) {
+    const rendered = emailTemplates.renderAuthEmail("account_exists", { ...ACCOUNT_EXISTS_LINKS, ...SITE, locale: code });
+    assert.match(rendered.subject, /^Sign-up attempt with your email · OpenSurveillanceDB$/, code);
+    for (const phrase of [...phrases, ...ACCOUNT_EXISTS_COPY.en]) {
+      assert.ok(rendered.html.includes(phrase), `${code}: HTML carries "${phrase}"`);
+      assert.ok(rendered.text.includes(phrase), `${code}: text carries "${phrase}"`);
+    }
+    // Both links in the plain text too, labelled.
+    assert.ok(rendered.text.includes(`${phrases[1]}: ${ACCOUNT_EXISTS_LINKS.actionUrl}`), code);
+    assert.ok(rendered.text.includes(`${phrases[2]}: ${ACCOUNT_EXISTS_LINKS.secondaryActionUrl}`), code);
+    assert.ok(!rendered.text.includes("{SITE}") && !rendered.html.includes("{SITE}"), `${code}: placeholder filled`);
+  }
+});
+
+test("ZERO TRACKING (account-exists): no img/remote assets, links ONLY to the two site pages, no token", () => {
+  const { emailTemplates } = runtime;
+  for (const locale of [null, ...Object.keys(ACCOUNT_EXISTS_COPY)]) {
+    const rendered = emailTemplates.renderAccountExistsEmail({ ...ACCOUNT_EXISTS_LINKS, ...SITE, locale });
+    assert.ok(!rendered.html.includes("<img"), "no <img> tags");
+    assert.ok(!rendered.html.includes("src="), "no src attributes");
+    assert.ok(!rendered.html.includes("<link"), "no <link> tags");
+    assert.ok(!rendered.html.includes("@import"), "no CSS @import");
+    assert.ok(!rendered.html.includes("<script"), "no scripts");
+    assert.ok(!rendered.html.includes("url("), "no CSS url() references");
+    const hrefs = allHrefs(rendered.html);
+    assert.ok(hrefs.includes(ACCOUNT_EXISTS_LINKS.actionUrl), "sign-in link present");
+    assert.ok(hrefs.includes(ACCOUNT_EXISTS_LINKS.secondaryActionUrl), "forgot-password link present");
+    for (const href of hrefs) {
+      assert.ok(
+        href === ACCOUNT_EXISTS_LINKS.actionUrl || href === ACCOUNT_EXISTS_LINKS.secondaryActionUrl,
+        `unexpected link in email: ${href}`,
+      );
+    }
+    assert.equal(/token=|[?&]/.test(hrefs.join(" ")), false, "plain links: no token, no query string");
+  }
+});
+
+test("account-exists reservation: 3 notices per contributor per 24 h, on top of the shared window", async () => {
+  const { mailer } = runtime;
+  const contributorId = await seedContributor();
+  // Shared window opened wide so the per-kind daily cap is what blocks.
+  const wide = { ...runtime.env, EMAIL_SEND_LIMIT_MAX: "100", EMAIL_SEND_LIMIT_WINDOW_SECONDS: "300" };
+  assert.equal(mailer.ACCOUNT_EXISTS_EMAIL_DAILY_MAX, 3);
+  const times = ["2026-08-02T01:00:00.000Z", "2026-08-02T05:00:00.000Z", "2026-08-02T09:00:00.000Z"];
+  for (const at of times) {
+    assert.equal((await mailer.reserveAuthEmail(contributorId, "account_exists", at, wide)).ok, true, at);
+  }
+  const blocked = await mailer.reserveAuthEmail(contributorId, "account_exists", NOW, wide);
+  assert.equal(blocked.ok, false);
+  assert.equal(blocked.reason, "rate_limited");
+  // The oldest notice (01:00) leaves the 24 h window at 01:00 next day.
+  assert.equal(blocked.retryAfterSeconds, 13 * 60 * 60);
+  // Other kinds are NOT held by the account-exists cap (only the shared window).
+  assert.equal((await mailer.reserveAuthEmail(contributorId, "reset", NOW, wide)).ok, true);
+  // 24 h after the oldest notice, one slot frees up again.
+  assert.equal(
+    (await mailer.reserveAuthEmail(contributorId, "account_exists", "2026-08-03T01:00:01.000Z", wide)).ok,
+    true,
+  );
+
+  // Default policy: the shared 1-per-5-minutes window ALSO gates the notice.
+  const other = await seedContributor("other@example.com");
+  assert.equal((await mailer.reserveAuthEmail(other, "verify", NOW, runtime.env)).ok, true);
+  assert.equal((await mailer.reserveAuthEmail(other, "account_exists", NOW, runtime.env)).ok, false);
+});
+
+test("sendAuthEmail(account_exists) sends the token-less notice and keeps the reservation as the log row", async () => {
+  const { mailer } = runtime;
+  const contributorId = await seedContributor();
+  const sentMessages = [];
+  runtime.env.EMAIL = {
+    send: async (message) => {
+      sentMessages.push(message);
+      return { messageId: "m-exists" };
+    },
+  };
+  const reservation = await mailer.reserveAuthEmail(contributorId, "account_exists", NOW, runtime.env);
+  assert.equal(reservation.ok, true);
+  const result = await mailer.sendAuthEmail({
+    reservationId: reservation.reservationId,
+    contributorId,
+    to: "contributor@example.com",
+    kind: "account_exists",
+    locale: "de",
+  });
+  assert.deepEqual(result, { ok: true, messageId: "m-exists" });
+  assert.equal(sentMessages.length, 1);
+  const [message] = sentMessages;
+  assert.match(message.subject, /^Sign-up attempt with your email/);
+  assert.ok(message.text.includes("https://opensurveillancedb.org/login"));
+  assert.ok(message.text.includes("https://opensurveillancedb.org/forgot-password"));
+  assert.ok(message.text.includes("Anmelden"), "requester's language block");
+  assert.equal(/token=/.test(message.text + message.html), false, "no token in the notice");
+  const rows = (await runtime.env.DB.prepare("SELECT kind FROM email_send_log").all()).results;
+  assert.deepEqual(rows.map((row) => row.kind), ["account_exists"]);
+});

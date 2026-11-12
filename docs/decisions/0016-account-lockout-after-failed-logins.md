@@ -89,7 +89,10 @@ Two questions had to be answered:
   for local development.
 - **Register is untouched.** Account enumeration on /api/auth/register (the
   409 surface) is tracked separately (t_b1ec48a9); this ADR covers
-  password brute force only.
+  password brute force only. *(Since resolved: register answers the same
+  202 for new and existing addresses and the owner of an existing one is
+  told by email — see ADR 0020, "Amendment: registration never reveals an
+  existing account".)*
 - **Operational knobs:** all four policy values are env-configurable, same
   convention as the rate-limit knobs, so the deployment can tighten or loosen
   the policy without a code change.
