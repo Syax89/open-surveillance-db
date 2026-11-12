@@ -18,12 +18,15 @@ import { CorrectionQueueItem } from "./moderation/CorrectionQueueItem";
 import { EditQueueItem } from "./moderation/EditQueueItem";
 import { HistorySection } from "./moderation/HistorySection";
 import { QueueSection } from "./moderation/QueueSection";
+import { QueueTabs, useQueueTab } from "./moderation/QueueTabs";
 import { useModerationQueue } from "./moderation/useModerationQueue";
 
 export function ModerationDashboard() {
   const errors = useDomainMessages(errorsByLocale);
   const t = useDomainMessages(moderationByLocale);
   const q = useModerationQueue();
+  const [tab, setTab] = useQueueTab();
+  const count = (queue: "pending" | "review" | "corrections" | "edits", shown: number) => q.loading ? undefined : (q.totals[queue] ?? shown);
 
   return <main id="main-content">
     <SiteHeader navLabel={t.navigation} homeLabel={t.home} toggle="none">
@@ -40,19 +43,21 @@ export function ModerationDashboard() {
       {q.queueError && <p className="notice" role="alert">{q.queueError}</p>}
       {q.loading ? <p className="loading-note" aria-live="polite">{t.loading}</p> : <p className="search-count" aria-live="polite">{q.summary}</p>}
 
-      <section className="moderation-section" aria-labelledby="actor-selector-title">
-        <div className="section-heading"><div><p className="eyebrow"><span /> {t.localAudit}</p><h2 id="actor-selector-title">{t.selectActor}</h2></div><p className="section-note">{t.actorRequired}</p></div>
-        <fieldset className="report-form" style={{ marginTop: 4, padding: 18 }}>
-          <label htmlFor="actor-select">{t.selectActor}
-            <select id="actor-select" value={q.actorId} onChange={(event) => q.setActorId(event.target.value)} required>
-              <option value="">{t.selectReason.replace("reason", "reviewer")}</option>
-              {q.reviewers.map((reviewer) => <option key={reviewer.id} value={reviewer.id}>{reviewer.displayName} · {reviewer.role}</option>)}
-            </select>
-            <span className="search-count">{t.actorHelp}</span>
-          </label>
-        </fieldset>
-      </section>
+      {/* Compact toolbar (2026-11): the acting reviewer is one inline field,
+          not a section of its own. */}
+      <div className="moderation-toolbar">
+        <label htmlFor="actor-select">{t.selectActor}</label>
+        <select id="actor-select" value={q.actorId} onChange={(event) => q.setActorId(event.target.value)} required aria-describedby="actor-help">
+          <option value="">{t.selectReason.replace("reason", "reviewer")}</option>
+          {q.reviewers.map((reviewer) => <option key={reviewer.id} value={reviewer.id}>{reviewer.displayName} · {reviewer.role}</option>)}
+        </select>
+        <span className="search-count" id="actor-help">{t.actorHelp}</span>
+      </div>
 
+      <QueueTabs label={t.queuesLabel} tab={tab} onSelect={setTab} labels={t.tabs}
+        counts={{ pending: count("pending", q.cameras.length), review: count("review", q.reviewCameras.length), corrections: count("corrections", q.corrections.length), edits: count("edits", q.editRequests.length), published: q.loading ? undefined : q.publishedTotal }} />
+      <div className="moderation-panel" role="tabpanel" id={`queue-panel-${tab}`} aria-labelledby={`queue-tab-${tab}`}>
+      {tab === "pending" && (
       <QueueSection
         id="pending-cameras-title" eyebrow={t.reports} title={t.pendingReports} note={`${q.queuePaging("pending", q.cameras.length).note} ${t.pending}`}
         listLabel={t.pendingReports} loading={q.loading} items={q.cameras} paging={q.queuePaging("pending", q.cameras.length)}
@@ -61,6 +66,8 @@ export function ModerationDashboard() {
         renderItem={(camera) => <CameraQueueItem camera={camera} variant="pending" queueBadge={q.queueBadge("camera", camera.id)} api={q.decisionApi} readableDate={q.readableDate} />}
       />
 
+      )}
+      {tab === "published" && (
       <QueueSection
         id="published-cameras-title" eyebrow={t.lifecycle} title={t.publishedRecords} note={`${t.shownOf(q.publishedCameras.length, q.publishedTotal)} ${t.verified}`}
         listLabel={t.publishedRecords} loading={q.loading || q.publishedPagination.loading || q.publishedPagination.failed} items={q.publishedCameras}
@@ -76,6 +83,8 @@ export function ModerationDashboard() {
         )}
       />
 
+      )}
+      {tab === "review" && (
       <QueueSection
         id="review-cameras-title" eyebrow={t.lifecycle} title={t.recordsNeedReview} note={`${q.queuePaging("review", q.reviewCameras.length).note} ${t.awaitingReview}`}
         listLabel={t.recordsNeedReview} loading={q.loading} items={q.reviewCameras} paging={q.queuePaging("review", q.reviewCameras.length)}
@@ -84,6 +93,8 @@ export function ModerationDashboard() {
         renderItem={(camera) => <CameraQueueItem camera={camera} variant="review" queueBadge={q.queueBadge("camera", camera.id)} api={q.decisionApi} readableDate={q.readableDate} />}
       />
 
+      )}
+      {tab === "corrections" && (<>
       <QueueSection
         id="correction-requests-title" eyebrow={t.corrections} title={t.privateCorrections} note={`${q.queuePaging("corrections", q.corrections.length).note} ${t.pending}`}
         listLabel={t.privateCorrections} loading={q.loading} items={q.corrections} paging={q.queuePaging("corrections", q.corrections.length)}
@@ -100,6 +111,8 @@ export function ModerationDashboard() {
         readableOutcome={q.readableOutcome}
       />
 
+      </>)}
+      {tab === "edits" && (
       <QueueSection
         id="edit-requests-title" eyebrow={t.editing} title={t.editRequests} note={`${q.queuePaging("edits", q.editRequests.length).note} ${t.pending}`}
         listLabel={t.editRequests} loading={q.loading} items={q.editRequests} paging={q.queuePaging("edits", q.editRequests.length)}
@@ -108,6 +121,8 @@ export function ModerationDashboard() {
         renderItem={(editRequest) => <EditQueueItem editRequest={editRequest} queueBadge={q.queueBadge("camera_edit", editRequest.id)} api={q.decisionApi} readableDate={q.readableDate} />}
       />
 
+      )}
+      {tab === "history" && (
       <HistorySection
         events={q.recentEvents}
         readableDate={q.readableDate}
@@ -115,6 +130,8 @@ export function ModerationDashboard() {
         readableReason={q.readableReason}
         readableStatus={q.readableStatus}
       />
+      )}
+      </div>
     </section>
   </main>;
 }

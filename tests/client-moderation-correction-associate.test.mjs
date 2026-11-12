@@ -33,7 +33,7 @@ before(async () => {
   ModerationDashboard = mod.ModerationDashboard;
 });
 
-afterEach(() => rtl?.cleanup());
+afterEach(() => { rtl?.cleanup(); window.location.hash = ""; });
 
 const queueFixture = {
   cameraReports: [],
@@ -97,6 +97,7 @@ const historyFixture = {
 };
 
 async function renderQueue() {
+  window.location.hash = "corrections"; // the correction queue is its own tab (2026-11)
   await renderWithLocale(React.createElement(ModerationDashboard));
   await rtl.waitFor(() => assert.ok(rtl.screen.queryByText("Fixture correction request text")));
 }

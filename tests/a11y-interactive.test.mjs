@@ -312,15 +312,23 @@ test("the moderation shell (credentials) renders the labelled nav, h1 and a poli
   assert.match(html, /<p class="loading-note" aria-live="polite">/, "queue loading must be announced");
 });
 
-test("the moderation dashboard uses no tabIndex at all (no involuntary focus trap)", async () => {
+test("the moderation dashboard adds no tabIndex outside the WAI-ARIA queue tabs (no involuntary focus trap)", async () => {
   // The monolith was split into components/moderation/* (kanban t_c7460073);
   // the no-tabIndex contract holds across the dashboard and every extracted
-  // component, so aggregate the sources before asserting.
+  // component — except the queue tablist (2026-11 redesign), which uses the
+  // standard WAI-ARIA roving tabindex: the selected tab is 0, the others -1,
+  // and the arrow keys move between them. That is the tabs pattern, not a trap.
   const source = await readModerationSource();
-  assert.doesNotMatch(source, /tabIndex/, "no element may be added to or removed from the tab order");
-  // Rendered shell: same guarantee.
+  const tabs = await readFile(path.join(root, "app", "components", "moderation", "QueueTabs.tsx"), "utf8");
+  const withoutTabs = source.split(tabs).join("");
+  assert.doesNotMatch(withoutTabs, /tabIndex/, "no other element may be added to or removed from the tab order");
+  assert.match(tabs, /tabIndex=\{tab === id \? 0 : -1\}/, "roving tabindex: only the selected tab is in the tab order");
+  assert.match(tabs, /ArrowRight[\s\S]*ArrowLeft[\s\S]*Home[\s\S]*End/, "the arrow keys reach the other tabs");
+  // Rendered shell: tabindex appears only on the role=tab buttons.
   const { html } = await renderRoute("/moderation", MODERATION_CREDENTIALS);
-  assert.doesNotMatch(html, /tabindex=/);
+  for (const match of html.matchAll(/<[^>]*tabindex=[^>]*>/g)) {
+    assert.match(match[0], /role="tab"/, `tabindex only on queue tabs: ${match[0]}`);
+  }
 });
 
 test("moderation decision controls are labelled and described (label-for, aria-describedby)", async () => {

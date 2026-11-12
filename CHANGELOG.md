@@ -395,6 +395,15 @@ changes accumulate under `[Unreleased]`.
 
 ### Changed
 
+- **Moderation dashboard redesign (2026-11, owner request: "too long and
+  scattered"):** the queues are WAI-ARIA tabs (Pending, To review,
+  Corrections, Edits, Published, History) with their sizes as badges — one
+  queue on screen at a time, the selected tab mirrored in the URL hash; the
+  acting reviewer is one sticky inline toolbar field instead of a section;
+  each item is one wide row (what was reported on the left, reason / note /
+  actions on the right) and the note field starts one line tall. With the
+  local fixtures the page went from ~18,700px to ~6,900px on desktop.
+
 - **Page transitions, account dashboard and home hero (2026-11, owner
   request):**
   - Every page change now crossfades, like the directory → record

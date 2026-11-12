@@ -161,7 +161,7 @@ export function useModerationQueue() {
   return {
     loading, message, error, queueError, summary,
     cameras, publishedCameras, reviewCameras, corrections, editRequests, recentEvents, reviewers,
-    actorId, setActorId, queuePaging: bounded.queuePaging, publishedTotal: totals.published ?? publishedCameras.length,
+    actorId, setActorId, queuePaging: bounded.queuePaging, totals, publishedTotal: totals.published ?? publishedCameras.length,
     publishedPagination: {
       previousLabel: community.previousPage, nextLabel: community.nextPage, loading: publishedLoading,
       hasPrevious: publishedHistory.length > 0, hasNext: publishedNextCursor !== null, failed: queueError !== "",

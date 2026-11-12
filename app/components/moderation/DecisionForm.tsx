@@ -45,7 +45,7 @@ export function DecisionForm({ entity, id, allowedActions, api }: Props) {
   const associateLocked = isCorrection && !api.cameraId(key);
   return (
     <>
-      <fieldset className="report-form" style={{ marginTop: 4, padding: 18 }}>
+      <fieldset className="report-form decision-form">
         <legend>{t.details}</legend>
         <label htmlFor={reasonId}>{t.requiredReason}
           <select id={reasonId} value={api.reason(key)} onChange={(event) => api.setReason(key, event.target.value)} required>

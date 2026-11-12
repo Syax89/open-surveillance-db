@@ -48,6 +48,9 @@ export const en = {
   lifecycle: "Lifecycle",
   corrections: "Corrections",
   localAudit: "Local audit",
+  // Queue tabs (2026-11 redesign): one queue on screen at a time.
+  queuesLabel: "Moderation queues",
+  tabs: { pending: "Pending", review: "To review", corrections: "Corrections", edits: "Edits", published: "Published", history: "History" },
   pendingReports: "Pending camera reports",
   pending: "pending",
   noPendingTitle: "No camera reports are waiting.",
@@ -270,6 +273,8 @@ export const it: Translation<typeof en> = {
   lifecycle: "Ciclo di vita",
   corrections: "Correzioni",
   localAudit: "Registro locale",
+  queuesLabel: "Code di moderazione",
+  tabs: { pending: "In attesa", review: "Da rivedere", corrections: "Correzioni", edits: "Modifiche", published: "Pubblicati", history: "Storico" },
   pendingReports: "Segnalazioni di telecamere in attesa",
   pending: "in attesa",
   noPendingTitle: "Non ci sono segnalazioni di telecamere in attesa.",
