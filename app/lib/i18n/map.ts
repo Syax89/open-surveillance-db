@@ -94,10 +94,18 @@ export const en = {
   listSearchPlaceholder: "Place, address, coordinates or #record",
   listSearchHelp:
     "Type a place, an address, coordinates such as 41.9068, 12.4808, or a record number such as #6302, then press Enter. Results inside the current map view are listed first.",
+  // Search-as-you-type (2026-11): suggestions come only from our own
+  // records (and the browser itself); the place search (OpenStreetMap)
+  // runs only on Enter or the explicit last item.
+  suggestLabel: "Suggestions",
+  suggestCount: (count: number) => (count === 1 ? "1 suggestion available" : `${count} suggestions available`),
+  suggestCoordinates: (text: string) => `Go to coordinates ${text}`,
+  suggestRecordNumber: (id: number) => `Open record #${id}`,
+  suggestPlace: (query: string) => `Search the place “${query}” (OpenStreetMap)`,
   listSearchButton: "Search",
   // Visible caption under the field: the privacy promise, in plain words.
   listSearchCaption:
-    "Nothing is sent while you type. Coordinates and #record numbers never leave your browser.",
+    "While you type, only our own records are searched. Places are looked up on OpenStreetMap only when you press Enter or choose “Search the place”; coordinates and #record numbers never leave your browser.",
   // Geocode autocomplete dropdown (t_b9666d09): the listbox under the
   // sidebar search field. Attribution is required by the ODbL for
   // Nominatim-derived place data (see docs/OSM_INTEGRATION.md §8).
@@ -246,9 +254,17 @@ export const it: Translation<typeof en> = {
   listSearchPlaceholder: "Luogo, indirizzo, coordinate o #scheda",
   listSearchHelp:
     "Scrivi un luogo, un indirizzo, delle coordinate come 41.9068, 12.4808 o un numero di scheda come #6302, poi premi Invio. I risultati dentro la vista attuale della mappa compaiono per primi.",
+  // Search-as-you-type (2026-11): suggestions come only from our own
+  // records (and the browser itself); the place search (OpenStreetMap)
+  // runs only on Enter or the explicit last item.
+  suggestLabel: "Suggerimenti",
+  suggestCount: (count: number) => (count === 1 ? "1 suggerimento disponibile" : `${count} suggerimenti disponibili`),
+  suggestCoordinates: (text: string) => `Vai alle coordinate ${text}`,
+  suggestRecordNumber: (id: number) => `Apri la scheda #${id}`,
+  suggestPlace: (query: string) => `Cerca il luogo «${query}» (OpenStreetMap)`,
   listSearchButton: "Cerca",
   listSearchCaption:
-    "Mentre scrivi non viene inviato nulla. Coordinate e #numeri di scheda non lasciano il tuo browser.",
+    "Mentre scrivi cerchiamo solo tra le nostre schede. I luoghi vengono cercati su OpenStreetMap solo quando premi Invio o scegli «Cerca il luogo»; coordinate e #numeri di scheda non lasciano il tuo browser.",
   // Menu a tendina del geocoding (t_b9666d09): la listbox sotto il campo di
   // ricerca della sidebar. L'attribuzione è richiesta da ODbL per i dati dei
   // luoghi derivati da Nominatim (vedi docs/OSM_INTEGRATION.md §8).

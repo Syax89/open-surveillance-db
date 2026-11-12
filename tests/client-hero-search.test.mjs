@@ -1,8 +1,10 @@
 // Hero directory search (issue #439; privacy pass 2026-11).
 //
-// A plain GET form to /directory with a name="q" input. It used to geocode
-// every pause in typing; it now sends NOTHING while typing and never talks
-// to a geocoder at all — the directory searches around a place on Enter.
+// A GET form to /directory with a name="q" input. It used to geocode every
+// pause in typing; since the privacy pass nothing typed reaches a third
+// party while typing. Search-as-you-type (2026-11) only asks our own
+// /api/cameras/suggest; the place geocoder runs only when the visitor
+// explicitly chooses "Search the place" (tests/search-suggestions.test.mjs).
 //
 // Fixtures are fictitious (no personal data).
 
@@ -54,23 +56,23 @@ test("the hero search renders as a plain GET /directory form with name=q and no 
 });
 
 
-test("typing sends no request at all and the field is a plain search box (no combobox, no suggestions)", async () => {
+test("typing never reaches the place geocoder: the only request is our own record suggestions", async () => {
   const requests = [];
-  installFetchMock((url) => { requests.push(String(url)); return jsonResponse({ results: [] }); });
+  installFetchMock((url) => { requests.push(String(url)); return jsonResponse({ suggestions: [] }); });
   const user = rtl.userEvent.setup();
   await renderWithLocale(React.createElement(HeroDirectorySearch));
-  const input = rtl.screen.getByRole("searchbox", { name: "Search the directory" });
+  const input = rtl.screen.getByRole("combobox", { name: "Search the directory" });
   await user.type(input, "Piazza del Duomo");
   await new Promise((resolve) => setTimeout(resolve, 600));
-  assert.deepEqual(requests, [], "nothing leaves the browser while typing");
-  assert.equal(rtl.screen.queryByRole("combobox"), null, "no autocomplete widget");
-  assert.equal(rtl.screen.queryByRole("listbox"), null, "no suggestion list");
+  assert.ok(requests.every((url) => url.startsWith("/api/cameras/suggest?")), `only our own suggestion endpoint is asked: ${requests.join(", ")}`);
+  assert.equal(requests.length, 1, "one debounced request after the pause");
+  assert.ok(!requests.some((url) => url.includes("/api/geocode")), "nothing reaches the geocoder while typing");
   assert.equal(input.value, "Piazza del Duomo");
 });
 
 test("Enter submits the normal GET form to /directory with q (nothing intercepts it)", async () => {
   await renderWithLocale(React.createElement(HeroDirectorySearch));
-  const input = rtl.screen.getByRole("searchbox", { name: "Search the directory" });
+  const input = rtl.screen.getByRole("combobox", { name: "Search the directory" });
   const form = input.closest("form");
   assert.equal(form.getAttribute("action"), "/directory");
   assert.equal(input.getAttribute("name"), "q");

@@ -49,8 +49,21 @@ export const en = {
   // progressively enhanced with the shared PlaceAutocomplete primitive.
   // The copy is home-scoped — the /segnala address search keeps its own
   // report-bundle wording.
+  // Hero search-as-you-type (2026-11): record suggestions from our own
+  // data only; the place lookup (OpenStreetMap) runs only when the last
+  // item is chosen, then a chosen place opens the map there.
+  suggestLabel: "Suggestions",
+  suggestCount: (count: number) => (count === 1 ? "1 suggestion available" : `${count} suggestions available`),
+  suggestCoordinates: (text: string) => `Show coordinates ${text} on the map`,
+  suggestRecordNumber: (id: number) => `Open record #${id}`,
+  suggestPlace: (query: string) => `Search the place “${query}” (OpenStreetMap)`,
+  searchPlaceLabel: "Place suggestions",
+  searchPlaceNoResults: (query: string) => `No results for “${query}”`,
+  searchPlaceUnavailable: "Place search is temporarily unavailable.",
+  searchPlaceRateLimited: (seconds: number) => `Place search has reached its short request limit. Try again in about ${seconds} seconds.`,
+  searchPlaceAttribution: "Places © OpenStreetMap contributors",
   searchDirectoryHelp:
-    "Search by name, type or address. In the directory, Enter also searches around a place.",
+    "While you type, suggestions come only from our own records. Enter searches the directory; a place is looked up on OpenStreetMap only if you choose “Search the place”.",
   statsLabel: "Database statistics",
   publicRecords: "public records",
   browseFreely: "No account",
@@ -115,8 +128,21 @@ export const it: Translation<typeof en> = {
   reportCta: "Segnala una telecamera",
   searchDirectory: "Cerca nell'elenco",
   searchDirectoryPlaceholder: "Cerca per nome, tipo o indirizzo",
+  // Hero search-as-you-type (2026-11): record suggestions from our own
+  // data only; the place lookup (OpenStreetMap) runs only when the last
+  // item is chosen, then a chosen place opens the map there.
+  suggestLabel: "Suggerimenti",
+  suggestCount: (count: number) => (count === 1 ? "1 suggerimento disponibile" : `${count} suggerimenti disponibili`),
+  suggestCoordinates: (text: string) => `Mostra le coordinate ${text} sulla mappa`,
+  suggestRecordNumber: (id: number) => `Apri la scheda #${id}`,
+  suggestPlace: (query: string) => `Cerca il luogo «${query}» (OpenStreetMap)`,
+  searchPlaceLabel: "Suggerimenti di luoghi",
+  searchPlaceNoResults: (query: string) => `Nessun risultato per “${query}”`,
+  searchPlaceUnavailable: "La ricerca dei luoghi non è al momento disponibile.",
+  searchPlaceRateLimited: (seconds: number) => `La ricerca dei luoghi ha raggiunto il limite temporaneo di richieste. Riprova tra circa ${seconds} secondi.`,
+  searchPlaceAttribution: "Luoghi © OpenStreetMap contributors",
   searchDirectoryHelp:
-    "Cerca per nome, tipo o indirizzo. Nell'elenco, Invio cerca anche intorno a un luogo.",
+    "Mentre scrivi, i suggerimenti arrivano solo dalle nostre schede. Invio cerca nell'elenco; un luogo viene cercato su OpenStreetMap solo se scegli «Cerca il luogo».",
   statsLabel: "Statistiche del database",
   publicRecords: "record pubblici",
   browseFreely: "Senza account",

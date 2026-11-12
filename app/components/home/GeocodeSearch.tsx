@@ -44,9 +44,12 @@ export function __resetGeocodePending(): void {}
  * the points while typing (that doubled as a confusing "the map emptied"
  * effect and is the directory's job).
  *
- * Privacy: nothing is sent while typing. Enter or the Search button runs the
- * query; coordinates and "#123" are resolved in the browser and never leave
- * it; only a real place name reaches our /api/geocode proxy (→ Nominatim,
+ * Privacy: nothing reaches a third party while typing. As-you-type
+ * suggestions list matching public records from our own
+ * /api/cameras/suggest (choosing one focuses it on the map, like "#123");
+ * Enter, the Search button or the last "Search the place" item runs the
+ * place query; coordinates and "#123" are resolved in the browser and never
+ * leave it; only a real place name reaches our /api/geocode proxy (→ Nominatim,
  * OSM Foundation), which never sees the visitor's IP or page URL. Results
  * inside the current view are ranked first in the browser — the map
  * position is never sent.
@@ -65,6 +68,8 @@ export function GeocodeSearch({ onPlaceSelect, onRecordSelect, view = null }: Pr
       onRecordSelect={onRecordSelect}
       view={view}
       describedBy="map-list-caption"
+      recordSuggestions
+      placeSearchItem
       afterInput={<p className="map-list-search-hint" id="map-list-caption">{t.listSearchCaption}</p>}
       copy={{
         listboxLabel: t.geocodeLabel,
@@ -75,6 +80,13 @@ export function GeocodeSearch({ onPlaceSelect, onRecordSelect, view = null }: Pr
         unavailable: t.geocodeUnavailable,
         attribution: t.geocodeAttribution,
         searchButton: t.listSearchButton,
+        suggest: {
+          listboxLabel: t.suggestLabel,
+          count: t.suggestCount,
+          coordinates: t.suggestCoordinates,
+          recordNumber: t.suggestRecordNumber,
+          place: t.suggestPlace,
+        },
       }}
     />
   );
