@@ -410,10 +410,10 @@ changes accumulate under `[Unreleased]`.
     profile / passkeys / API keys / danger zone a compact side column (one
     column on phones). With no contributions the filters and the duplicate
     header actions are hidden.
-  - Home hero: headline, intro, search and actions share one left column;
-    a right panel holds a quiet map preview, the database figures and the
-    provenance note (no scattered dots, no floating caption). Tablet and
-    phone keep one column; phones drop the preview.
+  - Home hero: headline, intro, search, actions and figures share one left
+    column; a quiet map preview is background art on the right half,
+    bleeding to the hero's edges and fading towards the text (no box inside
+    the box, no scattered dots, no floating caption). Hidden below 1100px.
 
 - **Search sends as little as possible to third parties (2026-11, owner
   request — "as little data as possible should reach other companies"):**

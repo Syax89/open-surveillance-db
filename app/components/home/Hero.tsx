@@ -39,14 +39,16 @@ export function Hero() {
       </div>
       <div className="hero-copy hero-copy--details">
         <div className="hero-actions"><a className="button button-primary" href="/mappa">{t.exploreTheMap} <span aria-hidden="true">→</span></a><a className="button button-quiet" href="/segnala">{t.reportCta} <span aria-hidden="true">→</span></a></div>
+        <dl className="hero-stats" aria-label={t.statsLabel}><div><dt>{total == null ? "—" : formatCount(total, locale)}</dt><dd>{t.publicRecords}</dd></div><div><dt>{t.browseFreely}</dt><dd>{t.browseFreelyDetail}</dd></div><div><dt>{t.openData}</dt><dd>{t.openDataDetail}</dd></div></dl>
+        <p className="hero-trust-note">{t.trustNote} <a href="/fonti">{t.sourcesLink} <span aria-hidden="true">→</span></a></p>
         {total !== null && <p className="sr-only" role="status">{total} {t.publicRecords}</p>}
       </div>
-      {/* Right-hand panel (home redesign 2026-11): a quiet map preview with
-          the database figures and the provenance note, instead of figures
-          trailing under the buttons and a floating caption over scattered
-          dots. Below 1100px it simply follows the buttons. */}
-      <div className="hero-panel">
-        <div className="hero-panel-map" aria-hidden="true">
+      {/* Background art (home redesign 2026-11): a quiet map preview that
+          bleeds to the right edge of the hero and fades towards the text —
+          no inner box, no scattered dots, no floating caption. */}
+      <div className="hero-visual" aria-hidden="true">
+        <div className="hero-map-pattern" />
+        <div className="hero-map-art">
           <div className="teaser-grid" />
           <span className="teaser-pin teaser-pin-one" />
           <span className="teaser-pin teaser-pin-two" />
@@ -54,11 +56,6 @@ export function Hero() {
           <span className="teaser-pin teaser-pin-four" />
           <span className="teaser-pin teaser-pin-five" />
         </div>
-        <dl className="hero-stats" aria-label={t.statsLabel}><div><dt>{total == null ? "—" : formatCount(total, locale)}</dt><dd>{t.publicRecords}</dd></div><div><dt>{t.browseFreely}</dt><dd>{t.browseFreelyDetail}</dd></div><div><dt>{t.openData}</dt><dd>{t.openDataDetail}</dd></div></dl>
-        <p className="hero-trust-note">{t.trustNote} <a href="/fonti">{t.sourcesLink} <span aria-hidden="true">→</span></a></p>
-      </div>
-      <div className="hero-visual" aria-hidden="true">
-        <div className="hero-map-pattern" />
       </div>
     </section>
 

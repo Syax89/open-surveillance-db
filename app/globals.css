@@ -380,22 +380,23 @@ button { cursor:pointer; }
 .hero-trust-note a { color:var(--mint); font-weight:800; text-decoration:underline; text-decoration-thickness:1px; text-underline-offset:3px; }
 .hero-trust-note a:hover { color:var(--mint-hover); }
 /* Home hero redesign (owner 2026-11: "the top of the home page needs
-   restyling"). One left column — headline, intro, search and actions share
-   ONE width — and a right panel with a quiet map preview, the database
-   figures and the provenance note. No scattered dots, no floating caption.
-   Below 1100px the panel follows the buttons in a single column. */
-.hero-panel { position:relative; z-index:2; margin:0 70px 56px; padding:18px; border:1px solid rgba(222,245,234,.16); border-radius:var(--radius-xl); background:rgba(6,28,48,.55); }
-.hero-panel-map { position:relative; height:200px; overflow:hidden; border-radius:var(--radius-lg); background:linear-gradient(135deg,var(--visual-mid),var(--visual-deeper)); }
-.hero-panel .hero-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin:18px 0 0; }
-.hero-panel .hero-trust-note { max-width:none; margin:16px 0 0; }
+   restyling"; v2: no box inside the box). One left column — headline,
+   intro, search, actions and figures share ONE width — and the map preview
+   becomes background art on the right half, bleeding to the hero's edges
+   and fading towards the text. Hidden below 1100px (it would sit behind
+   the text). */
+.hero-map-art { display:none; }
 @media (min-width:1100px) {
-  .hero { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(380px,.9fr); grid-template-areas:"intro panel" "search panel" "actions panel"; grid-template-rows:auto auto 1fr; column-gap:56px; min-height:0; padding:72px 64px 64px; }
-  .hero > .hero-copy { padding:0; max-width:none; }
-  .hero > .hero-copy--intro { grid-area:intro; }
-  .hero > .hero-search-row { grid-area:search; margin:0 0 16px; }
-  .hero > .hero-copy--details { grid-area:actions; }
-  .hero > .hero-panel { grid-area:panel; align-self:center; margin:0; }
-  .hero h1 { font-size:clamp(48px, 5.2vw, 76px); }
+  .hero-copy, .hero-copy--details { max-width:780px; }
+  .hero-search-row { max-width:710px; }
+  .hero h1 { font-size:clamp(52px, 4.6vw, 68px); }
+  .hero-copy--intro { padding-top:64px; }
+  .hero-intro { margin:22px 0; }
+  .hero-stats { margin-top:36px; }
+  .hero-copy--details { padding-bottom:48px; }
+  .hero-map-art { display:block; position:absolute; top:0; right:0; bottom:0; width:50%; overflow:hidden;
+    -webkit-mask-image:linear-gradient(90deg, transparent 0, #000 40%); mask-image:linear-gradient(90deg, transparent 0, #000 40%); }
+  .hero-map-art .teaser-grid { opacity:.7; }
 }
 .hero-visual { position:absolute; inset:0; z-index:0; overflow:hidden; isolation:isolate; background:linear-gradient(135deg,rgb(9 35 58),rgb(16 35 50) 45%,rgb(20 45 62)); }
 /* Community map pattern: subtle topographic lines + organic shapes */
@@ -988,7 +989,6 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .hero-copy--intro { padding-bottom:0; }
   .hero-copy--details { padding-top:0; }
   .hero-search-row { margin-inline:50px; }
-  .hero-panel { margin-inline:50px; }
   /* t_7cafab72: below 980px the copy is full-width and the decorative
      .visual-label (aria-hidden, bottom-right of the background) would sit
      on top of the trust note — hide it at these widths (it is pure
@@ -1131,9 +1131,6 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   /* Phones (design review 2026-11): three columns in ~330px wrapped "No account"
      over four lines. One stat per row, value and label on one baseline. */
   .hero-stats { margin-top:40px; flex-direction:column; gap:10px }
-  .hero-panel { margin:28px 16px 18px; padding:14px; }
-  .hero-panel-map { display:none; }
-  .hero-panel .hero-stats { display:flex; flex-direction:column; gap:10px; margin-top:16px; }
   .hero-stats div { display:flex; align-items:baseline; gap:10px; }
   .hero-stats dt { font-size:19px; white-space:nowrap; }
   .hero-stats dd { margin:0; }
