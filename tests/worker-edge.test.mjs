@@ -42,7 +42,14 @@ export default {
       // the RFC 8288 Link-header tests need a realistic content-type.
       return new Response("<html><head><title>osdb</title></head><body>ok</body></html>", { status: 200, headers: { "content-type": "text/html; charset=utf-8" } });
     }
-    return new Response("handler-ok", { status: 200, headers: { "content-type": "text/plain" } });
+    // Cache-policy tests ask the "route" to answer with a given policy.
+    const cacheControl = request.headers.get("x-test-cache-control");
+    const headers = { "content-type": "text/plain" };
+    if (cacheControl) {
+      headers["cache-control"] = cacheControl;
+      headers.etag = '"v1"';
+    }
+    return new Response("handler-ok", { status: 200, headers });
   },
 };
 `;
@@ -387,6 +394,50 @@ test("analytics: dynamic API segments are recorded as route patterns, unknown pa
     analytics.calls.map((point) => point.blobs[2]),
     cases.map(([, expected]) => expected),
   );
+});
+
+test("API cache policy: /api/auth/* and sessioned API responses are forced to no-store (security audit 2026-11)", async () => {
+  const { worker } = await loadWorker();
+  const send = (requestPath, { cacheControl, cookie } = {}) => {
+    const headers = {};
+    if (cacheControl) headers["x-test-cache-control"] = cacheControl;
+    if (cookie) headers.cookie = cookie;
+    return worker.fetch(request(requestPath, { headers }), testEnv(), ctx());
+  };
+
+  // /api/auth/* is always no-store, even when the route forgot (or chose a
+  // public policy), and even for an anonymous caller.
+  for (const requestPath of ["/api/auth/me", "/api/auth/oidc/providers", "/api/AUTH/me", "/api//auth/me"]) {
+    const missing = await send(requestPath);
+    assert.equal(missing.headers.get("cache-control"), "no-store", `${requestPath} without a route policy`);
+    const publicPolicy = await send(requestPath, { cacheControl: "public, max-age=3600" });
+    assert.equal(publicPolicy.headers.get("cache-control"), "no-store", `${requestPath} with a public route policy`);
+    assert.equal(publicPolicy.headers.get("etag"), null, "no validator on a forced no-store response");
+  }
+  // A route that already chose no-store keeps its exact policy.
+  const own = await send("/api/auth/me", { cacheControl: "private, no-store, max-age=0" });
+  assert.equal(own.headers.get("cache-control"), "private, no-store, max-age=0");
+
+  // Any API response to a request carrying the session cookie.
+  const sessioned = await send("/api/cameras?limit=1", { cacheControl: "public, s-maxage=300", cookie: "theme=dark; osdb_session=abc" });
+  assert.equal(sessioned.headers.get("cache-control"), "no-store");
+  const sessionedTile = await send("/api/tiles/13/1/1.png", { cacheControl: "public, max-age=604800", cookie: "osdb_session=abc" });
+  assert.equal(sessionedTile.headers.get("cache-control"), "no-store");
+
+  // Anonymous public API responses keep their cache policy (public-cache
+  // reads, tiles, geocode) — including a look-alike cookie name.
+  for (const [requestPath, policy] of [
+    ["/api/cameras?limit=1", "public, s-maxage=300"],
+    ["/api/tiles/13/1/1.png", "public, max-age=604800"],
+    ["/api/geocode?q=roma", "public, max-age=86400"],
+  ]) {
+    const anonymous = await send(requestPath, { cacheControl: policy, cookie: "not_osdb_session=1; theme=dark" });
+    assert.equal(anonymous.headers.get("cache-control"), policy, `${requestPath} stays cacheable for anonymous callers`);
+    assert.equal(anonymous.headers.get("etag"), '"v1"');
+  }
+  // Non-API pages are not touched by this policy.
+  const page = await send("/directory", { cacheControl: "public, max-age=60" });
+  assert.equal(page.headers.get("cache-control"), "public, max-age=60");
 });
 
 test("analytics: the route-pattern list covers every app/api route.ts", async () => {
