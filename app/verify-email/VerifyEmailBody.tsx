@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useDomainMessages } from "../lib/use-domain-messages";
 import { authByLocale } from "../lib/i18n/auth";
+import { readCsrfToken } from "../lib/csrf";
 import { PublicNav } from "../components/PublicNav";
 
 /**
@@ -84,7 +85,11 @@ export function VerifyEmailBody() {
     setResendBusy(true);
     setResendMessage(null);
     try {
-      const response = await fetch("/api/auth/verify-email/resend", { method: "POST" });
+      const csrfToken = readCsrfToken();
+      const response = await fetch("/api/auth/verify-email/resend", {
+        method: "POST",
+        headers: csrfToken ? { "x-csrf-token": csrfToken } : {},
+      });
       if (response.ok) {
         setResendMessage(t.verifyResent);
         return;

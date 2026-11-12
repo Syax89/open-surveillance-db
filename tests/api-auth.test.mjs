@@ -1148,11 +1148,26 @@ test("resend requires a live session (401 anonymous)", async () => {
   assert.equal(callArgs("createVerificationToken").length, 0);
 });
 
+test("resend requires the X-CSRF-Token double-submit (403, nothing minted or reserved)", async () => {
+  stub("findSessionByToken", async () => ({ ...session, contributor }));
+  const { POST } = await resendRoute();
+  for (const headers of [{}, { "x-csrf-token": "wrong-token" }]) {
+    const response = await POST(
+      sessionRequest("/api/auth/verify-email/resend", "raw-session-token-abc123", { method: "POST", headers }),
+    );
+    assert.equal(response.status, 403);
+    assert.equal(response.headers.get("cache-control"), "no-store");
+    assert.equal((await responseBody(response)).error, "Invalid CSRF token. Refresh the page and try again.");
+  }
+  assert.equal(callArgs("reserveAuthEmail").length, 0, "no mail budget spent");
+  assert.equal(callArgs("createVerificationToken").length, 0, "no token minted (the live link survives)");
+});
+
 test("resend on an already-verified account is a no-op success", async () => {
   stub("findSessionByToken", async () => ({ ...session, contributor: verifiedContributor }));
   const { POST } = await resendRoute();
   const response = await POST(
-    sessionRequest("/api/auth/verify-email/resend", "raw-session-token-abc123", { method: "POST" }),
+    sessionRequest("/api/auth/verify-email/resend", "raw-session-token-abc123", { method: "POST", headers: { "x-csrf-token": "csrf-token-123" } }),
   );
   assert.equal(response.status, 200);
   assert.deepEqual((await responseBody(response)).verified, true);
@@ -1168,7 +1183,7 @@ test("resend mints a fresh verify token and sends it through the canonical maile
   stub("sendAuthEmail", async () => ({ ok: true, messageId: "m1" }));
   const { POST } = await resendRoute();
   const response = await POST(
-    sessionRequest("/api/auth/verify-email/resend", "raw-session-token-abc123", { method: "POST" }),
+    sessionRequest("/api/auth/verify-email/resend", "raw-session-token-abc123", { method: "POST", headers: { "x-csrf-token": "csrf-token-123" } }),
   );
   assert.equal(response.status, 200);
   const body = await responseBody(response);
@@ -1198,7 +1213,7 @@ test("resend answers 429 with Retry-After when the atomic reservation is rate_li
   stub("reserveAuthEmail", async () => ({ ok: false, reason: "rate_limited", retryAfterSeconds: 300 }));
   const { POST } = await resendRoute();
   const response = await POST(
-    sessionRequest("/api/auth/verify-email/resend", "raw-session-token-abc123", { method: "POST" }),
+    sessionRequest("/api/auth/verify-email/resend", "raw-session-token-abc123", { method: "POST", headers: { "x-csrf-token": "csrf-token-123" } }),
   );
   assert.equal(response.status, 429);
   assert.equal(response.headers.get("retry-after"), "300");
@@ -1219,7 +1234,7 @@ test("resend releases the EXACT reservation when createVerificationToken throws 
   stub("releaseEmailReservation", async () => {});
   const { POST } = await resendRoute();
   const response = await POST(
-    sessionRequest("/api/auth/verify-email/resend", "raw-session-token-abc123", { method: "POST" }),
+    sessionRequest("/api/auth/verify-email/resend", "raw-session-token-abc123", { method: "POST", headers: { "x-csrf-token": "csrf-token-123" } }),
   );
   // Behaviour mapping: the mint failure is a server-side 503, honest error.
   assert.equal(response.status, 503);
@@ -1248,7 +1263,7 @@ test("resend answers 503 on a provider failure and logs only the fixed generic e
   try {
     const { POST } = await resendRoute();
     const response = await POST(
-      sessionRequest("/api/auth/verify-email/resend", "raw-session-token-abc123", { method: "POST" }),
+      sessionRequest("/api/auth/verify-email/resend", "raw-session-token-abc123", { method: "POST", headers: { "x-csrf-token": "csrf-token-123" } }),
     );
     assert.equal(response.status, 503);
     assert.equal((await responseBody(response)).error, "Unable to resend the verification email");

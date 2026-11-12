@@ -680,12 +680,12 @@ test("email: budget mail (override 3/600) esaurito con register+2 resend reali �
     assert.equal(body.verification.sent, true, "register reports the mail was accepted (no devLink, P1-1)");
     const firstToken = mailToken();
 
-    const resendOne = await resendRoute.POST(apiRequest("/api/auth/verify-email/resend", { method: "POST", headers }));
+    const resendOne = await resendRoute.POST(apiRequest("/api/auth/verify-email/resend", { method: "POST", headers: { cookie: headers.cookie, "x-csrf-token": headers.csrfToken } }));
     assert.equal(resendOne.status, 200); // invio #2
     const secondToken = mailToken();
     assert.ok(secondToken && secondToken !== firstToken, "resend mints a fresh token");
 
-    const resendTwo = await resendRoute.POST(apiRequest("/api/auth/verify-email/resend", { method: "POST", headers }));
+    const resendTwo = await resendRoute.POST(apiRequest("/api/auth/verify-email/resend", { method: "POST", headers: { cookie: headers.cookie, "x-csrf-token": headers.csrfToken } }));
     assert.equal(resendTwo.status, 200); // invio #3
     const thirdToken = mailToken();
     assert.ok(thirdToken && thirdToken !== secondToken, "resend mints a fresh token every time");
@@ -693,7 +693,7 @@ test("email: budget mail (override 3/600) esaurito con register+2 resend reali �
     // 4° invio: il budget è esaurito → 429 con Retry-After, PRIMA di ogni
     // mint/send (riserva atomica): il link corrente non viene né consumato né
     // revocato — il count in tabella resta a 3.
-    const blocked = await resendRoute.POST(apiRequest("/api/auth/verify-email/resend", { method: "POST", headers }));
+    const blocked = await resendRoute.POST(apiRequest("/api/auth/verify-email/resend", { method: "POST", headers: { cookie: headers.cookie, "x-csrf-token": headers.csrfToken } }));
     assert.equal(blocked.status, 429, "the 4th send in the window is blocked");
     assert.ok(Number(blocked.headers.get("retry-after")) > 0);
     const contributorRow = await env.DB.prepare("SELECT id FROM contributors WHERE email = ?").bind(email).first();

@@ -915,7 +915,7 @@ test("account: an unverified contributor sees the verification banner with a wor
   installFetchMock((input, init) => {
       if (String(input) === "/api/auth/keys" && (init?.method ?? "GET") === "GET") return jsonResponse({ keys: [] });
     const url = String(input);
-    requests.push({ url, method: init?.method ?? "GET" });
+    requests.push({ url, method: init?.method ?? "GET", headers: init?.headers ?? {} });
     if (url === "/api/auth/me") {
       return jsonResponse({
         contributor: {
@@ -937,6 +937,7 @@ test("account: an unverified contributor sees the verification banner with a wor
     return jsonResponse({ error: "unexpected route" }, { status: 404 });
   });
 
+  document.cookie = "osdb_csrf=fixture-csrf-token; path=/";
   await renderWithLocale(React.createElement(AccountPage));
 
   // P1-1 (design review): the banner explains the write gate and offers the
@@ -944,6 +945,8 @@ test("account: an unverified contributor sees the verification banner with a wor
   await waitFor(() => assert.ok(screen.getByRole("heading", { name: "Verify your email to contribute" })));
   await user.click(screen.getByRole("button", { name: "Resend the email" }));
   await waitFor(() => assert.ok(requests.some((r) => r.url === "/api/auth/verify-email/resend" && r.method === "POST")));
+  const resend = requests.find((r) => r.url === "/api/auth/verify-email/resend");
+  assert.equal(resend.headers["x-csrf-token"], "fixture-csrf-token", "the resend echoes the CSRF token");
   assert.ok(screen.getByText("Confirmation email sent."));
 });
 
