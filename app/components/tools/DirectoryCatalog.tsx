@@ -15,6 +15,7 @@ import { RecordCard } from "../RecordCard";
 import { FiltersBar } from "../FiltersBar";
 import { EmptyState } from "../EmptyState";
 import { usePlaceSearch } from "../../lib/usePlaceSearch";
+import { hardNavigate } from "../../lib/navigate";
 import { fetchImportSources, importSourceOf, type ImportSourceInfo } from "../../lib/import-sources";
 
 /** Records per page in the /directory catalog (t_f13fcb1c). */
@@ -356,10 +357,16 @@ export function DirectoryCatalog({ filteredRecords, loading, loadError, onRetryL
   // the screen too, so there are no pages of a list that is not rendered.
   const showPager = !placeDone && totalRecords > DIRECTORY_PAGE_SIZE;
 
+  // Search-as-you-type (2026-11): the field suggests matching public
+  // records from our own data; choosing one opens its record page. The
+  // list below keeps filtering exactly as before (the dropdown is a
+  // shortcut to one record, not a second result list).
+  const openSuggestedRecord = (id: number) => hardNavigate(`/records/${id}`);
+
   return (
     <section className="records-section" id="records" aria-label={t.accessibleDirectory}>
       {offline && <div className="offline-state" role="status"><b>{t.offlineTitle}.</b> {t.offlineBody} <button type="button" className="text-button" onClick={() => window.location.reload()}>{t.offlineAction} <span aria-hidden="true">→</span></button></div>}
-      <FiltersBar variant="bare" showCommunitySort stateFilter={stateFilter} setStateFilter={setStateFilter} originFilter={originFilter} setOriginFilter={setOriginFilter} activeFilterCount={placeActive ? 0 : activeFilters.length} cameraKinds={cameraKinds} search={search} setSearch={(value) => { place.clearPlaceSearch(); setSearch(value); }} onSearchSubmit={() => { void place.searchByQuery(search); }} kindFilter={kindFilter} setKindFilter={setKindFilter} freshnessFilter={freshnessFilter} setFreshnessFilter={setFreshnessFilter} sortOrder={sortOrder} setSortOrder={setSortOrder} resultCount={totalRecords} onReset={onResetFilters} />
+      <FiltersBar variant="bare" showCommunitySort stateFilter={stateFilter} setStateFilter={setStateFilter} originFilter={originFilter} setOriginFilter={setOriginFilter} activeFilterCount={placeActive ? 0 : activeFilters.length} cameraKinds={cameraKinds} search={search} setSearch={(value) => { place.clearPlaceSearch(); setSearch(value); }} onSearchSubmit={() => { void place.searchByQuery(search); }} onSuggestionSelect={openSuggestedRecord} kindFilter={kindFilter} setKindFilter={setKindFilter} freshnessFilter={freshnessFilter} setFreshnessFilter={setFreshnessFilter} sortOrder={sortOrder} setSortOrder={setSortOrder} resultCount={totalRecords} onReset={onResetFilters} />
       {place.placeResult?.status === "loading" && <p className="loading-note" role="status">{t.placeSearchLoading}</p>}
       {place.placeResult?.status === "error" && <p className="nearby-error" role="alert">{place.placeResult.message}</p>}
       {/* Visible results header (t_f13fcb1c): replaces the sr-only h2 with a

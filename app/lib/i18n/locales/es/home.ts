@@ -36,8 +36,21 @@ export const es: Translation<typeof en> = {
   // progressively enhanced with the shared PlaceAutocomplete primitive.
   // The copy is home-scoped — the /segnala address search keeps its own
   // report-bundle wording.
+  // Hero search-as-you-type (2026-11): record suggestions from our own
+  // data only; the place lookup (OpenStreetMap) runs only when the last
+  // item is chosen, then a chosen place opens the map there.
+  suggestLabel: "Sugerencias",
+  suggestCount: (count: number) => (count === 1 ? "1 sugerencia disponible" : `${count} sugerencias disponibles`),
+  suggestCoordinates: (text: string) => `Ver las coordenadas ${text} en el mapa`,
+  suggestRecordNumber: (id: number) => `Abrir la ficha #${id}`,
+  suggestPlace: (query: string) => `Buscar el lugar «${query}» (OpenStreetMap)`,
+  searchPlaceLabel: "Sugerencias de lugares",
+  searchPlaceNoResults: (query: string) => `No hay resultados para «${query}»`,
+  searchPlaceUnavailable: "La búsqueda de lugares no está disponible por ahora.",
+  searchPlaceRateLimited: (seconds: number) => `La búsqueda de lugares ha alcanzado su límite temporal de solicitudes. Vuelve a intentarlo en unos ${seconds} segundos.`,
+  searchPlaceAttribution: "Lugares © colaboradores de OpenStreetMap",
   searchDirectoryHelp:
-    "Busca por nombre, tipo o dirección. En el directorio, Intro también busca alrededor de un lugar.",
+    "Mientras escribes, las sugerencias vienen solo de nuestras propias fichas. Intro busca en el directorio; un lugar se busca en OpenStreetMap solo si eliges «Buscar el lugar».",
   statsLabel: "Estadísticas de la base de datos",
   publicRecords: "fichas públicas",
   browseFreely: "Sin cuenta",

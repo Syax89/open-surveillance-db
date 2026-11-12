@@ -36,8 +36,21 @@ export const de: Translation<typeof en> = {
   // progressively enhanced with the shared PlaceAutocomplete primitive.
   // The copy is home-scoped — the /segnala address search keeps its own
   // report-bundle wording.
+  // Hero search-as-you-type (2026-11): record suggestions from our own
+  // data only; the place lookup (OpenStreetMap) runs only when the last
+  // item is chosen, then a chosen place opens the map there.
+  suggestLabel: "Vorschläge",
+  suggestCount: (count: number) => (count === 1 ? "1 Vorschlag verfügbar" : `${count} Vorschläge verfügbar`),
+  suggestCoordinates: (text: string) => `Koordinaten ${text} auf der Karte zeigen`,
+  suggestRecordNumber: (id: number) => `Eintrag #${id} öffnen`,
+  suggestPlace: (query: string) => `Ort „${query}“ suchen (OpenStreetMap)`,
+  searchPlaceLabel: "Ortsvorschläge",
+  searchPlaceNoResults: (query: string) => `Keine Ergebnisse für „${query}“`,
+  searchPlaceUnavailable: "Die Ortssuche ist vorübergehend nicht verfügbar.",
+  searchPlaceRateLimited: (seconds: number) => `Die Ortssuche hat ihr kurzfristiges Anfragelimit erreicht. Versuch es in etwa ${seconds} Sekunden erneut.`,
+  searchPlaceAttribution: "Orte © OpenStreetMap-Mitwirkende",
   searchDirectoryHelp:
-    "Suche nach Name, Typ oder Adresse. Im Verzeichnis sucht die Eingabetaste auch rund um einen Ort.",
+    "Während du tippst, kommen die Vorschläge nur aus unseren eigenen Einträgen. Enter durchsucht das Verzeichnis; ein Ort wird nur bei OpenStreetMap gesucht, wenn du „Ort suchen“ wählst.",
   statsLabel: "Statistiken der Datenbank",
   publicRecords: "öffentliche Einträge",
   browseFreely: "Kein Konto",

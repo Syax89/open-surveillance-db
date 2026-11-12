@@ -194,7 +194,8 @@ test("the visible caption states the privacy promise and describes the input", a
   const { input } = await mountMap();
   const caption = document.getElementById("map-list-caption");
   assert.ok(caption, "the caption renders");
-  assert.match(caption.textContent, /Nothing is sent while you type/);
+  assert.match(caption.textContent, /While you type, only our own records are searched/);
+  assert.match(caption.textContent, /OpenStreetMap only when you press Enter/);
   assert.ok((input.getAttribute("aria-describedby") ?? "").split(" ").includes("map-list-caption"), "the caption is announced with the field");
 });
 

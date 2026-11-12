@@ -36,8 +36,21 @@ export const fr: Translation<typeof en> = {
   // progressively enhanced with the shared PlaceAutocomplete primitive.
   // The copy is home-scoped — the /segnala address search keeps its own
   // report-bundle wording.
+  // Hero search-as-you-type (2026-11): record suggestions from our own
+  // data only; the place lookup (OpenStreetMap) runs only when the last
+  // item is chosen, then a chosen place opens the map there.
+  suggestLabel: "Suggestions",
+  suggestCount: (count: number) => (count === 1 ? "1 suggestion disponible" : `${count} suggestions disponibles`),
+  suggestCoordinates: (text: string) => `Afficher les coordonnées ${text} sur la carte`,
+  suggestRecordNumber: (id: number) => `Ouvrir la fiche #${id}`,
+  suggestPlace: (query: string) => `Rechercher le lieu « ${query} » (OpenStreetMap)`,
+  searchPlaceLabel: "Suggestions de lieux",
+  searchPlaceNoResults: (query: string) => `Aucun résultat pour « ${query} »`,
+  searchPlaceUnavailable: "La recherche de lieux est temporairement indisponible.",
+  searchPlaceRateLimited: (seconds: number) => `La recherche de lieux a atteint sa limite temporaire de requêtes. Réessayez dans environ ${seconds} secondes.`,
+  searchPlaceAttribution: "Lieux © contributeurs OpenStreetMap",
   searchDirectoryHelp:
-    "Recherchez par nom, type ou adresse. Dans le répertoire, la touche Entrée lance aussi une recherche autour d’un lieu.",
+    "Pendant la saisie, les suggestions proviennent uniquement de nos propres fiches. Entrée lance la recherche dans le répertoire ; un lieu n’est recherché sur OpenStreetMap que si vous choisissez « Rechercher le lieu ».",
   statsLabel: "Statistiques de la base de données",
   publicRecords: "fiches publiques",
   browseFreely: "Aucun compte",

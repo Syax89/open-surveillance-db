@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { classifyDuplicateMatch, textSimilarity, type MatchStrength } from "../app/lib/duplicate-detection";
 import { PUBLIC_CAMERA_STATUSES } from "../app/lib/public-status";
+import { LIKE_ESCAPE_CLAUSE, likeContainsPattern, SUGGEST_ADDRESS_MAX_LENGTH, SUGGEST_MAX_LIMIT, type RecordSuggestion } from "../app/lib/search";
 import { titleSortKey } from "../app/lib/title-sort-key";
 import { confirmationCountsFor } from "./confirmations";
 import { communityActionCountsFor, type CommunityActionCounts } from "./community-actions";
@@ -296,8 +297,10 @@ export async function listPublicCamerasPage(
     // index stays usable.
   }
   if (filters?.q) {
-    query += " AND (title LIKE ? OR address LIKE ? OR kind LIKE ? OR source LIKE ?)";
-    const needle = `%${filters.q}%`;
+    // LIKE wildcards in the user text are escaped (audit 2026-11): "%" or
+    // "_" typed in the search box match themselves, never "anything".
+    query += ` AND (title LIKE ? ${LIKE_ESCAPE_CLAUSE} OR address LIKE ? ${LIKE_ESCAPE_CLAUSE} OR kind LIKE ? ${LIKE_ESCAPE_CLAUSE} OR source LIKE ? ${LIKE_ESCAPE_CLAUSE})`;
+    const needle = likeContainsPattern(filters.q);
     parameters.push(needle, needle, needle, needle);
   }
   if (filters?.initial) {
@@ -400,6 +403,40 @@ export async function listPublicCamerasPage(
   }));
   return { records, total, nextOffset };
 }
+/**
+ * Search-as-you-type suggestions (GET /api/cameras/suggest, 2026-11).
+ *
+ * A compact, bounded read for the suggestion dropdowns (home hero, map,
+ * directory): the shared public predicate (public statuses only, demo gate,
+ * review window), a case-insensitive contains-match on the public text
+ * fields title / address / kind with LIKE wildcards ESCAPED, and ONLY the
+ * fields a suggestion row renders — id, title, kind and a short address
+ * excerpt. No coordinates, no private fields, no counts (no per-row aggregates: the
+ * dropdown asks on every pause in typing, so the query must stay one cheap
+ * SELECT). Ordered by the natural title key so the
+ * (status, title_sort_key) index serves the ORDER BY and the scan stops
+ * after `limit` matches.
+ */
+export async function suggestPublicCameras(text: string, limit: number): Promise<RecordSuggestion[]> {
+  const d1 = await getD1();
+  const boundedLimit = Math.min(Math.max(Math.trunc(limit) || 1, 1), SUGGEST_MAX_LIMIT);
+  const { sql: publicPredicate, parameters } = publicCameraPredicate(new Date().toISOString());
+  const needle = likeContainsPattern(text);
+  const result = await d1
+    .prepare(`SELECT id, title, kind, address FROM cameras WHERE ${publicPredicate} AND (title LIKE ? ${LIKE_ESCAPE_CLAUSE} OR address LIKE ? ${LIKE_ESCAPE_CLAUSE} OR kind LIKE ? ${LIKE_ESCAPE_CLAUSE}) ORDER BY title_sort_key ASC, id DESC LIMIT ?`)
+    .bind(...parameters, needle, needle, needle, boundedLimit)
+    .all<RecordSuggestion>();
+  return result.results.map((row) => {
+    const address = typeof row.address === "string" ? row.address.trim() : "";
+    return {
+      id: row.id,
+      title: row.title,
+      kind: row.kind,
+      address: address ? address.slice(0, SUGGEST_ADDRESS_MAX_LENGTH) : null,
+    };
+  });
+}
+
 export type NearbyPublicCameraRecord = PublicCameraRecord & { distanceMeters: number };
 function distanceInMeters(fromLatitude: number, fromLongitude: number, toLatitude: number, toLongitude: number) { const earthRadiusMeters = 6_371_000; const toRadians = (degrees: number) => degrees * Math.PI / 180; const latitudeDelta = toRadians(toLatitude - fromLatitude); const longitudeDelta = toRadians(toLongitude - fromLongitude); const latitudeStart = toRadians(fromLatitude); const latitudeEnd = toRadians(toLatitude); const haversine = Math.sin(latitudeDelta / 2) ** 2 + Math.cos(latitudeStart) * Math.cos(latitudeEnd) * Math.sin(longitudeDelta / 2) ** 2; return 2 * earthRadiusMeters * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine)); }
 /**

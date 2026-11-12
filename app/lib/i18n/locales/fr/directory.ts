@@ -26,6 +26,13 @@ export const fr: Translation<typeof en> = {
   resultsRegion: "Résultats du répertoire",
   searchDirectory: "Rechercher dans le répertoire public",
   searchPlaceholder: "Nom, type, adresse ou lieu",
+  // Search-as-you-type (2026-11): record suggestions from our own data;
+  // the last item runs the existing place search (Enter does the same).
+  suggestLabel: "Suggestions",
+  suggestCount: (count: number) => (count === 1 ? "1 suggestion disponible" : `${count} suggestions disponibles`),
+  suggestCoordinates: (text: string) => `Rechercher près des coordonnées ${text}`,
+  suggestRecordNumber: (id: number) => `Ouvrir la fiche #${id}`,
+  suggestPlace: (query: string) => `Rechercher près du lieu « ${query} » (OpenStreetMap)`,
   searchHelp:
     "La recherche se fait pendant la saisie ; appuyez sur Entrée pour chercher autour d’un lieu.",
   filters: "Filtres",
