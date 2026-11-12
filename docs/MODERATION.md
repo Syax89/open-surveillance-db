@@ -4,8 +4,11 @@
 
 OpenSurveillanceDB is **community-driven**: reports from verified contributor accounts are **published immediately** (`status = 'active'`), with no review queue and no human moderation in the normal flow (ADR 0021 § 1). Accuracy and freshness are maintained by the community through automatic, trust-weighted actions — `like`, `confirm`, `gone`, `problem`, `privacy` — that trigger record transitions at fixed thresholds (ADR 0021 § 3/§ 4). Every transition is recorded in the record's **public lifecycle history without attribution** (ADR 0021 § 7).
 
-The only residual human step is the **legal-emergency admin hide/remove** —
-the only human write power over the record lifecycle (ADR 0021 § 8).
+The residual human steps are the **legal-emergency hide/remove** (ADR 0021
+§ 8) and, since 2026-11, the **review of every community privacy flag**: a
+privacy hide is applied at once and lands immediately in the moderator's
+review queue, where a moderator confirms the removal or restores the record
+(ADR 0021, amendment 2026-11).
 
 The retired human review cycle is not part of this model; the retired review
 tables were closed by migration and survive only as history (ADR 0021
@@ -37,7 +40,12 @@ These exclusions bind every submitter (TERMS § 4); violations are handled by th
 ## Community moderation (automatic, no human in the loop)
 
 - **Actions:** verified accounts may `like`, `confirm`, `gone`, `problem` or `privacy` a record — one action per user per record (`UNIQUE(camera_id, contributor_id)`), switchable; self-like/self-confirm are blocked (403); self-gone/problem/privacy are allowed (own data, own camera).
-- **Thresholds (trust-weighted, tunable):** `gone` sum ≥ 3 (≥ 3 distinct) → `removed`; `problem` sum ≥ 3 (≥ 2 distinct) → `hidden`; `privacy` ≥ 1 → `hidden` immediately (prudential); reversal requires contrary consensus (`confirm` sums) and, for privacy hides, a cooldown (default 7 days).
+- **Thresholds (trust-weighted, tunable):** `gone` sum ≥ 3 (≥ 3 distinct) → `removed`; `problem` sum ≥ 3 (≥ 2 distinct) → `hidden`; `privacy` ≥ 1 → `hidden` immediately (prudential); reversal of a **community** hide/removal requires contrary consensus (`confirm` sums) and, for privacy hides, a cooldown (default 7 days).
+- **Only community transitions are community-reversible.** A removal or hide decided by a moderator (legal/emergency hide, a confirmed privacy removal), by a correction outcome, or carried over by the 0039 migration from a moderator rejection is **never** restored by community consensus — no cooldown, no number of confirms (the protection of the person must not depend on a vote; mistakes are fixed through an appeal, ADR 0014). A record whose cause is unknown fails closed.
+- **Privacy flags reach a human (ADR 0021, amendment 2026-11):**
+  - one privacy flag still hides the record at once, and the same write opens its moderation queue item as **sensitive**; the record shows in the dashboard's **Review** tab until a moderator decides;
+  - each account may cast at most **5 privacy flags per rolling 24 h** (`quotas.privacyFlagsPerDay`), separately from the general daily quota; over the cap → 429 (same shape as the other quotas, `code: "privacy_flag_limit"`);
+  - **abuse penalty:** an account with **≥ 2 privacy flags rejected by a moderator in the last 90 days** (`penalties.privacyRejectedFlags`, `penalties.privacyRejectedWindowDays`) no longer auto-hides — its new privacy flags are stored and sent to the review queue only ("a moderator will review it"). Older rejections do not count.
 - **Transitions are events:** every state change writes a public `camera_lifecycle_events` row (no attribution) and an internal append-only audit entry; trigger actions are consumed so the state is stable until new consensus forms.
 - **No transition happens on a timer** (ADR 0021 § 2.2): a record is never moved to another lifecycle state by the passing of time; a record nobody confirms stays `active` until the community says otherwise.
 
@@ -55,15 +63,24 @@ were all removed. **No new uploads are accepted.** Existing R2 objects were
 touches the bucket. The retired workflow is documented as history in
 `docs/decisions/0008` (R6/R13) and `docs/legal/RETENTION_SCHEDULE.md` R13.
 
-## Legal-emergency admin actions (the only human write power over the record lifecycle)
+## Review of community flags (moderator)
 
-ADR 0021 § 8: the **only** remaining human write action on a record is the administrator's legal-emergency hide/removal:
+Records a community flag put in front of a moderator appear in the **Review** tab (with `needs_review` records), labelled "Hidden by a community flag" (`hidden`) or "Community flag on a public record" (`active`, e.g. a penalised account's flag), with the queue sensitivity shown. The decision uses the existing actions:
+
+- **Hide** → `removed`: the removal is confirmed. A moderator decision — never community-restorable.
+- **Reverify** → `active`: the flag was unfounded. A hidden record is restored (a still-public one keeps its state and the flag is dismissed); the restore is recorded in the audit trail and in the record's public revisions; each flagging account is charged one rejected privacy flag (the abuse penalty above), and the rejected privacy actions are consumed. The verdict is **final**: later community privacy/problem flags no longer hide the record on their own — they are queued for the moderator again. A fresh `gone` consensus (≥ 3 distinct accounts) can still remove it.
+- **Two-person rule:** on a sensitive item, `reverify` needs a second, different reviewer **only when another active reviewer exists** (`hasOtherActiveReviewer`); with a single active moderator the first decision is final. Emergency `hide` stays single-person (reviewed retrospectively).
+- **Escalate** routes the item to a senior moderator / privacy lead, as for any queue item.
+
+## Legal-emergency actions
+
+ADR 0021 § 8: besides the review of community flags above, the remaining human write action on a record is the legal-emergency hide/removal:
 
 - **Who:** the administrator (ADR 0009 role model), never the intake/record reviewers — they have no normal-flow duties anymore (roles stay defined in the schema, unused).
 - **When:** when the law requires it (e.g. court order, privacy breach, sensitive personal data) or an emergency exclusion applies (live stream, credentials, control interfaces, harassment).
 - **How:** `hide` / `remove` with a **mandatory reason code** (single-person by design so harm can be stopped immediately; **reviewed retrospectively**).
 - **Produces:** a public `hidden`/`removed` event with reason `admin-legal` (no attribution) and an internal audit entry (MODERATION_SLA.md § 3/§ 5).
-- **Reversal:** administrators **cannot restore or un-hide unilaterally** — the community's contrary consensus is the only reversal path (ADR 0021 § 6.2), so no single account — human or not — controls publication.
+- **Reversal:** a legal-emergency hide/removal is **not** reversible by community consensus — not after the cooldown, not by any number of confirms (owner 2026-11: the protection of the person must not depend on a vote). A mistaken decision is corrected through an **appeal** (ADR 0014), decided by a different reviewer.
 
 ## Corrections and rights
 
