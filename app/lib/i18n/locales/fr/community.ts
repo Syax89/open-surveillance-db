@@ -200,6 +200,10 @@ export const fr: Translation<typeof en> = {
     errorSessionEnded: "Votre session est terminée. Reconnectez-vous pour participer.",
     errorVerifyRequired: "Vérifiez votre adresse e-mail pour participer aux actions communautaires.",
     errorGeneric: "Impossible de mettre à jour l’action. Réessayez.",
+    // Privacy flags (ADR 0021 §6.4): the per-account daily cap, and a flag
+    // stored but sent to a moderator instead of hiding the record.
+    errorPrivacyLimit: "Vous avez atteint la limite quotidienne de signalements de vie privée. Réessayez demain, ou utilisez le formulaire de correction pour une demande urgente.",
+    privacyQueued: "Signalement reçu. Un modérateur l’examinera avant toute modification de cette fiche.",
     // Compact toolbar (map popup, redesign t_b7728ad0): the trigger that
     // opens the disclosure with the remaining three actions, and the
     // explicit-copy privacy confirmation (the only action that asks before

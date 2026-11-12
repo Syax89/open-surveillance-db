@@ -2173,6 +2173,8 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .community-actions-cta { margin:12px 0 0; }
 /* `.community-actions-cta a` lives in app/styles/map.css (after Leaflet). */
 .community-actions .auth-error { margin:10px 0 0; }
+/* Privacy flag sent to a moderator (ADR 0021 §6.4): neutral, not an error. */
+.community-actions-notice { margin:10px 0 0; color:var(--ink-5); font-size:var(--text-sm); }
 
 /* Compact variant — the map popup toolbar (redesign t_b7728ad0): the two
    visible actions (Utile/Conferma) + the disclosure trigger on one row,

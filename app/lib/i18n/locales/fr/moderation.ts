@@ -68,6 +68,9 @@ export const fr: Translation<typeof en> = {
   noReviewText:
     "Les fiches marquées à revoir restent hors des données publiques jusqu’à ce qu’elles soient revérifiées ou masquées.",
   needsReview: "À revoir",
+  // Review tab: records a community flag put in front of a moderator (ADR 0021 §6.4).
+  communityHidden: "Masqué par un signalement de la communauté : revérifier pour le rétablir, masquer pour confirmer le retrait",
+  communityFlagged: "Signalement de la communauté sur une fiche publique : revérifier pour le classer, masquer pour la retirer",
   privateCorrections: "Demandes de correction privées",
   noCorrectionsTitle: "Aucune demande de correction en attente.",
   noCorrectionsText:

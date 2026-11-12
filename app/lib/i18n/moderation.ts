@@ -73,6 +73,9 @@ export const en = {
   noReviewText:
     "Records marked for review remain out of the public data until they are reverified or hidden.",
   needsReview: "Needs review",
+  // Review tab: records a community flag put in front of a moderator (ADR 0021 §6.4).
+  communityHidden: "Hidden by a community flag: Reverify restores it, Hide confirms the removal",
+  communityFlagged: "Community flag on a public record: Reverify dismisses it, Hide removes the record",
   privateCorrections: "Private correction requests",
   noCorrectionsTitle: "No correction requests are waiting.",
   noCorrectionsText:
@@ -299,6 +302,9 @@ export const it: Translation<typeof en> = {
   noReviewText:
     "I record segnati per revisione restano fuori dai dati pubblici finché non sono riverificati o nascosti.",
   needsReview: "Da ricontrollare",
+  // Review tab: records a community flag put in front of a moderator (ADR 0021 §6.4).
+  communityHidden: "Nascosto da una segnalazione della community: riverifica per ripristinarlo, nascondi per confermare la rimozione",
+  communityFlagged: "Segnalazione della community su un record pubblico: riverifica per archiviarla, nascondi per rimuoverlo",
   privateCorrections: "Richieste private di correzione",
   noCorrectionsTitle: "Non ci sono richieste di correzione in attesa.",
   noCorrectionsText:

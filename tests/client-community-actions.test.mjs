@@ -378,3 +378,35 @@ test("community actions: compact privacy action asks explicit confirmation befor
   assert.equal(putCount, 0, "cancel sends nothing");
   await waitFor(() => {});
 });
+
+// ADR 0021 §6.4: a privacy flag the server stored but sent to a moderator
+// (`review: "pending"`) is said plainly (role="status", not an alert); the
+// privacy-flag cap (429 code privacy_flag_limit) names the specific limit.
+function privacyPutMock(putResponse) {
+  return (input, init) => {
+    const method = init?.method ?? "GET";
+    if (input === "/api/auth/me") return jsonResponse({ id: 7, displayName: "Contributor" });
+    if (input === "/api/cameras/7/actions" && method === "GET") return jsonResponse({ action: null });
+    if (input === "/api/cameras/7/actions" && method === "PUT") return putResponse();
+    return jsonResponse({ error: "unexpected route" }, { status: 404 });
+  };
+}
+
+test("community actions: privacy flag queued for review shows the neutral notice", async () => {
+  const { screen } = rtl;
+  installFetchMock(privacyPutMock(() => jsonResponse({ action: "privacy", counts: { ...zeroCounts, privacy: 1 }, review: "pending" })));
+  await renderWithLocale(React.createElement(CommunityActions, { recordId: 7, counts: zeroCounts }));
+  const privacy = await screen.findByRole("button", { name: /privacy or legal concern/ });
+  await rtl.userEvent.setup().click(privacy);
+  assert.ok(await screen.findByText("Report received. A moderator will review it before anything changes on this record."));
+  assert.equal(screen.queryByRole("alert"), null);
+});
+
+test("community actions: 429 privacy_flag_limit names the privacy cap", async () => {
+  const { screen } = rtl;
+  installFetchMock(privacyPutMock(() => jsonResponse({ error: "Too many actions. Try again later.", code: "privacy_flag_limit" }, { status: 429 })));
+  await renderWithLocale(React.createElement(CommunityActions, { recordId: 7, counts: zeroCounts }));
+  await rtl.userEvent.setup().click(await screen.findByRole("button", { name: /privacy or legal concern/ }));
+  const alert = await screen.findByRole("alert");
+  assert.match(alert.textContent, /daily limit for privacy reports/);
+});

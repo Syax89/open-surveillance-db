@@ -209,6 +209,10 @@ export const en = {
     errorSessionEnded: "Your session has ended. Log in again to take part.",
     errorVerifyRequired: "Verify your email to take part in community actions.",
     errorGeneric: "Could not update the action. Try again.",
+    // Privacy flags (ADR 0021 §6.4): the per-account daily cap, and a flag
+    // stored but sent to a moderator instead of hiding the record.
+    errorPrivacyLimit: "You have reached the daily limit for privacy reports. Try again tomorrow, or use the correction form for an urgent request.",
+    privacyQueued: "Report received. A moderator will review it before anything changes on this record.",
     // Compact toolbar (map popup, redesign t_b7728ad0): the trigger that
     // opens the disclosure with the remaining three actions, and the
     // explicit-copy privacy confirmation (the only action that asks before
@@ -421,6 +425,10 @@ export const it: Translation<typeof en> = {
     errorSessionEnded: "La sessione è terminata. Accedi di nuovo per partecipare.",
     errorVerifyRequired: "Verifica la tua email per partecipare alle azioni della community.",
     errorGeneric: "Impossibile aggiornare l'azione. Riprova.",
+    // Privacy flags (ADR 0021 §6.4): the per-account daily cap, and a flag
+    // stored but sent to a moderator instead of hiding the record.
+    errorPrivacyLimit: "Hai raggiunto il limite giornaliero di segnalazioni privacy. Riprova domani, oppure usa il modulo di correzione per una richiesta urgente.",
+    privacyQueued: "Segnalazione ricevuta. Un moderatore la esaminerà prima di qualsiasi modifica a questo record.",
     // Toolbar compatta (popup mappa, redesign t_b7728ad0): il trigger che
     // apre il disclosure con le tre azioni rimanenti, e la conferma con
     // copy esplicito per la privacy (l'unica azione che chiede prima di

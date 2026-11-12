@@ -166,6 +166,9 @@ export function CommunityActions({
   const [authState, setAuthState] = useState<"checking" | "anonymous" | "signed-in">("checking");
   const [busyAction, setBusyAction] = useState<ActionType | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // ADR 0021 §6.4: a flag the server stored but sent to a moderator instead
+  // of applying (`review: "pending"`) — said plainly, never as an error.
+  const [notice, setNotice] = useState<string | null>(null);
   // Redesign t_b7728ad0 (compact only): the disclosure state — whether the
   // "Aggiorna o segnala" panel is open, and whether the Privacy action is
   // awaiting its explicit confirmation step inside the panel.
@@ -227,6 +230,7 @@ export function CommunityActions({
     if (authState !== "signed-in" || busyAction !== null) return;
     setBusyAction(action);
     setError(null);
+    setNotice(null);
     const token = readCsrfToken();
     const isActive = myAction === action;
     try {
@@ -247,8 +251,9 @@ export function CommunityActions({
           // map payload cannot revert the visible count.
           onCountsChange?.(nextCounts);
         } else {
-          const body = (await response.json()) as { action: ActionType; counts?: ActionCounts };
+          const body = (await response.json()) as { action: ActionType; counts?: ActionCounts; review?: string };
           setMyAction(body.action);
+          if (body.review === "pending") setNotice(actions.privacyQueued);
           if (body.counts) {
             setCounts(body.counts);
             // BUG t_5bc23d61: the PUT response is the ONLY authority for
@@ -274,7 +279,9 @@ export function CommunityActions({
         setMyAction(action);
         setError(actions.errorDuplicate);
       } else if (response.status === 429) {
-        setError(actions.errorGeneric);
+        // The privacy-flag cap carries a code; every other 429 stays generic.
+        const body = (await response.json().catch(() => null)) as { code?: string } | null;
+        setError(body?.code === "privacy_flag_limit" ? actions.errorPrivacyLimit : actions.errorGeneric);
       } else {
         setError(actions.errorGeneric);
       }
@@ -404,6 +411,7 @@ export function CommunityActions({
           <a href="/login">{actions.anonymousCta} <span aria-hidden="true">→</span></a>
         </p>
       )}
+      {notice && <p className="community-actions-notice" role="status">{notice}</p>}
       {error && <p className="auth-error" role="alert">{error}</p>}
     </section>
   );
