@@ -13,18 +13,23 @@ import { authLimit } from "../../../../../lib/auth-route-helpers";
 import { sameOrigin } from "../../../../../lib/csrf";
 import { isRecord } from "../../../../../lib/guards";
 import { BodyReadError, readJsonBody, urlTooLong } from "../../../../../lib/input-limits";
-import { userHandleForContributor, webauthnRpConfig } from "../../../../../lib/passkey";
+import { decoyCredentialIds, userHandleForContributor, webauthnRpConfig } from "../../../../../lib/passkey";
 
 /**
  * POST /api/auth/passkey/login/begin — start a WebAuthn authentication
  * ceremony (Fase C, t_36989e06). Public: the login wall is open to anyone.
  *
  * The optional `email` narrows the ceremony to that account's passkeys
- * (non-discoverable flow). When it is absent or unknown, the options carry
- * an empty `allowCredentials` and the authenticator resolves the credential
- * itself (discoverable / Conditional UI). The response shape is identical in
- * every case, so this endpoint never reveals whether an email exists or has
- * passkeys enrolled (anti-enumeration).
+ * (non-discoverable flow). When it is absent, the options carry an empty
+ * `allowCredentials` and the authenticator resolves the credential itself
+ * (discoverable / Conditional UI). When an email is given but has NO
+ * enrolled passkey (unknown account, or an account without passkeys), the
+ * options carry 1-2 deterministic DECOY descriptors (`decoyCredentialIds`,
+ * HMAC of the email) instead of an empty list: before this, a non-empty
+ * list meant "this account exists and has passkeys" and an empty one
+ * meant the opposite (account enumeration). Every email-narrowed response
+ * now has the same shape, so this endpoint never reveals whether an email
+ * exists or has passkeys enrolled.
  *
  * The challenge is stored hashed in D1 with a 10-minute TTL and consumed
  * single-use by /complete (anti-replay).
@@ -52,7 +57,8 @@ export async function POST(request: Request) {
 
     const payload: unknown = await readJsonBody(request, env).catch(() => null);
     if (isRecord(payload) && typeof payload.email === "string" && isValidEmail(payload.email)) {
-      const contributor = await findContributorByEmail(normalizeEmail(payload.email));
+      const email = normalizeEmail(payload.email);
+      const contributor = await findContributorByEmail(email);
       if (contributor) {
         const passkeys = await listPasskeys(contributor.id);
         allowCredentials = passkeys.map((passkey) => ({
@@ -62,6 +68,11 @@ export async function POST(request: Request) {
             : {}),
         }));
         userHandle = userHandleForContributor(contributor.id);
+      }
+      if (allowCredentials.length === 0) {
+        // Anti-enumeration decoys (see the doc comment above).
+        const decoyIds = await decoyCredentialIds(email, env.REGISTRATION_IP_HMAC_KEY);
+        allowCredentials = decoyIds.map((id) => ({ id }));
       }
     }
 

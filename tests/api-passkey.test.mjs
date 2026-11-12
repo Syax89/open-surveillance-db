@@ -361,20 +361,66 @@ test("login/begin with a known email narrows the ceremony to that account's pass
   assert.equal(challengeArgs[0].userHandle, passkeyLib.userHandleForContributor(7));
 });
 
-test("login/begin with an unknown email is indistinguishable from no email (anti-enumeration)", async () => {
+/** Shape of an allowCredentials list with the ids blanked to their byte length. */
+function credentialShape(list) {
+  return list.map((entry) => ({
+    keys: Object.keys(entry).sort(),
+    type: entry.type,
+    bytes: Buffer.from(entry.id, "base64url").length,
+    base64url: /^[A-Za-z0-9_-]+$/.test(entry.id),
+  }));
+}
+
+async function loginBeginFor(email, { known, passkeys = [] }) {
+  resetMockState();
+  rateLimit.resetRateLimitState();
   stub("sweepExpiredWebAuthnChallenges", async () => 0);
-  stub("findContributorByEmail", async () => null);
+  stub("findContributorByEmail", async () => (known ? contributor : null));
+  stub("listPasskeys", async () => passkeys);
   stub("createWebAuthnChallenge", async () => ({ id: 1 }));
   const { POST } = await loginBeginRoute();
   const response = await POST(
-    apiRequest("/api/auth/passkey/login/begin", {
-      method: "POST",
-      body: { email: "ghost@example.org" },
-    }),
+    apiRequest("/api/auth/passkey/login/begin", { method: "POST", body: { email } }),
   );
   assert.equal(response.status, 200);
-  const body = await responseBody(response);
-  assert.deepEqual(body.options.allowCredentials, []);
+  return (await responseBody(response)).options;
+}
+
+test("login/begin with an unknown email answers decoy credentials shaped like a real account's (anti-enumeration)", async () => {
+  const unknown = await loginBeginFor("ghost@example.org", { known: false });
+  assert.ok(unknown.allowCredentials.length >= 1 && unknown.allowCredentials.length <= 2,
+    "an unknown email no longer answers an empty list (that was the oracle)");
+  for (const entry of unknown.allowCredentials) {
+    assert.equal(entry.type, "public-key");
+    assert.ok([16, 20, 32].includes(Buffer.from(entry.id, "base64url").length));
+    assert.match(entry.id, /^[A-Za-z0-9_-]+$/);
+  }
+  // Deterministic: the same email answers the same decoys (a repeated probe
+  // cannot spot per-request randomness), a different email different ones.
+  const again = await loginBeginFor("GHOST@example.org", { known: false });
+  assert.deepEqual(again.allowCredentials, unknown.allowCredentials);
+  const other = await loginBeginFor("phantom@example.org", { known: false });
+  assert.notDeepEqual(other.allowCredentials, unknown.allowCredentials);
+  // Same top-level option keys as a real account's ceremony.
+  const real = await loginBeginFor("contributor@example.org", {
+    known: true,
+    passkeys: [{ credentialId: Buffer.alloc(32, 7).toString("base64url"), transports: null }],
+  });
+  assert.deepEqual(Object.keys(unknown).sort(), Object.keys(real).sort());
+  assert.deepEqual(
+    credentialShape(real.allowCredentials)[0].keys,
+    credentialShape(unknown.allowCredentials)[0].keys,
+    "decoy entries carry exactly the fields of a real transport-less entry",
+  );
+});
+
+test("login/begin for a KNOWN account without passkeys also answers decoys, not an empty list", async () => {
+  const options = await loginBeginFor("contributor@example.org", { known: true, passkeys: [] });
+  assert.ok(options.allowCredentials.length >= 1);
+  const [challengeArgs] = callArgs("createWebAuthnChallenge");
+  const passkeyLib = await loadLibModule("passkey");
+  assert.equal(challengeArgs[0].userHandle, passkeyLib.userHandleForContributor(7),
+    "the server-side handle binding is unchanged");
 });
 
 test("login/begin rejects cross-origin requests", async () => {

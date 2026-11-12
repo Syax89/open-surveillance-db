@@ -134,3 +134,48 @@ export function emailUnverifiedResponse(): Response {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Decoy credential descriptors (passkey login/begin anti-enumeration)
+// ---------------------------------------------------------------------------
+
+/** Constant pepper used when no server secret is configured (local / tests). */
+const DECOY_CREDENTIAL_PEPPER = "osdb-passkey-decoy-v1";
+/** Raw byte lengths of real-world credential ids (platform + roaming keys). */
+const DECOY_CREDENTIAL_LENGTHS = [16, 20, 32] as const;
+
+/**
+ * Deterministic FAKE `allowCredentials` ids for an email that has no
+ * enrolled passkey (unknown account, or a known account without passkeys).
+ *
+ * Without decoys, POST /api/auth/passkey/login/begin returned a non-empty
+ * `allowCredentials` only for an existing account with passkeys, so the
+ * response shape was an account-enumeration oracle. The decoys are
+ * HMAC-SHA256(secret, email) derived: stable across calls for the same
+ * email (a repeated probe cannot spot randomness) and not computable without
+ * the server secret. The secret is `secret` when configured (production
+ * reuses REGISTRATION_IP_HMAC_KEY, domain-separated by the message prefix),
+ * else a constant pepper. One or two entries, base64url ids of 16/20/32
+ * bytes, no transports: the same shapes real descriptors take. No
+ * authenticator holds them, so the ceremony simply finds no credential.
+ */
+export async function decoyCredentialIds(email: string, secret: string | undefined): Promise<string[]> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret && secret.length > 0 ? secret : DECOY_CREDENTIAL_PEPPER),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sign = async (label: string) =>
+    new Uint8Array(
+      await crypto.subtle.sign("HMAC", key, new TextEncoder().encode("osdb-passkey-decoy:" + label + ":" + email)),
+    );
+  const seed = await sign("seed");
+  const count = 1 + (seed[0] % 2);
+  const ids: string[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const length = DECOY_CREDENTIAL_LENGTHS[seed[index + 1] % DECOY_CREDENTIAL_LENGTHS.length];
+    ids.push(bytesToBase64Url((await sign("id" + index)).slice(0, length)));
+  }
+  return ids;
+}
