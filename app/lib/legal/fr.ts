@@ -22,7 +22,7 @@ export const frLegal: LegalContent = {
     intro:
       "Comment OpenSurveillanceDB traite les données personnelles, ce que nous publions, ce que nous ne collectons jamais, et comment vous pouvez exercer vos droits au titre du RGPD.",
     versionNote:
-      "Version 0.8 — 9 août 2026. Alignement sur l’audit juridique : resynchronisée avec la PRIVACY_NOTICE canonique v0.14 (docs/legal/PRIVACY_NOTICE.md reste la version canonique). Le § 5 ajoute le sous-traitant de géocodage Nominatim (PR6) ; le § 7 documente les règles de suppression définitive des anciennes fiches `pending`/`rejected` (R19/R20) ; § 10 Section cookies ; références aux sous-traitants OIDC corrigées en PR4/PR5 ; note sur les catégories particulières reformulée selon le modèle texte uniquement (preuves photographiques supprimées).",
+      "Version 0.9 — 12 novembre 2026. Le § 10 Cookies est réécrit pour énumérer tous les cookies utilisés (langue, thème de couleurs, session de connexion et protection CSRF), tous strictement nécessaires : toujours aucun bandeau de consentement ; resynchronisée avec la PRIVACY_NOTICE canonique v0.16 (docs/legal/PRIVACY_NOTICE.md reste la version canonique).",
     sections: [
       {
         heading: "1. Qui sommes-nous (responsable du traitement)",
@@ -246,31 +246,34 @@ export const frLegal: LegalContent = {
         blocks: [
           {
             type: "paragraph",
-            text: "OpenSurveillanceDB utilise un seul cookie fonctionnel :",
+            text: "OpenSurveillanceDB n’utilise que les cookies énumérés ci-dessous. Tous sont strictement nécessaires ou fonctionnels : ils ne contiennent aucun identifiant de pistage, ne sont jamais partagés avec des tiers et ne servent ni à la mesure d’audience, ni à la publicité, ni au profilage. C’est pourquoi aucun bandeau de consentement n’est affiché.",
           },
           {
-            type: "paragraph",
-            text: "**opensurveillancedb-locale** — mémorise la langue que vous avez choisie sur cet appareil/navigateur (italien ou anglais). Il est déposé **uniquement lorsque vous changez de langue** ; il n’est jamais utilisé pour vous suivre.",
+            type: "table",
+            caption: "Cookies déposés par OpenSurveillanceDB",
+            headers: ["Cookie", "Finalité", "Quand il est déposé", "Durée", "Propriétés"],
+            rows: [
+              ["**opensurveillancedb-locale**", "Mémorise la langue de votre interface (en, it, fr, de, es ou pt). Il est aussi lu lorsque vous demandez un e-mail de vérification ou de réinitialisation du mot de passe, afin que le message vous parvienne en anglais et dans votre langue.", "Lorsque vous choisissez une langue dans le menu des langues ou ouvrez un lien de langue (/api/locale)", "1 an", "SameSite=Lax, path=/"],
+              ["**opensurveillancedb-theme**", "Mémorise le thème de couleurs clair ou sombre que vous avez choisi (light / dark). Sans lui, le site suit le réglage de votre système.", "Lorsque vous utilisez le sélecteur de thème", "1 an", "SameSite=Lax, path=/"],
+              ["**osdb_session**", "Vous garde connecté : contient un jeton de session aléatoire (nos serveurs n’en conservent que l’empreinte).", "Lorsque vous vous connectez ou créez un compte ; supprimé à la déconnexion", "Durée de la connexion (30 jours par défaut), ou jusqu’à votre déconnexion", "HttpOnly, Secure, SameSite=Strict, path=/"],
+              ["**osdb_csrf**", "Protège les actions que vous effectuez une fois connecté contre la falsification de requêtes intersites (CSRF) : contient un jeton aléatoire propre à la session, que la page renvoie à chaque modification.", "En même temps que osdb_session ; supprimé à la déconnexion", "Identique à osdb_session", "Secure, SameSite=Strict, path=/ ; lisible par les scripts du site lui-même, par conception"],
+            ],
           },
           {
             type: "list",
             items: [
-              "**Type :** fonctionnel — strictement nécessaire pour fournir la préférence linguistique que vous avez expressément demandée",
-              "**Finalité :** conserver la langue de votre interface",
-              "**Durée :** 1 an (`max-age=31536000`)",
-              "**Contenu :** aucune de vos données — un simple code de langue (`it` / `en`)",
-              "**Propriétés :** `SameSite=Lax`, `path=/`, non lisible depuis d’autres sites (aucune surface de pistage ni de session)",
+              "**Contenu :** aucun de ces cookies ne contient votre nom, votre adresse e-mail ni aucune autre donnée personnelle ; les deux cookies de connexion contiennent des jetons aléatoires qui n’ont aucun sens en dehors de ce site.",
               "**Base juridique :** art. 122 D.Lgs. 196/2003 (transposant l’art. 5(3) de la directive 2002/58/CE telle que modifiée par la directive 2009/136/CE) — le consentement n’est **pas** requis pour les cookies strictement nécessaires à la fourniture d’un service expressément demandé par l’utilisateur ; aucun bandeau de consentement n’est donc affiché.",
-              "**Gestion :** vous pouvez le supprimer à tout moment depuis les paramètres de votre navigateur ; sans lui, l’interface s’affiche par défaut dans la langue pilote (anglais) sur cet appareil.",
+              "**Gestion :** vous pouvez les supprimer à tout moment depuis les paramètres de votre navigateur. Sans le cookie de langue, l’interface s’affiche dans la langue pilote (anglais) ; sans le cookie de thème, elle suit le réglage de votre système ; supprimer les cookies de connexion vous déconnecte.",
             ],
           },
           {
             type: "paragraph",
-            text: "La même préférence est dupliquée dans le `localStorage` de votre navigateur pour la synchronisation entre onglets. Le `localStorage` est une technologie de stockage du navigateur, et non un cookie ; il n’est jamais transmis à nos serveurs.",
+            text: "La préférence de langue est aussi dupliquée dans le `localStorage` de votre navigateur pour la synchronisation entre onglets. Le `localStorage` est une technologie de stockage du navigateur, et non un cookie ; il n’est jamais transmis à nos serveurs.",
           },
           {
             type: "note",
-            text: "**Engagement :** si la refonte ou une fonctionnalité future introduit des cookies qui ne sont pas strictement nécessaires (mesure d’audience, publicité, profilage), nous vous demanderons votre consentement explicite au moyen d’un bandeau **avant** de les déposer, conformément à l’art. 122 D.Lgs. 196/2003.",
+            text: "**Engagement :** si une fonctionnalité future introduit des cookies qui ne sont pas strictement nécessaires (mesure d’audience, publicité, profilage), nous vous demanderons votre consentement explicite au moyen d’un bandeau **avant** de les déposer, conformément à l’art. 122 D.Lgs. 196/2003.",
           },
         ],
       },

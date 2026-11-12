@@ -23,7 +23,7 @@ export const deLegal: LegalContent = {
     intro:
       "Wie OpenSurveillanceDB personenbezogene Daten verarbeitet, was wir veröffentlichen, was wir niemals erheben und wie du deine Rechte nach der DSGVO ausüben kannst.",
     versionNote:
-      "Version 0.8 — 9. August 2026. Abgleich mit der rechtlichen Prüfung: neu synchronisiert mit der kanonischen PRIVACY_NOTICE v0.14 (docs/legal/PRIVACY_NOTICE.md bleibt maßgeblich). § 5 ergänzt den Geocoding-Auftragsverarbeiter Nominatim (PR6); § 7 dokumentiert die Regeln zur endgültigen Löschung von Altdaten mit Status `pending`/`rejected` (R19/R20); § 10 Abschnitt zu Cookies; Verweise auf OIDC-Auftragsverarbeiter auf PR4/PR5 korrigiert; Hinweis zu besonderen Kategorien an das reine Textmodell angepasst (Bildnachweise entfernt).",
+      "Version 0.9 — 12. November 2026. § 10 Cookies neu gefasst: Er führt jetzt alle verwendeten Cookies auf (Sprache, Farbschema, Anmeldesitzung und CSRF-Schutz), alle unbedingt erforderlich, daher weiterhin kein Einwilligungsbanner; neu synchronisiert mit der kanonischen PRIVACY_NOTICE v0.16 (docs/legal/PRIVACY_NOTICE.md bleibt maßgeblich).",
     sections: [
       {
         heading: "1. Wer wir sind (Verantwortlicher)",
@@ -247,31 +247,34 @@ export const deLegal: LegalContent = {
         blocks: [
           {
             type: "paragraph",
-            text: "OpenSurveillanceDB verwendet ein einziges funktionales Cookie:",
+            text: "OpenSurveillanceDB verwendet nur die unten aufgeführten Cookies. Alle sind unbedingt erforderlich oder funktional: Sie enthalten keine Tracking-Kennungen, werden nie an Dritte weitergegeben und nicht für Analyse, Werbung oder Profiling verwendet. Deshalb wird kein Einwilligungsbanner angezeigt.",
           },
           {
-            type: "paragraph",
-            text: "**opensurveillancedb-locale** — speichert die Sprache, die du auf diesem Gerät/in diesem Browser gewählt hast (Italienisch oder Englisch). Es wird **nur gesetzt, wenn du die Sprache änderst**; es wird nie verwendet, um dich zu verfolgen.",
+            type: "table",
+            caption: "Von OpenSurveillanceDB gesetzte Cookies",
+            headers: ["Cookie", "Zweck", "Wann es gesetzt wird", "Dauer", "Eigenschaften"],
+            rows: [
+              ["**opensurveillancedb-locale**", "Speichert deine Oberflächensprache (en, it, fr, de, es oder pt). Es wird auch gelesen, wenn du eine Bestätigungs- oder Passwort-Zurücksetzungs-E-Mail anforderst, damit die Nachricht auf Englisch und in deiner Sprache ankommt.", "Wenn du im Sprachmenü eine Sprache wählst oder einen Sprachlink öffnest (/api/locale)", "1 Jahr", "SameSite=Lax, path=/"],
+              ["**opensurveillancedb-theme**", "Speichert das helle oder dunkle Farbschema, das du gewählt hast (light / dark). Ohne dieses Cookie folgt die Website deiner Systemeinstellung.", "Wenn du den Design-Schalter benutzt", "1 Jahr", "SameSite=Lax, path=/"],
+              ["**osdb_session**", "Hält dich angemeldet: enthält ein zufälliges Sitzungstoken (unsere Server speichern nur dessen Hash).", "Wenn du dich anmeldest oder ein Konto erstellst; wird beim Abmelden gelöscht", "Dauer der Anmeldung (standardmäßig 30 Tage) oder bis du dich abmeldest", "HttpOnly, Secure, SameSite=Strict, path=/"],
+              ["**osdb_csrf**", "Schützt die Aktionen, die du angemeldet ausführst, vor websiteübergreifender Anfragefälschung (CSRF): enthält ein zufälliges sitzungsbezogenes Token, das die Seite bei jeder Änderung zurücksendet.", "Zusammen mit osdb_session; wird beim Abmelden gelöscht", "Wie osdb_session", "Secure, SameSite=Strict, path=/; absichtlich für die eigenen Skripte der Website lesbar"],
+            ],
           },
           {
             type: "list",
             items: [
-              "**Art:** funktional — unbedingt erforderlich, um die von dir ausdrücklich gewünschte Spracheinstellung bereitzustellen",
-              "**Zweck:** Speicherung deiner Oberflächensprache",
-              "**Dauer:** 1 Jahr (`max-age=31536000`)",
-              "**Inhalt:** keine deiner Daten — ein einfacher Sprachcode (`it` / `en`)",
-              "**Eigenschaften:** `SameSite=Lax`, `path=/`, nicht seitenübergreifend lesbar (keine Angriffsfläche für Tracking oder Sitzungen)",
+              "**Inhalt:** Keines dieser Cookies enthält deinen Namen, deine E-Mail-Adresse oder andere personenbezogene Daten; die beiden Anmelde-Cookies enthalten zufällige Tokens, die außerhalb dieser Website bedeutungslos sind.",
               "**Rechtsgrundlage:** Art. 122 D.Lgs. 196/2003 (zur Umsetzung von Art. 5 Abs. 3 der Richtlinie 2002/58/EG in der durch die Richtlinie 2009/136/EG geänderten Fassung) — für Cookies, die unbedingt erforderlich sind, um einen ausdrücklich von der nutzenden Person gewünschten Dienst bereitzustellen, ist **keine** Einwilligung erforderlich; daher wird kein Einwilligungsbanner angezeigt.",
-              "**Verwaltung:** Du kannst es jederzeit in deinen Browsereinstellungen löschen; ohne das Cookie wird die Oberfläche auf diesem Gerät standardmäßig in der Pilotsprache (Englisch) angezeigt.",
+              "**Verwaltung:** Du kannst sie jederzeit in deinen Browsereinstellungen löschen. Ohne das Sprach-Cookie wird die Oberfläche in der Pilotsprache (Englisch) angezeigt; ohne das Design-Cookie folgt sie deiner Systemeinstellung; wenn du die Anmelde-Cookies löschst, wirst du abgemeldet.",
             ],
           },
           {
             type: "paragraph",
-            text: "Dieselbe Einstellung wird zur Synchronisierung zwischen mehreren Tabs im `localStorage` deines Browsers gespiegelt. `localStorage` ist eine Speichertechnologie des Browsers, kein Cookie, und wird nie an unsere Server übertragen.",
+            text: "Die Spracheinstellung wird zur Synchronisierung zwischen mehreren Tabs außerdem im `localStorage` deines Browsers gespiegelt. `localStorage` ist eine Speichertechnologie des Browsers, kein Cookie, und wird nie an unsere Server übertragen.",
           },
           {
             type: "note",
-            text: "**Verpflichtung:** Sollte die Neugestaltung oder eine künftige Funktion Cookies einführen, die nicht unbedingt erforderlich sind (Analyse, Werbung, Profiling), holen wir **vor** deren Setzen über ein Banner deine ausdrückliche Einwilligung ein, gemäß Art. 122 D.Lgs. 196/2003.",
+            text: "**Verpflichtung:** Sollte eine künftige Funktion Cookies einführen, die nicht unbedingt erforderlich sind (Analyse, Werbung, Profiling), holen wir **vor** deren Setzen über ein Banner deine ausdrückliche Einwilligung ein, gemäß Art. 122 D.Lgs. 196/2003.",
           },
         ],
       },

@@ -137,7 +137,7 @@ PROD_URL (variable)    production hostname checked by ops-monitoring.yml
                        https://). Current value verified 2026-08-09:
                        open-surveillance-db.simone-rondina.workers.dev
                        (the deployed Cloudflare worker answers 200; the
-                       NPM→LXC host osdb.syaxhome89.com currently answers
+                       NPM→LXC host <preprod-host> currently answers
                        403 from anonymous clients because the container's
                        vite allowedHosts guard rejects it — see
                        DEPLOYMENT.md §Local LXC deployment). Set via
@@ -436,8 +436,21 @@ public environment"); once decided, the automatic trigger on tag `v*` is added
 | `dry-run` (default) | `wrangler d1 migrations apply --remote --dry-run` (pending migrations, none applied) + `wrangler deploy --dry-run` (local bundle) | none |
 | `deploy` | `wrangler d1 migrations apply --remote` + `wrangler deploy` + records the version id (`wrangler versions list`) | D1 migrated + worker updated |
 
-The job runs on `environment: production` (GitHub Environments): once
-required reviewers are added, every deploy requires human approval.
+The job runs on `environment: production` (GitHub Environments) and only
+from `main`: the job carries `if: github.ref == 'refs/heads/main'`, so a
+dispatch from any other branch is skipped before it can read the
+production secrets (both `dry-run` and `deploy` stay available from
+`main`).
+
+**Repository settings the owner must set** (Settings → Environments →
+`production`; they cannot be expressed in the workflow file):
+
+- **Required reviewers:** at least one maintainer, so every run (dry-run
+  included) waits for human approval before it gets the environment's
+  secrets.
+- **Deployment branches and tags:** "Selected branches and tags" with only
+  `main`, so the environment refuses any other ref even if the job-level
+  guard is removed or bypassed.
 
 ### 7.2 Prerequisites (one-time, before the first `deploy`)
 
@@ -470,6 +483,8 @@ data, worker rollback is not enough: D1 restore is required (§3.4).
 ### 7.4 Rules
 
 - Never run manual `wrangler deploy` to production from local machines: CI only.
+- Dispatch `deploy.yml` from `main` only; runs from other branches are skipped
+  (job guard) and refused by the `production` environment (branch rule, §7.1).
 - Never put moderation credentials in code or workflows: Cloudflare secrets only.
 - A deploy that fails halfway (e.g. a bad migration) → worker rollback (§5.2)
   + migration fix; do not attempt a blind second deploy.

@@ -2,7 +2,8 @@
 
 - **Status:** in force — personal open-source project (controller: Simone Rondina, syax89 — not a company); finalised 2026-08-08 and aligned with the current implementation.
 - **Legal basis:** GDPR art. 13 (data collected from data subjects) and art. 14 (data not obtained from the data subject, e.g. records sourced from official public sources); D.Lgs. 196/2003 (Codice Privacy, IT) as primary jurisdiction.
-- **Version:** 0.15 (2026-08-09) — API access credentials (ADR 0023, write-auth epic): § 3 adds the "API access credentials" category (hash-only storage, throttled last-used, per-key limits, retention R21); new § 3.2 describes API keys (write-only, show-once, revocation); § 7 adds R21 (90-day sweep after revocation/expiry); § 8 extends account erasure to API keys.
+- **Version:** 0.16 (2026-11-12) — § 10 Cookies rewritten to list every cookie actually set: `opensurveillancedb-locale` (now six languages, also used to pick the language of verification/password-reset emails), `opensurveillancedb-theme` (light/dark theme), `osdb_session` and `osdb_csrf` (sign-in session and CSRF protection); all strictly necessary, so still no consent banner.
+- **Previous version:** 0.15 (2026-08-09) — API access credentials (ADR 0023, write-auth epic): § 3 adds the "API access credentials" category (hash-only storage, throttled last-used, per-key limits, retention R21); new § 3.2 describes API keys (write-only, show-once, revocation); § 7 adds R21 (90-day sweep after revocation/expiry); § 8 extends account erasure to API keys.
 - **Decisions applied:** controller entity **Simone Rondina (syax89) / OpenSurveillanceDB — Italy** (2026-07-31); data licence **ODbL 1.0**; published coordinates rounded to **~4 decimal places (~10 m)**; privacy contact `privacy@opensurveillancedb.org` (dedicated, monitored mailbox, active).
 
 > **Disclaimer:** this document is product guidance / not legal advice. It is in force for the pilot jurisdiction (Italy); per-jurisdiction review remains documented for an EU-wide launch.
@@ -176,17 +177,19 @@ You may request, free of charge:
 
 ## 10. Cookies
 
-OpenSurveillanceDB uses a single functional cookie:
+OpenSurveillanceDB uses only the cookies listed below. All of them are strictly necessary or functional: they contain no tracking identifiers, are never shared with third parties and are not used for analytics, advertising or profiling. That is why no consent banner is shown.
 
-- **`opensurveillancedb-locale`** — remembers the language you selected on this device/browser (Italian or English). It is set **only when you change the language**; it is never used to track you.
-  - **Type:** functional — strictly necessary to provide the language preference you explicitly requested.
-  - **Purpose:** persist your interface language.
-  - **Duration:** 1 year (`max-age=31536000`).
-  - **Content:** none of your data — a plain language code (`it` / `en`).
-  - **Properties:** `SameSite=Lax`, `path=/`, not readable cross-site (no tracking or session surface).
-  - **Legal basis:** art. 122 D.Lgs. 196/2003 (transposing art. 5(3) of Directive 2002/58/EC as amended by 2009/136/EC) — consent is **not** required for cookies strictly necessary to provide a service explicitly requested by the user, so no consent banner is shown.
-  - **Managing it:** you can delete it at any time from your browser settings; without it the interface defaults to the pilot language (English) on this device.
+| Cookie | Purpose | When it is set | Duration | Properties |
+| --- | --- | --- | --- | --- |
+| `opensurveillancedb-locale` | Remembers your interface language (`en`, `it`, `fr`, `de`, `es` or `pt`). It is also read when you ask for a verification or password-reset email, so that the message is sent in English and in your language (without it: English and Italian). | When you choose a language in the language menu (client-side), or open a language link (`GET /api/locale`) | 1 year (`max-age=31536000`) | `SameSite=Lax`, `path=/` |
+| `opensurveillancedb-theme` | Remembers the light or dark colour theme you chose (`light` / `dark`), read by the root layout so the page is rendered in that theme. Without it, the site follows your system setting. | When you use the theme switch (client-side) | 1 year (`max-age=31536000`) | `SameSite=Lax`, `path=/` |
+| `osdb_session` | Keeps you signed in: holds a random session token (the server stores only its hash). | When you sign in (password, passkey or OIDC) or create an account; expired on sign-out | Length of the login (`AUTH_SESSION_TTL_DAYS`, 30 days by default), or until you sign out | `HttpOnly`, `Secure`, `SameSite=Strict`, `path=/` |
+| `osdb_csrf` | Protects signed-in actions against cross-site request forgery (CSRF): holds a random per-session token that the page echoes back in a request header with every change. | Together with `osdb_session`; expired on sign-out | Same as `osdb_session` | `Secure`, `SameSite=Strict`, `path=/`; **not** `HttpOnly`, by design (the site's own scripts must read it) |
 
-The same preference is mirrored in your browser's `localStorage` for multi-tab synchronisation. `localStorage` is a browser storage technology, not a cookie, and is never transmitted to our servers.
+- **Content:** none of these cookies contains your name, your email address or any other personal data; the two sign-in cookies hold random tokens that mean nothing outside this site.
+- **Legal basis:** art. 122 D.Lgs. 196/2003 (transposing art. 5(3) of Directive 2002/58/EC as amended by 2009/136/EC) — consent is **not** required for cookies strictly necessary to provide a service explicitly requested by the user, so no consent banner is shown.
+- **Managing them:** you can delete them at any time from your browser settings. Without the language cookie the interface uses the pilot language (English); without the theme cookie it follows your system setting; deleting the sign-in cookies signs you out.
 
-> **Commitment:** if the redesign or any future feature introduces cookies that are not strictly necessary (analytics, advertising, profiling), we will ask for your explicit consent through a banner **before** installing them, in accordance with art. 122 D.Lgs. 196/2003.
+The language preference is also mirrored in your browser's `localStorage` for multi-tab synchronisation. `localStorage` is a browser storage technology, not a cookie, and is never transmitted to our servers.
+
+> **Commitment:** if any future feature introduces cookies that are not strictly necessary (analytics, advertising, profiling), we will ask for your explicit consent through a banner **before** installing them, in accordance with art. 122 D.Lgs. 196/2003.
