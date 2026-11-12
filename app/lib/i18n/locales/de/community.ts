@@ -197,6 +197,10 @@ export const de: Translation<typeof en> = {
     errorSessionEnded: "Deine Sitzung ist beendet. Melde dich erneut an, um mitzumachen.",
     errorVerifyRequired: "Bestätige deine E-Mail-Adresse, um an Community-Aktionen teilzunehmen.",
     errorGeneric: "Die Aktion konnte nicht aktualisiert werden. Versuche es erneut.",
+    // Privacy flags (ADR 0021 §6.4): the per-account daily cap, and a flag
+    // stored but sent to a moderator instead of hiding the record.
+    errorPrivacyLimit: "Du hast das Tageslimit für Datenschutzmeldungen erreicht. Versuche es morgen erneut oder nutze für dringende Anliegen das Korrekturformular.",
+    privacyQueued: "Meldung erhalten. Ein Moderator prüft sie, bevor sich an diesem Eintrag etwas ändert.",
     // Compact toolbar (map popup, redesign t_b7728ad0): the trigger that
     // opens the disclosure with the remaining three actions, and the
     // explicit-copy privacy confirmation (the only action that asks before

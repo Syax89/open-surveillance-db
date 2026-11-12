@@ -67,6 +67,9 @@ export const pt: Translation<typeof en> = {
   noReviewText:
     "As fichas marcadas para revisão ficam fora dos dados públicos até serem novamente verificadas ou ocultadas.",
   needsReview: "Precisa de revisão",
+  // Review tab: records a community flag put in front of a moderator (ADR 0021 §6.4).
+  communityHidden: "Ocultada por uma denúncia da comunidade: volta a verificar para a repor, oculta para confirmar a remoção",
+  communityFlagged: "Denúncia da comunidade sobre uma ficha pública: volta a verificar para a arquivar, oculta para a remover",
   privateCorrections: "Pedidos privados de correção",
   noCorrectionsTitle: "Não há pedidos de correção à espera.",
   noCorrectionsText:

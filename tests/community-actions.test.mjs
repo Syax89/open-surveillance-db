@@ -357,6 +357,29 @@ test("PUT maps both quota kinds to 429 with Retry-After", async (t) => {
   }
 });
 
+test("PUT maps the privacy-flag cap to the same 429 shape plus a code", async () => {
+  stub("findSessionByToken", async () => ({ ...sessionFixture, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
+  stub("setCommunityAction", async () => ({ kind: "privacy_quota_exceeded", retryAfterSeconds: 44 }));
+  const { PUT } = await actionsRoute();
+  const response = await PUT(authed("PUT", "/api/cameras/5/actions", { body: { action: "privacy" } }));
+  assert.equal(response.status, 429);
+  assert.deepEqual(await responseBody(response), { error: "Too many actions. Try again later.", code: "privacy_flag_limit" });
+  assert.equal(response.headers.get("retry-after"), "44");
+  assert.equal(response.headers.get("cache-control"), "no-store");
+});
+
+test("PUT reports a flag queued for moderator review as review: pending", async () => {
+  stub("findSessionByToken", async () => ({ ...sessionFixture, contributor }));
+  stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));
+  const counts = { like: 0, confirm: 0, gone: 0, problem: 0, privacy: 1 };
+  stub("setCommunityAction", async () => ({ kind: "ok", actionType: "privacy", counts, queuedForReview: true }));
+  const { PUT } = await actionsRoute();
+  const response = await PUT(authed("PUT", "/api/cameras/5/actions", { body: { action: "privacy" } }));
+  assert.equal(response.status, 200);
+  assert.deepEqual(await responseBody(response), { action: "privacy", counts, review: "pending" });
+});
+
 test("PUT returns 503 when the database is unavailable", async () => {
   stub("findSessionByToken", async () => ({ ...sessionFixture, contributor }));
   stub("getContributorVerification", async (id) => ({ id, emailVerifiedAt: "2026-08-01T00:00:00.000Z", authProvider: "password" }));

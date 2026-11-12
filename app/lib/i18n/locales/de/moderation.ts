@@ -67,6 +67,9 @@ export const de: Translation<typeof en> = {
   noReviewText:
     "Zur Prüfung markierte Einträge bleiben außerhalb der öffentlichen Daten, bis sie neu verifiziert oder ausgeblendet werden.",
   needsReview: "Zu prüfen",
+  // Review tab: records a community flag put in front of a moderator (ADR 0021 §6.4).
+  communityHidden: "Durch eine Community-Meldung ausgeblendet: neu verifizieren zum Wiederherstellen, ausblenden zum Bestätigen der Entfernung",
+  communityFlagged: "Community-Meldung zu einem öffentlichen Eintrag: neu verifizieren zum Verwerfen, ausblenden zum Entfernen",
   privateCorrections: "Private Korrekturanfragen",
   noCorrectionsTitle: "Keine Korrekturanfragen warten.",
   noCorrectionsText:

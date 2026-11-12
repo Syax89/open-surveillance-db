@@ -1,6 +1,9 @@
 # ADR 0021: Community-driven pivot — immediate publication, community actions, automatic state transitions
 
-- **Status:** accepted (CEO decision, 2026-08-04)
+- **Status:** accepted (CEO decision, 2026-08-04); amended 2026-11 (owner
+  decision — see "Amendment 2026-11: privacy flags reach a human" at the end
+  of the Decision section; it overrides decisions 4.3, 6.2, 8 and 11.7 where
+  they disagree)
 - **Date:** 2026-08-04
 - **Author:** Simone Rondina (project owner), recording the CEO decision of 2026-08-04
 - **Decision owner:** CEO (Simone) — 2026-08-04: "the site becomes entirely report-driven: users add reports, flag cameras that are no longer there, and like the most useful ones — ALL WITHOUT manual moderation, ONLY registered users"
@@ -75,8 +78,8 @@ the community flow.
 | Status | Public? | Meaning |
 | --- | --- | --- |
 | `active` | Yes | Report is live and listed |
-| `hidden` | No (direct link with banner) | Present but withdrawn pending community/legal consensus — **reversible** |
-| `removed` | No (direct link with banner) | Community agrees it is no longer there (or admin legal removal) — **reversible** |
+| `hidden` | No (direct link with banner) | Present but withdrawn pending community/legal consensus — **reversible** (a community hide by community consensus or by a moderator; amendment 2026-11) |
+| `removed` | No (direct link with banner) | Community agrees it is no longer there (or a moderator / correction removal) — a **community** removal is community-reversible; a moderator or correction removal never is (amendment 2026-11) |
 | `demo` | Development only | Fictional seed data, never in production |
 
 `hidden` is a **new** status: today hiding a record means `removed` (terminal,
@@ -89,9 +92,9 @@ stateDiagram-v2
   [*] --> active: report submitted (verified contributor)
   active --> hidden: problem sum ≥ 3 (≥2 distinct) OR privacy action ≥ 1 OR admin legal emergency
   active --> removed: gone sum ≥ 3 (≥3 distinct) OR admin legal emergency
-  hidden --> active: contrary consensus (confirm sum ≥ 5, ≥3 distinct); privacy hides also require cooldown elapsed
-  hidden --> removed: gone sum ≥ 3 (≥3 distinct) while hidden
-  removed --> active: contrary consensus (confirm sum ≥ 3, ≥2 distinct)
+  hidden --> active: contrary consensus (confirm sum ≥ 5, ≥3 distinct; community hides only); privacy hides also require cooldown elapsed — OR moderator restore (final)
+  hidden --> removed: gone sum ≥ 3 (≥3 distinct) while hidden — OR moderator confirms the removal (final)
+  removed --> active: contrary consensus (confirm sum ≥ 3, ≥2 distinct; community removals only)
   demo --> [*]
 ```
 
@@ -174,6 +177,11 @@ Default weights per trust level (ADR 0018 `deriveLevel`), stored in config:
    possibly privacy-violating record immediately; reversal requires the high
    bar of decision 6. Abuse cost is bounded by email verification (creating
    verified accounts at scale is expensive) and by the reversal cooldown.
+   **Amended 2026-11:** the hide still happens at once, but every privacy hide
+   also lands immediately in the moderator's review queue (sensitive), each
+   account may cast at most 5 privacy flags per rolling 24 h, and an account
+   whose privacy flags were rejected twice in 90 days no longer auto-hides —
+   see the amendment.
 4. **Reversal (contrary consensus):**
    - `removed → active`: confirm sum ≥ **3**, ≥ **2 distinct** ("it is still
      there" beats "it is gone").
@@ -197,7 +205,11 @@ Default weights per trust level (ADR 0018 `deriveLevel`), stored in config:
    `thresholds.restoreFromHidden`, `thresholds.restoreMinDistinct*`,
    `cooldown.privacyHiddenDays`, `quotas.actionsPerDay`,
    `quotas.actionsPerDayTrusted`, `quotas.perRecordPerDay`,
-   `rateLimit.actionPerMinute`.
+   `rateLimit.actionPerMinute`; since the 2026-11 amendment also
+   `quotas.privacyFlagsPerDay` (5), `penalties.privacyRejectedFlags` (2) and
+   `penalties.privacyRejectedWindowDays` (90) — code defaults
+   (`COMMUNITY_SAFEGUARD_SETTINGS`, not part of the 0037 seed) that a
+   `community_settings` row with the same key overrides.
 2. Read path: one D1 point-read per evaluation with a 60 s in-process cache —
    changes apply within a minute, no deploy, no restart.
 3. Write path: `GET/PATCH /api/admin/community-settings`, admin-only (edge
@@ -209,10 +221,17 @@ Default weights per trust level (ADR 0018 `deriveLevel`), stored in config:
 1. Every state transition writes: a public `camera_lifecycle_events` row
    (decision 7) and an internal append-only `moderation_events` row (existing
    trigger-protected trail).
-2. Reversal is always **contrary consensus** (decision 4.4), never a
-   single-user undo and never an admin restore: the only human write power left
-   is the legal emergency hide (decision 8), which is itself reversible by
-   consensus after the cooldown.
+2. Reversal of a **community** transition is **contrary consensus** (decision
+   4.4), never a single-user undo. **Corrected 2026-11:** a withdrawal decided
+   by a moderator (legal/emergency hide, confirmed removal), by a correction
+   outcome, or carried over by the 0039 migration from a moderator rejection
+   is **never** community-restorable — not after a cooldown, not by any
+   number of confirms (the protection of the person must not depend on a
+   vote; mistakes are fixed through appeals, ADR 0014). Only transitions the
+   community itself made (`community-*` events by a `community:<id>` actor)
+   are community-reversible; an unknown cause fails closed. A moderator's
+   restore of a community hide is likewise final against community hides
+   (amendment).
 3. A hidden/removed record remains reachable by direct link, with an explicit
    banner ("record hidden — pending community verification" / "reported as no
    longer present"), so the reversal signals (`confirm`, `gone`) can still be
@@ -248,9 +267,11 @@ Default weights per trust level (ADR 0018 `deriveLevel`), stored in config:
    ADR 0009 emergency pattern, single-person by design and reviewed
    retrospectively). It produces a public `hidden`/`removed` event with reason
    `admin-legal`.
-2. Administrators cannot restore or un-hide unilaterally (separation: the
-   community consensus of decision 6 is the only reversal path, so no single
-   account — human or not — controls publication).
+2. ~~Administrators cannot restore or un-hide unilaterally.~~ **Superseded
+   2026-11:** a moderator reviews every community privacy hide and may restore
+   it or confirm the removal (amendment); the moderator's own legal/emergency
+   removals are not reversible by community consensus (decision 6.2) and are
+   challenged through appeals (ADR 0014).
 3. The reviewer role matrix (ADR 0009) stays defined for this residual surface;
    intake/record reviewers have no normal-flow duties anymore. Roles are not
    deleted in the schema (history, provisioning), only unused.
@@ -296,7 +317,10 @@ Default weights per trust level (ADR 0018 `deriveLevel`), stored in config:
 7. **Privacy-path bounded abuse** — aggressive hide is cheap, so reversal is
    expensive (5/3 distinct + 7 d cooldown) and re-hide by the same account is
    just another 1-action hide; the operator tunes
-   `thresholds.privacy` to 2 if abuse materialises (no deploy).
+   `thresholds.privacy` to 2 if abuse materialises (no deploy). **Since
+   2026-11** also: a moderator reviews every privacy hide, a separate
+   per-account cap of 5 privacy flags per rolling 24 h, and the abuse penalty
+   (amendment).
 
 ### 12. Trust levels — count over `active`
 
@@ -323,6 +347,62 @@ Default weights per trust level (ADR 0018 `deriveLevel`), stored in config:
 3. Legal basis unchanged: art. 6(1)(f) for all community mechanics (ADR 0018
    § 6.3); the public event history is a transparency control of the controller,
    not a new collection of personal data (aggregates only).
+
+### Amendment 2026-11: privacy flags reach a human
+
+Owner decision (ethics: the privacy of the third party in the picture comes
+first, but abuse of the fast hide must be bounded):
+
+1. **One privacy flag still hides at once.** `thresholds.privacy` stays 1:
+   the person is protected first, and hiding is reversible.
+2. **Every privacy hide is reviewed by a moderator.** The same atomic batch
+   that hides the record opens (or upgrades) its `moderation_queue` row with
+   sensitivity `sensitive` and `requires_second_review = 1`. The moderation
+   dashboard's **Review** tab lists, besides `needs_review` records, every
+   `active`/`hidden` record with a community flag not yet judged (a
+   `community-privacy-hidden`, `community-privacy-queued` or
+   `community-problem-queued` event newer — by event id — than the latest
+   moderator verdict on it). `deriveQueueSensitivity` keeps the item
+   `sensitive` even though the hide consumed the action rows. The moderator
+   decides with the existing actions:
+   - **Hide** → `removed`: removal confirmed. A moderator decision, so never
+     community-restorable (decision 6.2).
+   - **Reverify** → `active`: the flag was unfounded. The record is restored
+     (or, if still public, the flag is dismissed), each flagging account is
+     charged one `community-privacy-flag-rejected` event, the rejected
+     privacy actions are consumed, and a `moderator-privacy-cleared` marker
+     is written. The verdict is **final**: until the record's next status
+     transition, community privacy/problem flags no longer hide it on their
+     own — they are stored and queued for the moderator instead. A `gone`
+     consensus (a physical fact, ≥ 3 distinct accounts, cast after the
+     verdict) can still remove it.
+   - The two-person rule (ADR 0009 §4) applies to `reverify` on a sensitive
+     item **only when another active reviewer exists**
+     (`hasOtherActiveReviewer`); in a one-moderator project the first
+     decision is final. Emergency `hide` stays single-person.
+3. **Privacy-flag cap.** Independently of the general daily quota, an
+   account may cast at most `quotas.privacyFlagsPerDay` (**5**) privacy flags
+   per rolling 24 h (a switch into `privacy` counts). Over the cap the API
+   answers 429 with the same shape as the other quotas (`Retry-After`, same
+   `error`) plus `code: "privacy_flag_limit"`. The count runs on an
+   append-only `community-privacy-flag` ledger in `moderation_events`, one row
+   per accepted flag: a flag consumed by a hide still counts, and remove +
+   re-flag does not refund the allowance.
+4. **Abuse penalty.** An account with ≥ `penalties.privacyRejectedFlags`
+   (**2**) rejected privacy flags within `penalties.privacyRejectedWindowDays`
+   (**90**) days no longer auto-hides: its new privacy flags are stored,
+   recorded as `community-privacy-queued` (reason `penalised`) and sent to the
+   moderator's review queue only; the API answers `review: "pending"` and the
+   UI says "a moderator will review it". Rejections older than the window do
+   not count. A clean account's flag on the same record still hides it.
+   Every privacy flag that does not hide (penalised account, moderator-cleared
+   record, a raised threshold) is queued the same way, so no privacy flag is
+   ever silently dropped.
+5. **No new table.** Everything is recorded on the existing
+   `camera_community_actions` and the append-only `moderation_events` trail
+   (no migration). Internal-only: none of these events reaches the public
+   history (`listPublicCameraRevisions` keeps its whitelist; the public
+   `camera_lifecycle_events` still show only the aggregate `hidden`/`restored`).
 
 ## Data migration plan (existing data → new model)
 

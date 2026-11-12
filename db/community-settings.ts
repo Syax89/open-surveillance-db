@@ -51,6 +51,24 @@ export const DEFAULT_COMMUNITY_SETTINGS: Record<string, unknown> = {
   "rateLimit.actionPerMinute": 10,
 };
 
+/**
+ * Abuse safeguards on the privacy flag (ADR 0021 §6.4, owner 2026-11).
+ * Tunable exactly like the knobs above (a `community_settings` row with the
+ * same key wins over the code value), but deliberately NOT part of the 0037
+ * seed: adding seed rows would need a data migration, and the code value is
+ * the documented default. The read path merges them under the DB rows.
+ *
+ *   quotas.privacyFlagsPerDay           privacy flags per account, rolling 24 h
+ *   penalties.privacyRejectedFlags      rejected privacy flags that switch off
+ *                                       an account's auto-hide…
+ *   penalties.privacyRejectedWindowDays …within this many days
+ */
+export const COMMUNITY_SAFEGUARD_SETTINGS: Record<string, unknown> = {
+  "quotas.privacyFlagsPerDay": 5,
+  "penalties.privacyRejectedFlags": 2,
+  "penalties.privacyRejectedWindowDays": 90,
+};
+
 export type CommunitySettingsRow = {
   key: string;
   value: string;
@@ -67,7 +85,7 @@ export async function getCommunitySettings(): Promise<Record<string, unknown>> {
   const rows = await d1
     .prepare("SELECT key, value AS value, updated_at AS updatedAt FROM community_settings")
     .all<CommunitySettingsRow>();
-  const settings: Record<string, unknown> = { ...DEFAULT_COMMUNITY_SETTINGS };
+  const settings: Record<string, unknown> = { ...DEFAULT_COMMUNITY_SETTINGS, ...COMMUNITY_SAFEGUARD_SETTINGS };
   for (const row of rows.results) {
     try {
       settings[row.key] = JSON.parse(row.value);

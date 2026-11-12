@@ -145,10 +145,18 @@ export async function PUT(request: Request) {
       await purgeCacheTags(cameraPurgeTags(id), env);
     }
     switch (result.kind) {
+      // `review: "pending"` (ADR 0021 §6.4): the flag was stored but did not
+      // hide the record — it went to a moderator, and the UI says so.
       case "ok":
-        return Response.json({ action: result.actionType, counts: result.counts }, { headers: NO_STORE_HEADERS });
+        return Response.json(
+          { action: result.actionType, counts: result.counts, ...(result.queuedForReview ? { review: "pending" } : {}) },
+          { headers: NO_STORE_HEADERS },
+        );
       case "switched":
-        return Response.json({ action: result.actionType, switchedFrom: result.switchedFrom, counts: result.counts }, { headers: NO_STORE_HEADERS });
+        return Response.json(
+          { action: result.actionType, switchedFrom: result.switchedFrom, counts: result.counts, ...(result.queuedForReview ? { review: "pending" } : {}) },
+          { headers: NO_STORE_HEADERS },
+        );
       case "duplicate":
         return Response.json({ error: "This action is already set." }, { status: 409, headers: NO_STORE_HEADERS });
       case "self_action":
@@ -160,6 +168,14 @@ export async function PUT(request: Request) {
       case "daily_quota_exceeded":
       case "per_record_cap_exceeded":
         return Response.json({ error: "Too many actions. Try again later." }, {
+          status: 429,
+          headers: { ...NO_STORE_HEADERS, "Retry-After": String(result.retryAfterSeconds) },
+        });
+      // Separate privacy-flag cap (ADR 0021 §6.4): same 429 + Retry-After
+      // shape as the other quotas, plus a machine-readable `code` so the UI
+      // can explain the specific limit.
+      case "privacy_quota_exceeded":
+        return Response.json({ error: "Too many actions. Try again later.", code: "privacy_flag_limit" }, {
           status: 429,
           headers: { ...NO_STORE_HEADERS, "Retry-After": String(result.retryAfterSeconds) },
         });
