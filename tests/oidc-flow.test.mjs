@@ -675,10 +675,11 @@ test("merge: concurrent consumption race answers 410 (single-use)", async () => 
   assert.equal(response.status, 410);
 });
 
-test("merge: locked account answers 429 before any credential work", async () => {
+test("merge: locked account answers 429 before any credential work, paying the dummy PBKDF2 (timing)", async () => {
   stubLockoutDefaults();
   stub("getOidcMergeRequest", async () => mergeRequest);
   stub("getLoginLockout", async () => ({ locked: true, retryAfterSeconds: 900 }));
+  stub("verifyPasswordDummy", async () => false);
   const { POST } = await mergeRoute();
   const response = await POST(
     apiRequest("/api/auth/oidc/merge", { method: "POST", body: mergeBody() }),
@@ -686,6 +687,7 @@ test("merge: locked account answers 429 before any credential work", async () =>
   assert.equal(response.status, 429);
   assert.equal(response.headers.get("retry-after"), "900");
   assert.equal(callArgs("authenticateContributor").length, 0);
+  assert.equal(callArgs("verifyPasswordDummy").length, 1, "the locked branch pays the same PBKDF2 cost as login");
 });
 
 test("merge: failed attempt that trips the lockout answers 429", async () => {
