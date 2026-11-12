@@ -70,19 +70,22 @@ export const OIDC_MERGE_TTL_MS = 15 * 60 * 1000; // 15 minutes
 /**
  * Persist a fresh OIDC authorization request. Returns the raw `state` nonce
  * (the only value the caller may send to the provider); the row stores its
- * SHA-256. The PKCE verifier is generated here and stored in clear (it must
+ * SHA-256. The /start route passes `rawState` derived from the browser
+ * binding cookie (app/lib/oidc.ts `oidcStateForBinding`, login-CSRF
+ * defence); without it a random nonce is generated. The PKCE verifier is generated here and stored in clear (it must
  * survive until the callback), bound to the state row so a callback can only
  * exchange the code for the exact verifier it was issued with.
  */
 export async function createOidcState(input: {
   provider: OidcProvider;
   redirectTo: string;
+  rawState?: string;
   now?: string;
 }): Promise<{ rawState: string; codeVerifier: string }> {
   const d1 = await getD1();
   const now = input.now ?? new Date().toISOString();
   const expiresAt = new Date(Date.parse(now) + OIDC_STATE_TTL_MS).toISOString();
-  const rawState = randomBase64Url(32);
+  const rawState = input.rawState ?? randomBase64Url(32);
   const codeVerifier = randomBase64Url(32);
   const stateHash = await sha256Hex(rawState);
   await d1

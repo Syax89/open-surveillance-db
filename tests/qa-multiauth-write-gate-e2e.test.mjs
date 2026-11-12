@@ -124,6 +124,13 @@ function sessionHeaders(response) {
   };
 }
 
+/** The OIDC browser-binding cookie set by /start, as a `Cookie` header pair. */
+function oidcBindingCookie(start) {
+  const cookie = start.headers.getSetCookie().find((entry) => /^(__Host-)?osdb_oidc_binding=/.test(entry));
+  assert.ok(cookie, "OIDC start must set the browser binding cookie");
+  return cookie.split(";")[0];
+}
+
 function writeWith(headers) {
   return apiRequest("/api/cameras", {
     method: "POST",
@@ -604,7 +611,9 @@ test("oidc: callback linked (email del provider verificata) apre una sessione ch
 
     // Il callback reale scambia il codice col provider stubato.
     const callback = await oidcCallbackRoute.GET(
-      apiRequest(`/api/auth/oidc/github/callback?code=the-code&state=${state}`),
+      apiRequest(`/api/auth/oidc/github/callback?code=the-code&state=${state}`, {
+        headers: { cookie: oidcBindingCookie(start) },
+      }),
     );
     assert.equal(callback.status, 302);
     assert.equal(new URL(callback.headers.get("location")).pathname, "/account");
@@ -628,7 +637,9 @@ test("oidc: callback linked (email del provider verificata) apre una sessione ch
 
     // Lo state è single-use: un secondo callback con lo stesso state fallisce.
     const replayed = await oidcCallbackRoute.GET(
-      apiRequest(`/api/auth/oidc/github/callback?code=the-code&state=${state}`),
+      apiRequest(`/api/auth/oidc/github/callback?code=the-code&state=${state}`, {
+        headers: { cookie: oidcBindingCookie(start) },
+      }),
     );
     assert.equal(replayed.status, 400, "replayed state must be rejected");
   } finally {
@@ -742,14 +753,20 @@ test("oidc: conflitto email → merge manuale reale → sessione linked → writ
     assert.ok(state, "start must carry the state param");
 
     const callback = await oidcCallbackRoute.GET(
-      apiRequest(`/api/auth/oidc/github/callback?code=the-code&state=${state}`),
+      apiRequest(`/api/auth/oidc/github/callback?code=the-code&state=${state}`, {
+        headers: { cookie: oidcBindingCookie(start) },
+      }),
     );
     assert.equal(callback.status, 302);
     const callbackUrl = new URL(callback.headers.get("location"));
     assert.equal(callbackUrl.pathname, "/login", "an email conflict never auto-links: it lands on /login");
     const mergeToken = callbackUrl.searchParams.get("merge");
     assert.ok(mergeToken, "the callback issues a single-use merge token");
-    assert.equal(callback.headers.getSetCookie().length, 0, "no session is issued before the manual merge");
+    assert.deepEqual(
+      callback.headers.getSetCookie().filter((entry) => !/^(__Host-)?osdb_oidc_binding=;/.test(entry)),
+      [],
+      "no session is issued before the manual merge (only the binding cookie is cleared)",
+    );
 
     // Merge manuale reale: la proprietà dell'account è provata con
     // email+password (stesso path lockout-protetto del login).

@@ -67,6 +67,22 @@ test("createOidcState stores only the hash; consume is single-use and provider-b
   assert.ok(await oidc.consumeOidcState(second.rawState, "google", NOW));
 });
 
+test("createOidcState persists a caller-provided state (browser-binding derived) by hash only", async () => {
+  const { oidc, env } = runtime;
+  const derived = "binding-derived-state-0123456789abcdefABCDEF";
+  const { rawState } = await oidc.createOidcState({
+    provider: "github",
+    redirectTo: "/account",
+    rawState: derived,
+    now: NOW,
+  });
+  assert.equal(rawState, derived);
+  const rows = (await env.DB.prepare("SELECT state_hash FROM oidc_states").all()).results;
+  assert.equal(rows.length, 1);
+  assert.notEqual(rows[0].state_hash, derived, "the raw state is never stored");
+  assert.ok(await oidc.consumeOidcState(derived, "github", NOW));
+});
+
 test("consumeOidcState refuses expired state rows", async () => {
   const { oidc } = runtime;
   const { rawState } = await oidc.createOidcState({
