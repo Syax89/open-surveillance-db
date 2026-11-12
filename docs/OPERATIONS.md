@@ -137,7 +137,7 @@ PROD_URL (variable)    production hostname checked by ops-monitoring.yml
                        https://). Current value verified 2026-08-09:
                        open-surveillance-db.simone-rondina.workers.dev
                        (the deployed Cloudflare worker answers 200; the
-                       NPM→LXC host osdb.syaxhome89.com currently answers
+                       NPM→LXC host <preprod-host> currently answers
                        403 from anonymous clients because the container's
                        vite allowedHosts guard rejects it — see
                        DEPLOYMENT.md §Local LXC deployment). Set via

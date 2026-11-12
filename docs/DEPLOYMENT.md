@@ -222,7 +222,7 @@ and `CLOUDFLARE_ACCOUNT_ID` (the `PROD_URL` variable is only used by the
 (hostname only, no scheme — the workflow prepends `https://`) is set to
 `open-surveillance-db.simone-rondina.workers.dev` (verified 2026-08-09:
 the deployed worker answers 200). The NPM→LXC public hostname
-`osdb.syaxhome89.com` is the alternate; it can be added as the optional
+`<preprod-host>` is the alternate; it can be added as the optional
 `PROD_URL_ALT` repository variable for the dual health check once the
 container accepts the host (see `ALLOWED_HOSTS` note in §Local LXC
 deployment — without it the host answers 403, so adding it as PROD_URL_ALT
@@ -353,8 +353,8 @@ by default (ADR 0022).
 - `ALLOWED_HOSTS` must be in the systemd unit's `Environment=` (or the
   shell that starts the service): the vite dev server rejects any Host
   header not in `server.allowedHosts`, and the public NPM→LXC hostname
-  (`osdb.syaxhome89.com`) is only accepted when
-  `ALLOWED_HOSTS=.syaxhome89.com` reaches the process. The value lives in
+  (`<preprod-host>`) is only accepted when
+  `ALLOWED_HOSTS` (set to that host's parent domain, e.g. `.<preprod-domain>`) reaches the process. The value lives in
   `.dev.vars` too, but only the systemd `Environment=` line guarantees it
   reaches the vite config evaluation on a clean start (verified
   2026-08-09: without it the public host answers 403 "Blocked request.

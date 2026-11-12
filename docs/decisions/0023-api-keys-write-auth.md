@@ -16,8 +16,7 @@
   (moderation access control — the worker edge gate is untouched), 0004
   (retention and review cycle — R21 extends the schedule)
 - **Related docs:** implementation plan (2026-08-09,
-  `/home/simone/.hermes/plans/2026-08-09_223218-osdb-write-api-keys.md`,
-  outside the repo), `docs/DATA_MODEL.md` (api_keys table),
+  kept outside the repo), `docs/DATA_MODEL.md` (api_keys table),
   `docs/legal/RETENTION_SCHEDULE.md` (new R21),
   `docs/legal/PRIVACY_NOTICE.md`, `docs/TERMS_OF_USE.md`,
   `docs/PRIVACY_AND_SAFETY.md`, `docs/SECURITY.md`,
