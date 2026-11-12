@@ -88,10 +88,18 @@ export const pt: Translation<typeof en> = {
   listSearchPlaceholder: "Local, morada, coordenadas ou #ficha",
   listSearchHelp:
     "Escreve um local, uma morada, coordenadas como 41.9068, 12.4808 ou um número de ficha como #6302 e prime Enter. Os resultados dentro da vista atual do mapa aparecem primeiro.",
+  // Search-as-you-type (2026-11): suggestions come only from our own
+  // records (and the browser itself); the place search (OpenStreetMap)
+  // runs only on Enter or the explicit last item.
+  suggestLabel: "Sugestões",
+  suggestCount: (count: number) => (count === 1 ? "1 sugestão disponível" : `${count} sugestões disponíveis`),
+  suggestCoordinates: (text: string) => `Ir para as coordenadas ${text}`,
+  suggestRecordNumber: (id: number) => `Abrir a ficha #${id}`,
+  suggestPlace: (query: string) => `Procurar o local «${query}» (OpenStreetMap)`,
   listSearchButton: "Procurar",
   // Visible caption under the field: the privacy promise, in plain words.
   listSearchCaption:
-    "Nada é enviado enquanto escreves. As coordenadas e os #números de ficha nunca saem do teu navegador.",
+    "Enquanto escreves, só pesquisamos nas nossas próprias fichas. Os locais só são procurados no OpenStreetMap quando premes Enter ou escolhes «Procurar o local»; as coordenadas e os #números de ficha nunca saem do teu navegador.",
   // Geocode autocomplete dropdown (t_b9666d09): the listbox under the
   // sidebar search field. Attribution is required by the ODbL for
   // Nominatim-derived place data (see docs/OSM_INTEGRATION.md §8).

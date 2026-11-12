@@ -32,6 +32,13 @@ export const en = {
   resultsRegion: "Directory results",
   searchDirectory: "Search the public directory",
   searchPlaceholder: "Name, type, address or place",
+  // Search-as-you-type (2026-11): record suggestions from our own data;
+  // the last item runs the existing place search (Enter does the same).
+  suggestLabel: "Suggestions",
+  suggestCount: (count: number) => (count === 1 ? "1 suggestion available" : `${count} suggestions available`),
+  suggestCoordinates: (text: string) => `Search near coordinates ${text}`,
+  suggestRecordNumber: (id: number) => `Open record #${id}`,
+  suggestPlace: (query: string) => `Search near the place “${query}” (OpenStreetMap)`,
   searchHelp:
     "Search the records as you type, or press Enter to search around a place.",
   filters: "Filters",
@@ -189,6 +196,13 @@ export const it: Translation<typeof en> = {
   resultsRegion: "Risultati dell'elenco",
   searchDirectory: "Cerca nell'elenco pubblico",
   searchPlaceholder: "Nome, tipo, indirizzo o luogo",
+  // Search-as-you-type (2026-11): record suggestions from our own data;
+  // the last item runs the existing place search (Enter does the same).
+  suggestLabel: "Suggerimenti",
+  suggestCount: (count: number) => (count === 1 ? "1 suggerimento disponibile" : `${count} suggerimenti disponibili`),
+  suggestCoordinates: (text: string) => `Cerca vicino alle coordinate ${text}`,
+  suggestRecordNumber: (id: number) => `Apri la scheda #${id}`,
+  suggestPlace: (query: string) => `Cerca vicino al luogo «${query}» (OpenStreetMap)`,
   searchHelp:
     "Cerca i record mentre scrivi, oppure premi Invio per cercare intorno a un luogo.",
   filters: "Filtri",

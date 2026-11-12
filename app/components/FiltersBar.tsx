@@ -5,6 +5,7 @@ import { useDomainMessages } from "../lib/use-domain-messages";
 import { formatCount } from "../lib/format-number";
 import { useLocale } from "./LocaleProvider";
 import { directoryByLocale } from "../lib/i18n/directory";
+import { PlaceAutocomplete } from "./home/PlaceAutocomplete";
 
 /**
  * Shared filter bar (F1 route group (tools), D4): search + kind + freshness +
@@ -56,6 +57,7 @@ export function FiltersBar({
   // filter group still states its state. Optional: the home page and /mappa
   // never pass it, so their output stays byte-identical.
   activeFilterCount = 0,
+  onSuggestionSelect,
 }: {
   variant: "inline" | "panel" | "bare";
   cameraKinds: string[];
@@ -118,6 +120,16 @@ export function FiltersBar({
    * compact disclosure summary (synchronized with the /directory chips).
    */
   activeFilterCount?: number;
+  /**
+   * Search-as-you-type (2026-11, /directory only): when set, the search
+   * field becomes the shared PlaceAutocomplete combobox — matching public
+   * records from our own /api/cameras/suggest (choosing one calls this with
+   * its id), "#123" and coordinates answered in the browser, and a last
+   * "Search near the place" item that runs onSearchSubmit (the same place
+   * search as Enter). The list below keeps filtering as today; the home
+   * page and /mappa never pass it, so their output stays unchanged.
+   */
+  onSuggestionSelect?: (id: number) => void;
 }) {
   const t = useDomainMessages(directoryByLocale);
   const { locale } = useLocale();
@@ -154,7 +166,37 @@ export function FiltersBar({
         {!hideSearch && (
           <form className="record-search" role="search" onSubmit={submitSearch}>
             <label htmlFor="record-search">{t.searchDirectory}</label>
-            <input id="record-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t.searchPlaceholder} aria-describedby="record-search-help record-search-count" />
+            {onSuggestionSelect ? (
+              <PlaceAutocomplete
+                inputId="record-search"
+                className="record-search-combobox"
+                value={search}
+                onValueChange={setSearch}
+                selectFirstOnEnter={false}
+                recordSuggestions
+                placeSearchItem
+                onRecordSelect={onSuggestionSelect}
+                onPlaceSearch={() => onSearchSubmit?.()}
+                describedBy="record-search-help record-search-count"
+                copy={{
+                  listboxLabel: t.suggestLabel,
+                  placeholder: t.searchPlaceholder,
+                  noResults: () => t.placeNotFoundTitle,
+                  rateLimited: () => t.placeSearchRateLimited,
+                  unavailable: t.placeSearchUnavailable,
+                  attribution: "",
+                  suggest: {
+                    listboxLabel: t.suggestLabel,
+                    count: t.suggestCount,
+                    coordinates: t.suggestCoordinates,
+                    recordNumber: t.suggestRecordNumber,
+                    place: t.suggestPlace,
+                  },
+                }}
+              />
+            ) : (
+              <input id="record-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t.searchPlaceholder} aria-describedby="record-search-help record-search-count" />
+            )}
             <p id="record-search-help">{t.searchHelp}</p>
           </form>
         )}

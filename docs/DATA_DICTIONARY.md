@@ -26,6 +26,7 @@ CSV, or GeoJSON output. See [DATA_MODEL.md](DATA_MODEL.md) and
 | GeoJSON bbox layer | `GET /api/cameras?bbox=west,south,east,north&format=geojson` | `FeatureCollection` of `Point` features inside the box, plus `"truncated": true \| false` (bounded, see below) |
 | Nearby JSON | `GET /api/cameras/nearby?latitude=…&longitude=…&radius=…` | `{ "records": [ … ] }`, same fields plus `distanceMeters` |
 | Search JSON | `GET /api/cameras/search?q=…&lang=…` | `{ "query", "area": { "kind", "displayName"?, "latitude", "longitude", "radiusMeters", "radiusLabel" }, "count", "records" }` |
+| Suggestions JSON | `GET /api/cameras/suggest?q=…&limit=…` | `{ "suggestions": [ { "id", "title", "kind", "address" } ] }` — search-as-you-type over title/address/kind (public records only; `q` 2–200 chars, `limit` default 5, max 10; `address` cut to 80 chars, no coordinates) |
 | Revisions JSON | `GET /api/cameras/revisions?cameraId=N` | `{ "recordId", "revisions": [ { "id", "entityId", "previousStatus", "newStatus", "action", "createdAt" } ] }` |
 
 The default JSON list is paginated so the payload stays bounded as the

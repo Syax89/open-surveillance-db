@@ -269,12 +269,16 @@ test("the map search label is short in EN and IT and states the privacy promise"
   assert.ok(en.listSearchLabel.length < 40 && it.listSearchLabel.length < 40, "the label fits one line on a phone");
 
   // One purpose (privacy pass 2026-11): places, addresses, coordinates and
-  // #record numbers on Enter; nothing is sent while typing.
+  // #record numbers on Enter; while typing only our own records are
+  // searched (search-as-you-type 2026-11) and the place lookup waits for
+  // Enter or the explicit "Search the place" item.
   assert.match(en.listSearchHelp, /coordinates/);
   assert.match(en.listSearchHelp, /#6302/);
-  assert.match(en.listSearchCaption, /Nothing is sent while you type/);
+  assert.match(en.listSearchCaption, /While you type, only our own records are searched/);
+  assert.match(en.listSearchCaption, /OpenStreetMap only when you press Enter/);
   assert.match(it.listSearchHelp, /coordinate/);
-  assert.match(it.listSearchCaption, /non viene inviato nulla/);
+  assert.match(it.listSearchCaption, /Mentre scrivi cerchiamo solo tra le nostre schede/);
+  assert.match(it.listSearchCaption, /OpenStreetMap solo quando premi Invio/);
 
   // The shortened key is map-only: exactly one consumer, no other widget.
   const geocode = await readSource("app/components/home/GeocodeSearch.tsx");

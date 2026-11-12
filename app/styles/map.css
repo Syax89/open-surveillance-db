@@ -140,6 +140,10 @@
 /* Search field (2026-11): a magnifier glyph marks it as THE search box. */
 .map-explorer-search .map-list-search input:focus-visible { border-color:var(--focus); outline:3px solid color-mix(in srgb, var(--focus) 35%, transparent); outline-offset:0; }
 .map-explorer-search .geocode-dropdown { left:0; right:0; }
+/* Leaflet panes and controls use z-index 400–1000: contain them in the map's
+   own stacking context so the search suggestion list (and the header's mobile
+   menu) are never covered by the scale bar or the zoom buttons. */
+.leaflet-container { isolation:isolate; }
 /* Always-visible caption under the /mappa sidebar search: reuses the same
    muted small-text tokens as the record-search help (.record-search p), which
    does not reach this block because it is scoped to .record-search. */

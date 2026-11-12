@@ -374,7 +374,7 @@ details.locale-toggle .locale-menu button.is-active { background:var(--notice-bg
    .hero-copy (z-index:2) sits above .hero-visual, which is absolutely pinned
    to the section (inset:0, z-index:0). Both are navy-family, so the light
    hero ink keeps strong contrast over the gradient without any scrim. */
-.hero { width:var(--container-wide); margin:9px auto 0; min-height:590px; overflow:hidden; position:relative; border-radius:var(--radius-2xl); background:var(--navy); color:var(--hero-ink); }
+.hero { width:var(--container-wide); margin:9px auto 0; min-height:590px; overflow:visible; position:relative; border-radius:var(--radius-2xl); background:var(--navy); color:var(--hero-ink); }
 .hero-copy { position:relative; z-index:2; padding:78px 0 62px 70px; max-width:860px; }
 .hero-copy--intro { padding-bottom:0; }
 .hero-copy--details { padding-top:0; }
@@ -405,7 +405,9 @@ details.locale-toggle .locale-menu button.is-active { background:var(--notice-bg
 .hero-search input:focus-visible { outline:3px solid var(--mint); outline-offset:-3px; }
 .hero-search button { flex:none; border:0; border-left:1px solid rgba(222,245,234,.32); padding:0 16px; background:var(--mint); color:var(--button-ink); font-size:var(--text-base); font-weight:800; border-radius:0 var(--radius-lg) var(--radius-lg) 0; }
 .hero-search button:hover { background:var(--mint-hover); }
-.hero-search .geocode-dropdown { left:0; right:0; }
+/* The hero no longer clips its children (overflow:visible, the art is
+   clipped by .hero-visual) so the suggestion list can extend below it. */
+.hero-search .geocode-dropdown { left:0; right:0; z-index:40; }
 .hero-actions { display:flex; align-items:center; gap:var(--space-3); flex-wrap:wrap; }
 .button { border:1px solid transparent; padding:13px 18px; border-radius:var(--radius-lg); display:inline-flex; align-items:center; gap:13px; font-size:var(--text-base); font-weight:800; transition:transform .2s ease, background .2s ease; }
 .button:hover { transform:translateY(-2px); }
@@ -438,7 +440,7 @@ details.locale-toggle .locale-menu button.is-active { background:var(--notice-bg
     -webkit-mask-image:linear-gradient(90deg, transparent 0, #000 40%); mask-image:linear-gradient(90deg, transparent 0, #000 40%); }
   .hero-map-art .teaser-grid { opacity:.7; }
 }
-.hero-visual { position:absolute; inset:0; z-index:0; overflow:hidden; isolation:isolate; background:linear-gradient(135deg,rgb(9 35 58),rgb(16 35 50) 45%,rgb(20 45 62)); }
+.hero-visual { position:absolute; inset:0; z-index:0; overflow:hidden; border-radius:inherit; isolation:isolate; background:linear-gradient(135deg,rgb(9 35 58),rgb(16 35 50) 45%,rgb(20 45 62)); }
 /* Community map pattern: subtle topographic lines + organic shapes */
 .hero-map-pattern { position:absolute; inset:0; opacity:.15; background-image:
   radial-gradient(circle at 25% 30%, rgba(203,247,218,.3) 0, transparent 28%),
@@ -1348,6 +1350,12 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .directory-tool .directory-controls .record-search label { grid-column:1; grid-row:1; }
 .directory-tool .directory-controls .record-search p { grid-column:2; grid-row:1; margin:0; color:var(--muted); font-size:var(--text-sm); line-height:1.35; }
 .directory-tool .directory-controls .record-search input { grid-column:1/-1; grid-row:2; }
+/* Search-as-you-type (2026-11): on /directory the input sits in the
+   combobox wrapper, which takes the input's grid cell and anchors the
+   suggestion dropdown (same .geocode-dropdown as the map and the hero). */
+.record-search-combobox { position:relative; min-width:0; }
+.directory-tool .directory-controls .record-search .record-search-combobox { grid-column:1/-1; grid-row:2; }
+.record-search-combobox .geocode-dropdown { left:0; right:0; }
 /* Same fraction-only columns on the /mappa filters panel: IT select labels
    ("Tipo di telecamera") are wider than EN, so fixed-fr tracks avoided a
    ±14px shuffle of the selects between languages. */
@@ -1498,7 +1506,8 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .directory-tool .directory-controls .record-search { grid-template-columns:1fr; row-gap:6px; }
   .directory-tool .directory-controls .record-search label,
   .directory-tool .directory-controls .record-search p,
-  .directory-tool .directory-controls .record-search input { grid-column:1; grid-row:auto; }
+  .directory-tool .directory-controls .record-search input,
+  .directory-tool .directory-controls .record-search .record-search-combobox { grid-column:1; grid-row:auto; }
 }
 @media (max-width:820px) {
   .filters-disclosure { border:1px solid var(--line); border-radius:var(--radius-md); background:var(--card-bg); }
@@ -2090,6 +2099,17 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .geocode-option-type { color:var(--geocode-meta-ink); font-size:var(--text-xs); text-transform:capitalize; white-space:nowrap; }
 .geocode-status { margin:0; padding:14px 16px; color:var(--supporting); font-size:var(--text-md); line-height:1.5; }
 .geocode-attribution { margin:0; padding:8px 12px; border-top:1px solid var(--attribution-line); color:var(--geocode-meta-ink); font-size:var(--text-2xs); }
+/* Search-as-you-type rows (2026-11): touch-sized (>=44px), long titles and
+   addresses wrap inside the row instead of overflowing a 320px screen; the
+   last "search the place (OpenStreetMap)" item is set apart by a rule so the
+   moment text leaves our server is visibly a separate choice. */
+.geocode-option.suggest-option { min-height:44px; box-sizing:border-box; align-items:center; }
+.geocode-option-name, .suggest-option-text { min-width:0; overflow-wrap:anywhere; }
+.suggest-option-text { display:flex; flex-direction:column; gap:2px; }
+.suggest-option-detail { color:var(--geocode-meta-ink); font-size:var(--text-xs); line-height:1.35; }
+.suggest-option-place { margin-top:4px; border-top:1px solid var(--attribution-line); border-radius:0 0 var(--radius-md) var(--radius-md); }
+.suggest-option-place:first-child { margin-top:0; border-top:0; border-radius:var(--radius-md); }
+.suggest-option-place .geocode-option-name, .suggest-option-coordinates .geocode-option-name, .suggest-option-record-number .geocode-option-name { font-weight:600; }
 /* Mobile-first (t_702c10af, t_966254a1; MAP-FIRST redesign t_b7728ad0,
    CEO 2026-08-05): below 768px the MAP is the primary function and comes
    FIRST — filters (compact) then map, with the "Points in this view"

@@ -247,6 +247,19 @@ compliance posture as the tile proxy:
   `#record` numbers are resolved in the browser and never reach the proxy;
   results are ranked by the current map view in the browser, so the map
   position is never sent either.
+- **Search-as-you-type comes from our own data only (2026-11)**: the home
+  hero, the /mappa search and the /directory field show suggestions while
+  the visitor types, but those come exclusively from
+  `GET /api/cameras/suggest` — our own public records (public statuses and
+  public fields only; debounced 300 ms, min 2 characters, stale requests
+  aborted, recent queries cached in the browser; query text never logged).
+  Coordinates and `#record` numbers are offered as instant local
+  suggestions with no request at all. The geocoder is reached only when the
+  visitor explicitly chooses the last item, "Search the place «…»
+  (OpenStreetMap)" — or presses Enter where Enter already meant a place
+  search (/mappa, /directory) — so the moment text leaves our server is
+  always a visible, deliberate choice. Pinned by
+  `tests/search-privacy.test.mjs` and `tests/search-suggestions.test.mjs`.
 - **Rate limiting**: a per-caller bucket (default 30/min,
   `GEOCODE_RATE_LIMIT_MAX` / `GEOCODE_RATE_LIMIT_WINDOW_SECONDS`) keeps the
   average well below the Nominatim ceiling (~1 request/second/client); the
