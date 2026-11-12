@@ -257,6 +257,34 @@ test("GET /api/moderation role gate precedes cursor validation", async () => {
   assert.equal(callArgs("listPendingModerationItems").length, 0);
 });
 
+test("identity headers: the edge header wins; conflicting edge/platform identities are denied", async () => {
+  const adminUser = { ...moderatorUser, id: 5, email: "admin@osdb.test", role: "admin" };
+  stub("listPendingModerationItems", async () => ({ cameras: [] }));
+  stub("getUserByEmail", async (email) =>
+    email === moderatorUser.email ? moderatorUser : email === adminUser.email ? adminUser : null,
+  );
+  const { GET } = await route();
+
+  // Both present and different: ambiguous identity → 401, no queue read.
+  const conflicting = await GET(publicRequest("/api/moderation", {
+    headers: { "x-osdb-user-email": moderatorUser.email, "oai-authenticated-user-email": adminUser.email },
+  }));
+  assert.equal(conflicting.status, 401);
+  assert.equal(callArgs("listPendingModerationItems").length, 0);
+  assert.equal(callArgs("getUserByEmail").length, 0, "no identity is resolved for a conflicting pair");
+
+  // Both present and equal: accepted.
+  const agreeing = await GET(publicRequest("/api/moderation", {
+    headers: { "x-osdb-user-email": moderatorUser.email, "oai-authenticated-user-email": moderatorUser.email },
+  }));
+  assert.equal(agreeing.status, 200);
+
+  // Edge header alone resolves the edge identity.
+  const edgeOnly = await GET(publicRequest("/api/moderation", { headers: { "x-osdb-user-email": moderatorUser.email } }));
+  assert.equal(edgeOnly.status, 200);
+  assert.deepEqual(callArgs("getUserByEmail").at(-1), [moderatorUser.email]);
+});
+
 // ---------------------------------------------------------------------------
 // PATCH /api/moderation — valid decisions
 // ---------------------------------------------------------------------------

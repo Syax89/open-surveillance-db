@@ -35,9 +35,19 @@ import { CSRF_REJECTED_ERROR, SESSION_COOKIE, csrfVerified, readCookie, sameOrig
 const CHATGPT_EMAIL_HEADER = "oai-authenticated-user-email";
 const PROTOTYPE_EMAIL_HEADER = "x-osdb-user-email";
 
-/** Resolve the authenticated user from the request, or null when anonymous. */
+/**
+ * Resolve the authenticated user from the request, or null when anonymous.
+ *
+ * The edge-injected `x-osdb-user-email` (set only after the worker's own
+ * moderation gate) takes precedence over the platform header. When both are
+ * present and disagree, the identity is ambiguous and the request is denied
+ * (null → 401) instead of silently trusting either one.
+ */
 export async function resolveAuthUser(request: Request): Promise<UserRecord | null> {
-  const email = request.headers.get(CHATGPT_EMAIL_HEADER) ?? request.headers.get(PROTOTYPE_EMAIL_HEADER);
+  const edgeEmail = request.headers.get(PROTOTYPE_EMAIL_HEADER);
+  const platformEmail = request.headers.get(CHATGPT_EMAIL_HEADER);
+  if (edgeEmail !== null && platformEmail !== null && edgeEmail !== platformEmail) return null;
+  const email = edgeEmail ?? platformEmail;
   if (!email) return null;
   const user = await getUserByEmail(email);
   if (!user || user.active !== 1) return null;
