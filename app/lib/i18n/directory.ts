@@ -57,8 +57,8 @@ export const en = {
   filterOrder: (label: string) => `Order: ${label}`,
   alphaIndexTitle: "Alphabetical index",
   alphaIndexAria: (letter: string) => `Jump to records starting with ${letter}`,
-  showingRecords: (from: number, to: number, total: number) => `Showing ${from}–${to} of ${total} records`,
-  pageOf: (page: number, pages: number) => `Page ${page} of ${pages}`,
+  showingRecords: (from: number | string, to: number | string, total: number | string) => `Showing ${from}–${to} of ${total} records`,
+  pageOf: (page: number | string, pages: number | string) => `Page ${page} of ${pages}`,
   previousPage: "Previous page",
   nextPage: "Next page",
   // Catalog mode: the place-search panel trigger in the results meta row
@@ -213,8 +213,8 @@ export const it: Translation<typeof en> = {
   filterOrder: (label: string) => `Ordine: ${label}`,
   alphaIndexTitle: "Indice alfabetico",
   alphaIndexAria: (letter: string) => `Vai ai record che iniziano con ${letter}`,
-  showingRecords: (from: number, to: number, total: number) => `Mostrando ${from}–${to} di ${total} record`,
-  pageOf: (page: number, pages: number) => `Pagina ${page} di ${pages}`,
+  showingRecords: (from: number | string, to: number | string, total: number | string) => `Mostrando ${from}–${to} di ${total} record`,
+  pageOf: (page: number | string, pages: number | string) => `Pagina ${page} di ${pages}`,
   previousPage: "Pagina precedente",
   nextPage: "Pagina successiva",
   // Modalità catalogo: trigger del pannello ricerca-per-luogo nella riga

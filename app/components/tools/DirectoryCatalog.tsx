@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocale } from "../LocaleProvider";
+import { formatCount } from "../../lib/format-number";
 import { useDomainMessages } from "../../lib/use-domain-messages";
 import { directoryByLocale } from "../../lib/i18n/directory";
 import { statusByLocale } from "../../lib/i18n/status";
@@ -192,7 +193,7 @@ export function DirectoryCatalog({ filteredRecords, loading, loadError, onRetryL
       // No known total yet (first fetch in flight): announce loading, not a false zero.
       : loading && serverTotalRecords == null
         ? t.loading
-        : serverTotalRecords === 1 ? t.oneRecordFound : `${serverTotalRecords ?? filteredRecords.length} ${t.recordsFound}`;
+        : serverTotalRecords === 1 ? t.oneRecordFound : `${formatCount(serverTotalRecords ?? filteredRecords.length, locale)} ${t.recordsFound}`;
 
   // Pagination: in cursor mode the server already paginated (records ARE
   // the current page, total comes from the API) — the client slice must
@@ -326,7 +327,7 @@ export function DirectoryCatalog({ filteredRecords, loading, loadError, onRetryL
     return (
       <nav className={className} aria-label={t.resultsRegion}>
         <button type="button" className="pagination-button" disabled={safePage <= 1} onClick={() => goToPage(safePage - 1)}><span aria-hidden="true">←</span> {t.previousPage}</button>
-        <p className="pagination-summary">{t.showingRecords((safePage - 1) * DIRECTORY_PAGE_SIZE + 1, Math.min(safePage * DIRECTORY_PAGE_SIZE, totalRecords), totalRecords)} · {t.pageOf(safePage, pageCount)}</p>
+        <p className="pagination-summary">{t.showingRecords(formatCount((safePage - 1) * DIRECTORY_PAGE_SIZE + 1, locale), formatCount(Math.min(safePage * DIRECTORY_PAGE_SIZE, totalRecords), locale), formatCount(totalRecords, locale))} · {t.pageOf(formatCount(safePage, locale), formatCount(pageCount, locale))}</p>
         <button type="button" className="pagination-button" disabled={safePage >= pageCount} onClick={() => goToPage(safePage + 1)}>{t.nextPage} <span aria-hidden="true">→</span></button>
       </nav>
     );
@@ -373,7 +374,7 @@ export function DirectoryCatalog({ filteredRecords, loading, loadError, onRetryL
             direct shortcut to the report form (/segnala). Plain link: the
             write gate on /segnala handles anonymous visitors. */}
         <div className="directory-results-actions">
-          <a className="add-button" href={reportHref} aria-label={t.reportCamera}><span aria-hidden="true">+</span></a>
+          <a className="add-button" href={reportHref} aria-label={t.reportCamera}><span aria-hidden="true">+</span><span className="add-button-label" aria-hidden="true">{t.reportCamera}</span></a>
         </div>
       </div>
       {/* Active-filter chips: the state of the list at a glance, removable

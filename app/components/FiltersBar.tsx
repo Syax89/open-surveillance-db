@@ -2,6 +2,8 @@
 
 import { useId, useState, type FormEvent, type ReactNode } from "react";
 import { useDomainMessages } from "../lib/use-domain-messages";
+import { formatCount } from "../lib/format-number";
+import { useLocale } from "./LocaleProvider";
 import { directoryByLocale } from "../lib/i18n/directory";
 
 /**
@@ -118,6 +120,7 @@ export function FiltersBar({
   activeFilterCount?: number;
 }) {
   const t = useDomainMessages(directoryByLocale);
+  const { locale } = useLocale();
   // On constrained layouts (≤820px) the whole filter group becomes one short
   // disclosure; the search always stays visible. On wider layouts the toggle
   // is not rendered (display:none) and the controls are ALWAYS shown.
@@ -217,7 +220,7 @@ export function FiltersBar({
       {/* The result counter. "bare" (catalog) omits it: the counter lives in
           the .directory-meta row rendered by PublicDirectory (catalog) so it
           sits next to export and above the list (t_127492f1). */}{variant !== "bare" && (
-        <p className="search-count" id="record-search-count" role="status">{resultCount === 1 ? t.oneRecordFound : `${resultCount} ${t.recordsFound}`}</p>
+        <p className="search-count" id="record-search-count" role="status">{resultCount === 1 ? t.oneRecordFound : `${formatCount(resultCount, locale)} ${t.recordsFound}`}</p>
       )}
     </>
   );

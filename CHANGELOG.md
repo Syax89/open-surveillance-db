@@ -395,6 +395,21 @@ changes accumulate under `[Unreleased]`.
 
 ### Changed
 
+- **Design review pass (2026-11, desktop + mobile):** public counts use a
+  cached `Intl.NumberFormat` (`app/lib/format-number.ts`: "6,240"); the hero
+  search field is opaque so the decorative dot grid no longer shows through;
+  the hero stats stack one per row on phones; the record page uses the shared
+  `PublicNav` (back link moved above the card), "Public record" and the status
+  share one line, the double rule before the history is gone and the lower
+  "View on map" opens the record (`/mappa?focus=<id>`) like the early one;
+  sign-in-gated community buttons are readable (~5:1 instead of ~2:1); the
+  map and directory workspaces align with the header (`--container-wide`);
+  the directory "+" shortcut shows its "Report a camera" label on desktop,
+  export links align with the card and the off-screen card reservation
+  matches the real desktop height (scroll jump ~880px → ~200px); footer
+  "Legal information" aligns with the other columns and the licence credits
+  no longer orphan "1.0"; removed an invalid `font-family:var(--heading)`.
+
 - **BREAKING (API clients) — GeoJSON bbox layer bounded (2026-11-11,
   branch `claude/repo-analysis-a9hrio`):** `GET /api/cameras?bbox=…&format=geojson`
   now honours the `kind` and `freshness` filters (they were silently

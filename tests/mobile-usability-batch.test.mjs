@@ -450,7 +450,7 @@ test("F3: the map action is exposed early with the /mappa?focus contract, and th
   // The accepted lower action is untouched: same label, same href, own class.
   const late = container.querySelector(".record-detail-actions a.record-map-late");
   assert.ok(late, "the lower action still renders in the accepted action row");
-  assert.equal(late.getAttribute("href"), "/mappa", "with its original href");
+  assert.equal(late.getAttribute("href"), "/mappa?focus=7", "the lower action opens this record on the map too");
   assert.equal(text(late), "View on map ↗");
   assert.equal(container.querySelectorAll("a.record-map-early, a.record-map-late").length, 2, "one link per breakpoint, never a third copy");
 });
@@ -460,7 +460,7 @@ test("F3: withdrawn records expose neither the early nor the lower map action", 
     const view = await renderRecord({ ...BASE_RECORD, status });
     assert.equal(view.container.querySelector("a.record-map-early"), null, `${status} records render no early map action`);
     assert.equal(view.container.querySelector("a.record-map-late"), null, `${status} records render no lower map action`);
-    assert.equal(view.container.querySelectorAll('a[href^="/mappa"]').length, 0, `${status} records expose no /mappa link at all`);
+    assert.equal(view.container.querySelectorAll('.record-detail a[href^="/mappa"]').length, 0, `${status} records expose no /mappa link in the record card (the shared site nav keeps its own map link)`);
     rtl.cleanup();
     __resetPublicCamerasCache();
   }
@@ -473,7 +473,7 @@ test("F3: a demo record keeps the early focused action, localized in IT", async 
   assert.ok(early, "demo records are shown on the map, so they keep the early action");
   assert.equal(early.getAttribute("href"), "/mappa?focus=7");
   assert.equal(text(early), "Vedi sulla mappa ↗", "the existing Italian label is reused");
-  assert.equal(container.querySelector("a.record-map-late")?.getAttribute("href"), "/mappa", "the lower action is unchanged in IT too");
+  assert.equal(container.querySelector("a.record-map-late")?.getAttribute("href"), "/mappa?focus=7", "the lower action focuses the record in IT too");
 });
 
 test("F3 (CSS): exactly one map action is visible per breakpoint", async () => {

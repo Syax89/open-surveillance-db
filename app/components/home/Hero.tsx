@@ -3,6 +3,8 @@
 import { useDomainMessages } from "../../lib/use-domain-messages";
 import { homeByLocale } from "../../lib/i18n/home";
 import { usePublicCount } from "../../lib/use-public-count";
+import { formatCount } from "../../lib/format-number";
+import { useLocale } from "../LocaleProvider";
 import { HeroDirectorySearch } from "./HeroDirectorySearch";
 
 /**
@@ -24,6 +26,7 @@ import { HeroDirectorySearch } from "./HeroDirectorySearch";
 export function Hero() {
   const t = useDomainMessages(homeByLocale);
   const { total } = usePublicCount();
+  const { locale } = useLocale();
   return (
     <section className="hero" id="top">
       <div className="hero-copy hero-copy--intro">
@@ -36,7 +39,7 @@ export function Hero() {
       </div>
       <div className="hero-copy hero-copy--details">
         <div className="hero-actions"><a className="button button-primary" href="/mappa">{t.exploreTheMap} <span aria-hidden="true">→</span></a><a className="button button-quiet" href="/segnala">{t.reportCta} <span aria-hidden="true">→</span></a></div>
-        <dl className="hero-stats" aria-label={t.statsLabel}><div><dt>{total ?? "—"}</dt><dd>{t.publicRecords}</dd></div><div><dt>{t.browseFreely}</dt><dd>{t.browseFreelyDetail}</dd></div><div><dt>{t.openData}</dt><dd>{t.openDataDetail}</dd></div></dl>
+        <dl className="hero-stats" aria-label={t.statsLabel}><div><dt>{total == null ? "—" : formatCount(total, locale)}</dt><dd>{t.publicRecords}</dd></div><div><dt>{t.browseFreely}</dt><dd>{t.browseFreelyDetail}</dd></div><div><dt>{t.openData}</dt><dd>{t.openDataDetail}</dd></div></dl>
         <p className="hero-trust-note">{t.trustNote} <a href="/fonti">{t.sourcesLink} <span aria-hidden="true">→</span></a></p>
         {total !== null && <p className="sr-only" role="status">{total} {t.publicRecords}</p>}
       </div>
