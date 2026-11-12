@@ -263,38 +263,34 @@ export async function requireModerationAuth(
       identityEmail: null,
     };
   }
-  if (!moderationCredentialsConfigured(env)) {
-    console.error("Moderation access control is not configured; denying", request.url);
-    return {
-      denied: Response.json(
-        { error: "Moderation is unavailable." },
-        { status: 503, headers: { "Cache-Control": "no-store" } },
-      ),
-      identityEmail: null,
-    };
+  // The moderator's own site login comes first and works whatever edge
+  // credentials are configured (owner 2026-11: only accounts the owner has
+  // authorised — users.role moderator+ linked to the contributor — may see
+  // the moderation area at all).
+  const sessionEmail = await moderatorEmailFromSession(request);
+  if (sessionEmail) {
+    return { denied: null, identityEmail: sessionEmail, source: "session" };
   }
+
+  // Everyone else gets a plain 404, exactly like a page that does not exist:
+  // no Basic-auth browser prompt (WWW-Authenticate) that would advertise the
+  // area, no "unavailable" page. Edge credentials (MODERATION_TOKEN, the
+  // operator list, the legacy Basic pair) still work for scripts that SEND
+  // the Authorization header up front; browsers never send it unprompted.
+  const notFound = () => ({
+    denied: Response.json({ error: "Not found." }, { status: 404, headers: { "Cache-Control": "no-store" } }),
+    identityEmail: null,
+  });
+  if (!moderationCredentialsConfigured(env)) return notFound();
 
   const authorization = request.headers.get("Authorization") ?? "";
   if (env.MODERATION_TOKEN && safeEqual(`Bearer ${env.MODERATION_TOKEN}`, authorization)) {
     return { denied: null, identityEmail: env.MODERATION_IDENTITY_EMAIL ?? null, source: "edge" };
   }
-  const sessionEmail = await moderatorEmailFromSession(request);
-  if (sessionEmail) {
-    return { denied: null, identityEmail: sessionEmail, source: "session" };
-  }
   if (operators !== null && operators.length > 0) {
     const operator = matchBasicOperator(authorization, operators);
     if (operator) return { denied: null, identityEmail: operator.email, source: "edge" };
-    return {
-      denied: new Response("Unauthorized", {
-        status: 401,
-        headers: {
-          "WWW-Authenticate": 'Basic realm="moderation", charset="UTF-8"',
-          "Cache-Control": "no-store",
-        },
-      }),
-      identityEmail: null,
-    };
+    return notFound();
   }
   if (env.MODERATION_USER && env.MODERATION_PASSWORD) {
     const expected = `Basic ${btoa(`${env.MODERATION_USER}:${env.MODERATION_PASSWORD}`)}`;
@@ -302,14 +298,5 @@ export async function requireModerationAuth(
       return { denied: null, identityEmail: env.MODERATION_IDENTITY_EMAIL ?? null, source: "edge" };
     }
   }
-  return {
-    denied: new Response("Unauthorized", {
-      status: 401,
-      headers: {
-        "WWW-Authenticate": 'Basic realm="moderation", charset="UTF-8"',
-        "Cache-Control": "no-store",
-      },
-    }),
-    identityEmail: null,
-  };
+  return notFound();
 }
