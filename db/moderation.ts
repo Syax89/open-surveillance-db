@@ -186,7 +186,12 @@ export type ModerationResult<T> =
   | { kind: "actor_not_found" }
   | { kind: "actor_inactive" }
   | { kind: "second_review_same_reviewer" }
-  | { kind: "escalation_requires_note" };
+  | { kind: "escalation_requires_note" }
+  // The acting reviewer's linked contributor account (users.contributor_id)
+  // submitted the item or owns the record it targets: a moderator never
+  // decides their own report / edit request / correction. Recusal and
+  // escalation stay available (they are how a conflicted reviewer steps aside).
+  | { kind: "self_review" };
 
 /** Legacy decision shape, kept as an alias for callers of the pre-Wave-B API. */
 export type ModerationDecision<T> = { item: T; event: ModerationEvent };
@@ -366,6 +371,30 @@ async function getReviewerById(d1: ModerationD1, id: number): Promise<Reviewer |
     .first<Reviewer>();
 }
 
+/**
+ * Self-moderation check (separation of duties). The reviewer profile links
+ * to a `users` identity (reviewers.user_id) which may link to the
+ * reviewer's own contributor account (users.contributor_id, ADR 0003
+ * amendment). Returns true when that contributor is one of `ownerIds`.
+ */
+async function isSelfReview(
+  d1: ModerationD1,
+  reviewer: Reviewer | null,
+  ownerIds: ReadonlyArray<number | null | undefined>,
+): Promise<boolean> {
+  if (!reviewer) return false;
+  const owners = ownerIds.filter((value): value is number => typeof value === "number");
+  if (owners.length === 0) return false;
+  const row = await d1
+    .prepare(
+      "SELECT u.contributor_id AS contributorId FROM reviewers r JOIN users u ON u.id = r.user_id WHERE r.id = ?",
+    )
+    .bind(reviewer.id)
+    .first<{ contributorId: number | null }>();
+  const contributorId = row?.contributorId ?? null;
+  return contributorId !== null && owners.includes(contributorId);
+}
+
 async function findOpenQueueItem(
   d1: ModerationD1,
   entity: ModerationEntity,
@@ -379,17 +408,93 @@ async function findOpenQueueItem(
     .first<ModerationQueueItem>();
 }
 
+const sensitivityRank: Record<QueueSensitivity, number> = { standard: 0, sensitive: 1, urgent: 2 };
+
+function maxSensitivity(a: QueueSensitivity, b: QueueSensitivity | undefined): QueueSensitivity {
+  return b !== undefined && sensitivityRank[b] > sensitivityRank[a] ? b : a;
+}
+
+/** Correction issue types that are privacy/legal takedown or abuse reports (db/corrections.ts whitelist). */
+const SENSITIVE_CORRECTION_ISSUE_TYPES = ["removal", "abuse"] as const;
+
+/**
+ * Server-side sensitivity floor for a queue item (ADR 0009 §4 two-person
+ * review). The deciding moderator used to choose `sensitivity` /
+ * `requiresSecondReview` in the request body, so the two-person rule was
+ * opt-in by the very person it is meant to check. The floor is derived from
+ * the item itself and can never be lowered by the client (a client value
+ * may only raise it):
+ *
+ *   - correction: a `removal` / `abuse` report (privacy/legal takedown or
+ *     abuse) → `urgent`;
+ *   - camera: an open `removal` / `abuse` report on the record → `urgent`;
+ *     a community `privacy` flag on the record → `sensitive`;
+ *   - camera_edit: the target camera's floor (same signals).
+ */
+async function deriveQueueSensitivity(
+  d1: ModerationD1,
+  entity: ModerationEntity,
+  entityId: number,
+): Promise<QueueSensitivity> {
+  const issueList = SENSITIVE_CORRECTION_ISSUE_TYPES.map((type) => `'${type}'`).join(", ");
+  if (entity === "correction") {
+    const row = await d1
+      .prepare(`SELECT 1 AS hit FROM correction_requests WHERE id = ? AND issue_type IN (${issueList})`)
+      .bind(entityId)
+      .first<{ hit: number }>();
+    return row ? "urgent" : "standard";
+  }
+  let cameraId: number | null = entityId;
+  if (entity === "camera_edit") {
+    const request = await d1
+      .prepare("SELECT camera_id AS cameraId FROM camera_edit_requests WHERE id = ?")
+      .bind(entityId)
+      .first<{ cameraId: number | null }>();
+    cameraId = request?.cameraId ?? null;
+  }
+  if (cameraId === null) return "standard";
+  const row = await d1
+    .prepare(
+      `SELECT
+         EXISTS (SELECT 1 FROM correction_requests WHERE camera_id = ? AND status = 'pending' AND issue_type IN (${issueList})) AS urgentReport,
+         EXISTS (SELECT 1 FROM camera_community_actions WHERE camera_id = ? AND action_type = 'privacy') AS privacyFlag`,
+    )
+    .bind(cameraId, cameraId)
+    .first<{ urgentReport: number; privacyFlag: number }>();
+  if (Number(row?.urgentReport ?? 0) === 1) return "urgent";
+  if (Number(row?.privacyFlag ?? 0) === 1) return "sensitive";
+  return "standard";
+}
+
 async function getOrCreateQueueItem(
   d1: ModerationD1,
   entity: ModerationEntity,
   entityId: number,
   options: { sensitivity?: ModerationContext["sensitivity"]; assigneeId?: number; requiresSecondReview?: boolean },
 ): Promise<ModerationQueueItem> {
+  // Effective sensitivity = max(server floor, stored row, client request):
+  // the client may only upgrade, never downgrade (see deriveQueueSensitivity).
+  const derived = await deriveQueueSensitivity(d1, entity, entityId);
+  const requested = maxSensitivity(derived, options.sensitivity);
+
   const existing = await findOpenQueueItem(d1, entity, entityId);
-  if (existing) return existing;
+  if (existing) {
+    const sensitivity = maxSensitivity(existing.sensitivity, requested);
+    const requiresSecondReview =
+      existing.requiresSecondReview === 1 || options.requiresSecondReview === true || sensitivity !== "standard" ? 1 : 0;
+    if (sensitivity === existing.sensitivity && requiresSecondReview === existing.requiresSecondReview) return existing;
+    // Upgrade only: the UPDATE never lowers either column.
+    await d1
+      .prepare(
+        "UPDATE moderation_queue SET sensitivity = ?, requires_second_review = MAX(requires_second_review, ?), updated_at = ? WHERE id = ? AND state != 'closed'",
+      )
+      .bind(sensitivity, requiresSecondReview, new Date().toISOString(), existing.id)
+      .run();
+    return (await findOpenQueueItem(d1, entity, entityId)) ?? existing;
+  }
 
   const now = new Date().toISOString();
-  const sensitivity = options.sensitivity ?? "standard";
+  const sensitivity = requested;
   const requiresSecondReview =
     options.requiresSecondReview === true || sensitivity !== "standard" ? 1 : 0;
   // SQLite RETURNING cannot reference table aliases, so the fresh row is
@@ -794,13 +899,14 @@ function buildGuardedEventStatement(
   guardTable: string,
   guardId: number,
   expectedStatus: string,
+  extraGuard?: { sql: string; binds: (string | number | null)[] },
 ): D1PreparedStatement {
   const createdAt = new Date().toISOString();
   return d1
     .prepare(
       `INSERT INTO moderation_events (entity, entity_id, previous_status, new_status, action, reason_code, note, actor, reviewer_id, actor_role, recused, escalated, second_reviewer_id, appeal_id, created_at)
        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-       WHERE EXISTS (SELECT 1 FROM ${guardTable} WHERE id = ? AND status = ?)
+       WHERE EXISTS (SELECT 1 FROM ${guardTable} WHERE id = ? AND status = ?${extraGuard ? ` ${extraGuard.sql}` : ""})
        RETURNING id, entity, entity_id AS entityId, previous_status AS previousStatus, new_status AS newStatus, action, reason_code AS reasonCode, note, actor, reviewer_id AS reviewerId, actor_role AS actorRole, recused, escalated, second_reviewer_id AS secondReviewerId, appeal_id AS appealId, created_at AS createdAt`,
     )
     .bind(
@@ -821,6 +927,7 @@ function buildGuardedEventStatement(
       createdAt,
       guardId,
       expectedStatus,
+      ...(extraGuard?.binds ?? []),
     );
 }
 
@@ -860,9 +967,9 @@ export async function moderateCamera(
   if (reviewer && !roleAllowsAction(reviewer.role, action)) return { kind: "forbidden" };
 
   const current = await d1
-    .prepare("SELECT status FROM cameras WHERE id = ?")
+    .prepare("SELECT status, contributor_id AS contributorId FROM cameras WHERE id = ?")
     .bind(id)
-    .first<{ status: string }>();
+    .first<{ status: string; contributorId: number | null }>();
   if (!current) return { kind: "not_found" };
 
   const queue = context
@@ -926,6 +1033,8 @@ export async function moderateCamera(
     const updatedQueue = (results[2].results?.[0] as ModerationQueueItem | undefined) ?? queue;
     return { kind: "ok", item: (await loadCamera(d1, id))!, event, queue: updatedQueue };
   }
+
+  if (await isSelfReview(d1, reviewer, [current.contributorId])) return { kind: "self_review" };
 
   const transition = getCameraTransition(current.status, action);
   if (!transition) return { kind: "not_found" };
@@ -1194,9 +1303,9 @@ export async function moderateCorrection(
   if (reviewer && !roleAllowsAction(reviewer.role, action)) return { kind: "forbidden" };
 
   const current = await d1
-    .prepare("SELECT status, camera_id AS cameraId FROM correction_requests WHERE id = ?")
+    .prepare("SELECT status, camera_id AS cameraId, contributor_id AS contributorId FROM correction_requests WHERE id = ?")
     .bind(id)
-    .first<{ status: string; cameraId: number | null }>();
+    .first<{ status: string; cameraId: number | null; contributorId: number | null }>();
   if (!current) return { kind: "not_found" };
 
   // The route validates cameraId as a positive integer, but existence must
@@ -1270,6 +1379,19 @@ export async function moderateCorrection(
     const event = results[1].results?.[0] as ModerationEvent;
     const updatedQueue = (results[2].results?.[0] as ModerationQueueItem | undefined) ?? queue;
     return { kind: "ok", item: (await loadCorrection(d1, id))!, event, queue: updatedQueue };
+  }
+
+  // Self-moderation: neither the reporter nor the owner of the targeted
+  // record may decide the request (or link it to their own record).
+  if (reviewer) {
+    const targetCameraId = cameraId !== undefined ? cameraId : current.cameraId;
+    const targetOwner = targetCameraId !== null
+      ? (await d1
+          .prepare("SELECT contributor_id AS contributorId FROM cameras WHERE id = ?")
+          .bind(targetCameraId)
+          .first<{ contributorId: number | null }>())?.contributorId ?? null
+      : null;
+    if (await isSelfReview(d1, reviewer, [current.contributorId, targetOwner])) return { kind: "self_review" };
   }
 
   const transition = getCorrectionTransition(action);
@@ -1493,6 +1615,17 @@ export async function moderateCameraEdit(
     return { kind: "recused", item: (await loadEditRequestItem(d1, id))!, event, queue };
   }
 
+  // Self-moderation: neither the requester nor the record owner may decide.
+  if (reviewer) {
+    const cameraOwner = current.cameraId !== null
+      ? (await d1
+          .prepare("SELECT contributor_id AS contributorId FROM cameras WHERE id = ?")
+          .bind(current.cameraId)
+          .first<{ contributorId: number | null }>())?.contributorId ?? null
+      : null;
+    if (await isSelfReview(d1, reviewer, [current.contributorId, cameraOwner])) return { kind: "self_review" };
+  }
+
   // Idempotence: a terminal request re-decided the same way answers ok with
   // the original event — no double apply, no duplicate audit row. A terminal
   // request decided the OTHER way is an invalid transition.
@@ -1560,11 +1693,35 @@ export async function moderateCameraEdit(
   const newStatus = action === "approve" ? "approved" : "rejected";
   const eventAction = action === "approve" ? "edit_applied" : "edit_rejected";
 
-  // ONE batch: [approve only] camera COALESCE diff, the request UPDATE, the
-  // guarded decision event (guarded on the request's new terminal status, so
-  // it only lands when the UPDATE actually decided the request), then queue
-  // close + readback. Everything commits atomically.
+  // ONE batch, in this order (race guard, audit finding): the request UPDATE
+  // FIRST — `WHERE status = 'pending'` and, on approve, only while the target
+  // camera is still in an editable published status — then [approve only]
+  // the camera COALESCE diff, guarded on the request now being approved BY
+  // THIS decision (decided_by + decided_at) and the camera still editable,
+  // then the decision event under the same guard, then queue close +
+  // readback. A concurrent reject/approve or a removal that lands between
+  // the pre-reads above and this batch makes the request UPDATE a no-op, so
+  // the diff is never applied and no event is recorded (→ not_found).
+  // Everything commits atomically.
   const statements: D1PreparedStatement[] = [];
+  const editableStatusList = [...PUBLISHED_EDITABLE_CAMERA_STATUSES].map((status) => `'${status}'`).join(", ");
+  const decidedBy = reviewer?.id ?? null;
+  const decisionGuard = {
+    sql: "AND decided_by IS ? AND decided_at = ?",
+    binds: [decidedBy, nowIso],
+  };
+
+  statements.push(
+    d1
+      .prepare(
+        `UPDATE camera_edit_requests SET status = ?, decided_by = ?, decision_note = ?, decided_at = ?, updated_at = ? WHERE id = ? AND status = 'pending'${
+          action === "approve"
+            ? ` AND EXISTS (SELECT 1 FROM cameras c WHERE c.id = camera_edit_requests.camera_id AND c.status IN (${editableStatusList}))`
+            : ""
+        }`,
+      )
+      .bind(newStatus, decidedBy, note, nowIso, nowIso, id),
+  );
 
   if (action === "approve") {
     // The target must still be published-editable at decision time: a camera
@@ -1605,22 +1762,15 @@ export async function moderateCameraEdit(
              latitude = COALESCE((SELECT proposed_latitude FROM camera_edit_requests WHERE id = ?), latitude),
              longitude = COALESCE((SELECT proposed_longitude FROM camera_edit_requests WHERE id = ?), longitude),
              updated = ?
-           WHERE id = ?`,
+           WHERE id = ? AND status IN (${editableStatusList})
+             AND EXISTS (SELECT 1 FROM camera_edit_requests WHERE id = ? AND camera_id = cameras.id AND status = 'approved' AND decided_by IS ? AND decided_at = ?)`,
         )
         // title_sort_key (migration 0047) is derived in JS from the
         // request's proposed title (read above; immutable once submitted) —
         // NULL keeps the stored key, exactly like the COALESCE on title.
-        .bind(id, current.proposedTitle !== null ? titleSortKey(current.proposedTitle) : null, id, id, id, id, id, id, id, id, id, id, nowIso, current.cameraId),
+        .bind(id, current.proposedTitle !== null ? titleSortKey(current.proposedTitle) : null, id, id, id, id, id, id, id, id, id, id, nowIso, current.cameraId, id, decidedBy, nowIso),
     );
   }
-
-  statements.push(
-    d1
-      .prepare(
-        "UPDATE camera_edit_requests SET status = ?, decided_by = ?, decision_note = ?, decided_at = ?, updated_at = ? WHERE id = ? AND status = 'pending'",
-      )
-      .bind(newStatus, reviewer?.id ?? null, note, nowIso, nowIso, id),
-  );
 
   const eventIndex = statements.length;
   statements.push(
@@ -1642,6 +1792,7 @@ export async function moderateCameraEdit(
       "camera_edit_requests",
       id,
       newStatus,
+      decisionGuard,
     ),
   );
 
@@ -1656,7 +1807,10 @@ export async function moderateCameraEdit(
   }
 
   const results = (await d1.batch(statements)) as D1BatchResult[];
-  const event = results[eventIndex].results?.[0] as ModerationEvent;
+  const event = results[eventIndex].results?.[0] as ModerationEvent | undefined;
+  // No event = the guarded request UPDATE matched nothing: a concurrent
+  // decision or a camera status change won the race. Nothing was applied.
+  if (!event) return { kind: "not_found" };
   if (context) {
     updatedQueue = (results[results.length - 1].results?.[0] as ModerationQueueItem | undefined) ?? queue;
   }
@@ -1936,7 +2090,11 @@ export async function listPublicCameraRevisions(cameraId: number): Promise<Publi
   const d1 = await getModerationD1();
   const result = await d1
     .prepare(
-      "SELECT id, entity_id AS entityId, previous_status AS previousStatus, new_status AS newStatus, action, created_at AS createdAt FROM moderation_events WHERE entity = 'camera' AND entity_id = ? ORDER BY created_at ASC, id ASC",
+      // recused = 0 and a real status change: recusals and first-review
+      // intents reuse lifecycle action names (approve/reject/hide…) with
+      // previous_status = new_status and must never surface publicly. The
+      // `corrected` outcome is the one public revision that keeps its status.
+      "SELECT id, entity_id AS entityId, previous_status AS previousStatus, new_status AS newStatus, action, created_at AS createdAt FROM moderation_events WHERE entity = 'camera' AND entity_id = ? AND recused = 0 AND (previous_status != new_status OR action = 'corrected') ORDER BY created_at ASC, id ASC",
     )
     .bind(cameraId)
     .all<PublicCameraRevision>();

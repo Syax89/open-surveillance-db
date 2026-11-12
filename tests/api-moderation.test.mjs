@@ -436,6 +436,7 @@ test("PATCH maps role/state violations to their documented statuses", async (t) 
     { name: "unknown reviewer", kind: "actor_not_found", status: 404 },
     { name: "second reviewer must differ", kind: "second_review_same_reviewer", status: 409 },
     { name: "escalation needs a note", kind: "escalation_requires_note", status: 400 },
+    { name: "self-moderation refused", kind: "self_review", status: 403 },
   ];
   for (const { name, kind, status } of cases) {
     await t.test(name, async () => {
@@ -447,6 +448,7 @@ test("PATCH maps role/state violations to their documented statuses", async (t) 
         }),
       );
       assert.equal(response.status, status, name);
+      if (kind === "self_review") assert.equal((await responseBody(response)).code, "self_review");
     });
   }
 });

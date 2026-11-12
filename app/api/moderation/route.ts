@@ -132,6 +132,10 @@ function parseModerationRequest(value: unknown): ParsedModerationRequest {
 
   const parsedReasonCode = reasonCode as ModerationReasonCode;
   const parsedNote = typeof note === "string" && note.trim() ? note.trim() : null;
+  // `sensitivity` / `requiresSecondReview` are an UPGRADE request only: the
+  // db layer derives the two-person-review floor from the item itself
+  // (db/moderation.ts deriveQueueSensitivity) and never lets the deciding
+  // moderator lower it.
   const context = {
     actorId,
     ...(value.sensitivity !== undefined ? { sensitivity: value.sensitivity as QueueSensitivity } : {}),
@@ -282,6 +286,14 @@ function moderationResponse(
       return Response.json(
         { error: "Escalation requires a note explaining the reason." },
         { status: 400 },
+      );
+    case "self_review":
+      return Response.json(
+        {
+          error: "You cannot decide an item you submitted or a record you own. Recuse or escalate instead.",
+          code: "self_review",
+        },
+        { status: 403 },
       );
   }
 }
