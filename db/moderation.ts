@@ -485,8 +485,11 @@ function communityReviewOpenSql(idExpr: string): string {
       AND ce.id > ${lastModeratorVerdictSql("ce.entity_id")})`;
 }
 
-/** Review tab: lifecycle reviews plus community flags awaiting a moderator. */
-const REVIEW_QUEUE_PREDICATE = `(status = 'needs_review' OR (status IN ('active', 'hidden') AND ${communityReviewOpenSql("cameras.id")}))`;
+/**
+ * Review tab, second half: records a community flag put in front of a
+ * moderator. OR-ed with the bound `status = 'needs_review'` lifecycle review.
+ */
+const COMMUNITY_REVIEW_PREDICATE = `(status IN ('active', 'hidden') AND ${communityReviewOpenSql("cameras.id")})`;
 
 async function isInCommunityReview(d1: ModerationD1, cameraId: number): Promise<boolean> {
   const row = await d1
@@ -838,9 +841,9 @@ export async function listPendingModerationItems(
           // Review tab: lifecycle reviews (needs_review) AND every record a
           // community flag put in moderator review (privacy hides, queued
           // privacy flags of penalised accounts, flags on cleared records).
-          `SELECT ${cameraColumns} FROM cameras WHERE ${REVIEW_QUEUE_PREDICATE}${reviewAfter.sql} ORDER BY created_at ASC, id ASC LIMIT ?`,
+          `SELECT ${cameraColumns} FROM cameras WHERE (status = ? OR ${COMMUNITY_REVIEW_PREDICATE})${reviewAfter.sql} ORDER BY created_at ASC, id ASC LIMIT ?`,
         )
-        .bind(...reviewAfter.params, probe)
+        .bind("needs_review", ...reviewAfter.params, probe)
         .all<CameraRecord>(),
       d1
         .prepare(
@@ -896,7 +899,7 @@ export async function listPendingModerationItems(
           `SELECT
              (SELECT COUNT(*) FROM cameras WHERE status = 'pending') AS pending,
              (SELECT COUNT(*) FROM cameras WHERE status = 'active') AS published,
-             (SELECT COUNT(*) FROM cameras WHERE ${REVIEW_QUEUE_PREDICATE}) AS review,
+             (SELECT COUNT(*) FROM cameras WHERE status = 'needs_review' OR ${COMMUNITY_REVIEW_PREDICATE}) AS review,
              (SELECT COUNT(*) FROM cameras WHERE status = 'stale') AS stale,
              (SELECT COUNT(*) FROM correction_requests WHERE status = 'pending') AS corrections,
              (SELECT COUNT(*) FROM camera_edit_requests WHERE status = 'pending') AS edits`,
