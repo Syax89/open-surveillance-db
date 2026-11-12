@@ -24,7 +24,7 @@ export const itLegal: LegalContent = {
     intro:
       "Come OpenSurveillanceDB tratta i dati personali, cosa pubblichiamo, cosa non raccogliamo mai e come puoi esercitare i tuoi diritti ai sensi del GDPR.",
     versionNote:
-      "Versione 0.8 — 9 agosto 2026. Allineamento da audit legale: risincronizzata con la PRIVACY_NOTICE canonica v0.14 (docs/legal/PRIVACY_NOTICE.md resta la versione canonica). § 5 aggiunge il processore di geocoding Nominatim (PR6); § 7 documenta le regole di cancellazione definitiva delle segnalazioni legacy `pending`/`rejected` (R19/R20); § 10 sezione Cookie; riferimenti ai processori OIDC corretti a PR4/PR5; nota sulle categorie particolari riformulata per il modello solo-testo (rimozione dell'evidenza fotografica).",
+      "Versione 0.9 — 12 novembre 2026. § 10 Cookie riscritto per elencare tutti i cookie in uso (lingua, tema dei colori, sessione di accesso e protezione CSRF), tutti strettamente necessari: resta senza banner di consenso; risincronizzata con la PRIVACY_NOTICE canonica v0.16 (docs/legal/PRIVACY_NOTICE.md resta la versione canonica).",
     sections: [
       {
         heading: "1. Chi siamo (titolare del trattamento)",
@@ -248,31 +248,34 @@ export const itLegal: LegalContent = {
         blocks: [
           {
             type: "paragraph",
-            text: "OpenSurveillanceDB utilizza un solo cookie funzionale:",
+            text: "OpenSurveillanceDB usa solo i cookie elencati qui sotto. Sono tutti strettamente necessari o funzionali: non contengono identificativi di tracciamento, non vengono mai condivisi con terze parti e non servono a statistiche, pubblicità o profilazione. Per questo non ti mostriamo alcun banner di consenso.",
           },
           {
-            type: "paragraph",
-            text: "**opensurveillancedb-locale** — ricorda la lingua che hai scelto su questo dispositivo/browser (italiano o inglese). Viene impostato **solo quando cambi lingua**; non viene mai utilizzato per tracciarti.",
+            type: "table",
+            caption: "Cookie impostati da OpenSurveillanceDB",
+            headers: ["Cookie", "Finalità", "Quando viene impostato", "Durata", "Proprietà"],
+            rows: [
+              ["**opensurveillancedb-locale**", "Ricorda la lingua dell'interfaccia (en, it, fr, de, es o pt). Viene letto anche quando chiedi un'email di verifica o di reimpostazione della password, così il messaggio ti arriva in inglese e nella tua lingua.", "Quando scegli una lingua dal menu delle lingue o apri un link di lingua (/api/locale)", "1 anno", "SameSite=Lax, path=/"],
+              ["**opensurveillancedb-theme**", "Ricorda il tema chiaro o scuro che hai scelto (light / dark). Senza questo cookie il sito segue l'impostazione del tuo sistema.", "Quando usi il selettore del tema", "1 anno", "SameSite=Lax, path=/"],
+              ["**osdb_session**", "Ti mantiene connesso: contiene un token di sessione casuale (sui nostri server ne conserviamo solo l'hash).", "Quando accedi o crei un account; viene cancellato quando esci", "Durata dell'accesso (30 giorni per impostazione predefinita) o finché non esci", "HttpOnly, Secure, SameSite=Strict, path=/"],
+              ["**osdb_csrf**", "Protegge le azioni che compi da connesso contro le richieste contraffatte da altri siti (CSRF): contiene un token casuale legato alla sessione, che la pagina rimanda a ogni modifica.", "Insieme a osdb_session; viene cancellato quando esci", "Come osdb_session", "Secure, SameSite=Strict, path=/; leggibile dagli script del sito per scelta progettuale"],
+            ],
           },
           {
             type: "list",
             items: [
-              "**Tipo:** funzionale — strettamente necessario a fornire la preferenza di lingua che hai esplicitamente richiesto",
-              "**Finalità:** memorizzare la lingua dell'interfaccia",
-              "**Durata:** 1 anno (`max-age=31536000`)",
-              "**Contenuto:** nessun tuo dato — solo il codice lingua (`it` / `en`)",
-              "**Proprietà:** `SameSite=Lax`, `path=/`, non leggibile cross-site (nessuna superficie di tracciamento o sessione)",
+              "**Contenuto:** nessuno di questi cookie contiene il tuo nome, il tuo indirizzo email o altri dati personali; i due cookie di accesso contengono token casuali, privi di significato al di fuori di questo sito.",
               "**Base giuridica:** art. 122 D.Lgs. 196/2003 (recepimento dell'art. 5(3) della Direttiva 2002/58/CE, come modificata dalla 2009/136/CE) — il consenso **non** è richiesto per i cookie strettamente necessari a fornire un servizio esplicitamente richiesto dall'utente; nessun banner di consenso è pertanto mostrato.",
-              "**Gestione:** puoi eliminarlo in qualsiasi momento dalle impostazioni del browser; senza di esso l'interfaccia torna alla lingua predefinita (inglese) su questo dispositivo.",
+              "**Gestione:** puoi eliminarli in qualsiasi momento dalle impostazioni del browser. Senza il cookie della lingua l'interfaccia usa la lingua predefinita (inglese); senza quello del tema segue l'impostazione del tuo sistema; se elimini i cookie di accesso vieni disconnesso.",
             ],
           },
           {
             type: "paragraph",
-            text: "La stessa preferenza è replicata nel `localStorage` del browser per la sincronizzazione tra schede. Il `localStorage` è una tecnologia di archiviazione del browser, non un cookie, e non viene mai trasmesso ai nostri server.",
+            text: "La preferenza di lingua è replicata anche nel `localStorage` del browser per la sincronizzazione tra schede. Il `localStorage` è una tecnologia di archiviazione del browser, non un cookie, e non viene mai trasmesso ai nostri server.",
           },
           {
             type: "note",
-            text: "**Impegno:** se il redesign o una futura funzionalità introducesse cookie non strettamente necessari (analytics, pubblicità, profilazione), richiederemo il tuo consenso esplicito tramite banner **prima** di installarli, ai sensi dell'art. 122 D.Lgs. 196/2003.",
+            text: "**Impegno:** se una futura funzionalità introducesse cookie non strettamente necessari (analytics, pubblicità, profilazione), richiederemo il tuo consenso esplicito tramite banner **prima** di installarli, ai sensi dell'art. 122 D.Lgs. 196/2003.",
           },
         ],
       },
