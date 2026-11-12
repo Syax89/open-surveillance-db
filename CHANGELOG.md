@@ -395,6 +395,14 @@ changes accumulate under `[Unreleased]`.
 
 ### Changed
 
+- **Consistency pass on content pages (2026-11):** every content section
+  heading (FAQ "Still have questions?", contacts, guide publication model,
+  rules) uses the same bold display style — some rendered at weight 400 or
+  as 16px body text — and the copy under a section heading no longer touches
+  it. On phones the 270px card min-height (a desktop row-alignment aid) and
+  the empty grid rows are dropped, so manifesto/rules/guide cards fit their
+  content.
+
 - **One page width + mobile menu redesign (2026-11, owner request):** every
   page now aligns with the header, hero, map and directory
   (`--container-standard` and `--container-readable` resolve to

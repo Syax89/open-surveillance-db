@@ -402,7 +402,11 @@ button { cursor:pointer; }
 .map-section, .principles, .report-section, footer { width:var(--container-standard); margin-left:auto; margin-right:auto; }
 .map-section { padding:112px 0 102px; }
 .section-heading { display:flex; align-items:end; justify-content:space-between; margin-bottom:30px; gap:var(--space-6); }
-.section-heading h2, .principles h2, .report-section h2, .founder-declaration h2 { margin:0; font-size:var(--text-section); letter-spacing:-.065em; line-height:1; font-weight:800; }
+.section-heading h2, .principles h2, .report-section h2, .founder-declaration h2, .correction-section h2, .guide-publication-details h2, .faq-resources h2 { margin:0; font-size:var(--text-section); letter-spacing:-.065em; line-height:1; font-weight:800; }
+/* Section headings (consistency pass 2026-11): every content section uses the
+   same bold display heading (some rendered at 400 or as 16px body text), and
+   the copy under it no longer touches its descenders. */
+:is(.principles, .report-section, .founder-declaration, .correction-section, .guide-publication-details, .faq-resources) h2 { margin-bottom:16px; text-wrap:balance; }
 .section-note { margin:0; padding:7px 10px; border:1px solid var(--note-border); color:var(--eyebrow); border-radius:var(--radius-full); font-size:var(--text-sm); white-space:normal; }
 .prototype-banner { margin:-10px 0 18px; padding:12px 15px; border:1px solid var(--notice-outline); border-left:3px solid var(--notice-border); border-radius:var(--radius-sm); background:var(--notice-bg); color:var(--notice-copy); font-size:var(--text-md); line-height:1.45; }
 .live-map-workspace { display:grid; grid-template-columns:1fr 280px; min-height:540px; border:1px solid var(--line); border-radius:var(--radius-xl); overflow:hidden; background:var(--map-surface); box-shadow:0 20px 45px rgba(25,46,52,.08); }
@@ -1001,6 +1005,9 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
   .nav-shell:has(.menu-button) .nav-links .auth-nav-links a.nav-action { border-color:var(--heading); background:var(--heading); color:var(--white); }
 }
 @media (max-width:700px) {
+  /* One column on phones: the 270px min-height that aligns desktop card rows
+     only left large empty boxes (manifesto, rules, guide). */
+  .record-list-card { min-height:0; grid-template-rows:none; padding:24px }
   .hero, .map-section, .records-section, .principles, .guide-overview, .report-section, .correction-section, .moderation-page, footer, .tool-section, .tool-cards, .founder-declaration { width:min(100% - 32px,1180px) }
   .tool-section { padding:40px 0 72px }
   /* Matrioska fix (CEO 2026-08-12, /segnala mobile): the tool forms lost
@@ -1635,7 +1642,7 @@ footer>p { margin:0; color:var(--footer-ink); font-size:var(--text-md); line-hei
 .faq-item p { margin:0; padding:0 22px 22px 60px; color:var(--ink-4); font-size:var(--text-base); line-height:1.55; }
 .faq-resources { width:var(--container-readable); margin:0 auto 100px; padding:42px 0 0; border-top:1px solid var(--line); }
 .faq-resources-heading { max-width:600px; }
-.faq-resources h2 { margin:0; color:var(--ink); font-size:var(--text-section); letter-spacing:-.055em; line-height:1.05; text-wrap:balance; }
+.faq-resources h2 { margin:0 0 16px; color:var(--ink); font-size:var(--text-section); letter-spacing:-.055em; line-height:1.05; text-wrap:balance; }
 .faq-resources-heading>p:not(.eyebrow) { color:var(--ink-4); font-size:var(--text-lg); line-height:1.55; }
 .faq-resource-links { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:24px; }
 .faq-resource-links a { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:52px; padding:12px 15px; border:1px solid var(--line); border-radius:var(--radius-md); background:var(--card-bg); color:var(--nav-ink); font-size:var(--text-sm); font-weight:800; line-height:1.3; text-decoration:none; }
