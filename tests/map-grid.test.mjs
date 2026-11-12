@@ -27,6 +27,7 @@ after(async () => cleanupRouteTree());
 
 const {
   GRID_CELL_PX,
+  GRID_BADGE_HALF_PX,
   GRID_MAX_ZOOM,
   MAX_INDIVIDUAL_MARKERS,
   webMercatorProject,
@@ -129,17 +130,35 @@ test("aggregateToGrid: nearby records share a cell, distant records do not", () 
 });
 
 test("aggregateToGrid: centroid is the member-average (projected, then unprojected)", () => {
-  // Two records ~15 m apart (clearly inside one 48px cell at z12 — the
-  // previous fixture straddled a cell boundary and split into two cells,
-  // which is correct grid behaviour, just a bad fixture).
+  // Two records ~15 m apart around the CENTRE of one cell at z12, so the
+  // badge clamp (GRID_BADGE_HALF_PX inside the cell) does not move them.
+  const z = 12;
+  const centre = webMercatorUnproject(1100.5 * GRID_CELL_PX, 760.5 * GRID_CELL_PX, z);
   const records = [
-    { id: 1, latitude: 41.9004, longitude: 12.4936 },
-    { id: 2, latitude: 41.9005, longitude: 12.4937 },
+    { id: 1, latitude: centre.latitude - 0.00005, longitude: centre.longitude - 0.00005 },
+    { id: 2, latitude: centre.latitude + 0.00005, longitude: centre.longitude + 0.00005 },
   ];
-  const cells = aggregateToGrid(records, 12);
+  const cells = aggregateToGrid(records, z);
   assert.equal(cells.length, 1);
-  assert.ok(Math.abs(cells[0].centroidLat - (41.9004 + 41.9005) / 2) < 1e-4);
-  assert.ok(Math.abs(cells[0].centroidLng - (12.4936 + 12.4937) / 2) < 1e-4);
+  assert.ok(Math.abs(cells[0].centroidLat - centre.latitude) < 1e-4);
+  assert.ok(Math.abs(cells[0].centroidLng - centre.longitude) < 1e-4);
+});
+
+test("aggregateToGrid: badges of neighbouring cells never overlap (clamped >= 2 x GRID_BADGE_HALF_PX apart)", () => {
+  // Two tight clusters on either side of a shared cell edge: their raw
+  // centroids are ~2px apart, so unclamped 44px badges sat on top of each other.
+  const z = 13;
+  const edgeX = 2200 * GRID_CELL_PX;
+  const y = 1520.5 * GRID_CELL_PX;
+  const at = (px) => { const p = webMercatorUnproject(px, y, z); return { latitude: p.latitude, longitude: p.longitude }; };
+  const records = [
+    { id: 1, ...at(edgeX - 1.2) }, { id: 2, ...at(edgeX - 0.8) },
+    { id: 3, ...at(edgeX + 0.8) }, { id: 4, ...at(edgeX + 1.2) },
+  ];
+  const cells = aggregateToGrid(records, z);
+  assert.equal(cells.length, 2, "the edge splits them into two cells");
+  const [a, b] = cells.map((cell) => webMercatorProject(cell.centroidLat, cell.centroidLng, z));
+  assert.ok(Math.abs(a.x - b.x) >= 2 * GRID_BADGE_HALF_PX - 1e-6, `badge centres ${Math.abs(a.x - b.x)}px apart`);
 });
 
 test("aggregateToGrid: finer cells at higher zoom (same records, more cells)", () => {
@@ -273,8 +292,9 @@ test("markersForViewport: culling respects the viewport (records outside bounds 
 // Constants (documented thresholds — keep the component/tests in lockstep)
 // ---------------------------------------------------------------------------
 
-test("grid constants: 48px cells, individual from street-level zoom (z12) or under 150 visible", () => {
-  assert.equal(GRID_CELL_PX, 48, "one badge per 48px screen box");
-  assert.equal(GRID_MAX_ZOOM, 12, "street-level zoom renders individuals");
+test("grid constants: 64px cells, individual from street-level zoom (z14) or under 150 visible", () => {
+  assert.equal(GRID_CELL_PX, 64, "one badge per 64px screen box");
+  assert.equal(GRID_BADGE_HALF_PX, 22, "badges stay half their 44px hit box inside the cell");
+  assert.equal(GRID_MAX_ZOOM, 14, "street-level zoom renders individuals");
   assert.equal(MAX_INDIVIDUAL_MARKERS, 150, "cheap views skip aggregation");
 });

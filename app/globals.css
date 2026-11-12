@@ -682,6 +682,13 @@ button { cursor:pointer; }
 .report-locate-row .address-search input { width:100%; min-height:44px; box-sizing:border-box; padding:9px 11px; border:1px solid var(--map-input-border); border-radius:var(--radius-md); background:var(--white); color:var(--ink-5); font-size:var(--text-md); }
 .report-locate-row .address-search .geocode-dropdown { left:0; right:0; }
 .report-locate-row .report-geolocate-button { white-space:nowrap; padding:0 16px; font-size:var(--text-sm); justify-self:auto; }
+/* Place search with an explicit Search button (privacy 2026-11: nothing is
+   sent while typing). Field and button share a row; the label, caption,
+   sr-only help and the dropdown span the full width. */
+.address-search, .map-list-search { display:grid; grid-template-columns:minmax(0,1fr) auto; column-gap:8px; align-items:center; }
+.address-search > *, .map-list-search > * { grid-column:1 / -1; }
+.address-search > input, .map-list-search > input { grid-column:1; }
+.address-search > .place-search-button, .map-list-search > .place-search-button { grid-column:2; min-height:44px; padding:0 16px; font-size:var(--text-sm); white-space:nowrap; }
 .coordinate-readout { margin-top:18px; padding:13px 15px; border-radius:var(--radius-md); background:var(--coordinate-bg); color:var(--coordinate-ink); font-size:var(--text-sm); line-height:1.5; }
 .coordinate-readout b { color:var(--coordinate-strong); }
 .coordinate-entry { display:grid; gap:var(--space-3); margin:0; padding:var(--space-4); border:1px solid var(--coordinate-border); border-radius:var(--radius-md); background:var(--coordinate-entry-bg); }

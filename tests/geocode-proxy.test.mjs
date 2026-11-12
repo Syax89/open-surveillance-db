@@ -147,7 +147,7 @@ test("rejects malformed limit, countrycodes and lang with 400", async () => {
 // Upstream forwarding (identification, Referer, query passthrough)
 // ---------------------------------------------------------------------------
 
-test("forwards to the canonical Nominatim endpoint with an identifying User-Agent and the client Referer", async () => {
+test("forwards to the canonical Nominatim endpoint with an identifying User-Agent and the client Referer origin", async () => {
   let captured;
   stubFetch(async (url, init) => {
     captured = { url, init };
@@ -169,8 +169,9 @@ test("forwards to the canonical Nominatim endpoint with an identifying User-Agen
   assert.match(captured.init.headers.get("User-Agent"), /OpenSurveillanceDB\/0\.1/);
   assert.match(captured.init.headers.get("User-Agent"), /privacy@opensurveillancedb\.org/);
   assert.equal(captured.init.headers.get("Accept"), "application/json");
-  // Proxy policy §3.4: the Referer is forwarded verbatim, never stripped.
-  assert.equal(captured.init.headers.get("Referer"), "https://osdb.test/mappa");
+  // Proxy policy §3.4: never stripped — reduced to the origin (privacy
+  // 2026-11: the page the visitor was on is not passed to the geocoder).
+  assert.equal(captured.init.headers.get("Referer"), "https://osdb.test/");
 });
 
 test("omits the Referer header upstream when the client request has none", async () => {

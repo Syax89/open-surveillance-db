@@ -168,11 +168,14 @@ test("mobile map chrome is compacted while the search caption stays visible", as
   assert.ok(Number(declaration(filters, "padding").split(" ")[0].replace("px", "")) <= 10, "the filters padding is tightened");
 
   // The dual-purpose caveat (typed filter cleared when a place is picked)
-  // must stay visible: no rule may hide it to buy vertical space.
+  // is never removed from the DOM or the accessibility tree (no display:none);
+  // on phones it is visually tucked away at rest and shown while the field is
+  // in use (owner 2026-11: compact map chrome, search kept).
   const hint = ruleBlocks(mobile, ".map-explorer-search .map-list-search .map-list-search-hint")[0]
     ?? ruleBlocks(css, ".map-explorer-search .map-list-search .map-list-search-hint")[0];
   assert.ok(hint, "the search caption keeps its own rule");
-  assert.doesNotMatch(css, /\.map-list-search-hint[^{]*\{[^}]*display\s*:\s*none/, "the search caption must never be hidden");
+  assert.doesNotMatch(css, /\.map-list-search-hint[^{]*\{[^}]*display\s*:\s*none/, "the search caption is never display:none");
+  assert.match(css, /\.map-list-search:not\(:focus-within\) \.map-list-search-hint \{[^}]*clip:rect\(0 0 0 0\)/, "on phones it shows while the field is in use");
 
   // No touch target is shrunk to buy space: the 44px floors stay declared.
   assert.match(css, /\.map-panel \.leaflet-control-zoom a \{[^}]*width:44px;[^}]*height:44px/, "map zoom targets stay 44px");

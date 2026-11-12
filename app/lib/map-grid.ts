@@ -32,10 +32,26 @@
 
 import { longitudeInCopy, recordsInBounds, type ViewportBounds } from "./map-viewport";
 
-/** Screen-pixel size of one aggregation cell (Web Mercator world px). */
-export const GRID_CELL_PX = 48;
-/** Zoom at or above which markers are ALWAYS individual (street level). */
-export const GRID_MAX_ZOOM = 12;
+/**
+ * Screen-pixel size of one aggregation cell (Web Mercator world px).
+ * 64 (design review 2026-11, was 48): fewer, more legible badges; together
+ * with the badge clamp below, two badges can never overlap.
+ */
+export const GRID_CELL_PX = 64;
+/**
+ * Half of the badge's 44px hit box. A badge is drawn at its members'
+ * centroid, clamped this far inside its own cell, so badges of neighbouring
+ * cells are always >= 44px apart (they used to overlap when two centroids
+ * sat on either side of a shared cell edge).
+ */
+export const GRID_BADGE_HALF_PX = 22;
+/**
+ * Zoom at or above which markers are ALWAYS individual (street level).
+ * 14 (design review 2026-11, was 12): a dense city centre at z12-13 drew
+ * hundreds of overlapping dots. Those zooms now aggregate too — only above
+ * MAX_INDIVIDUAL_MARKERS visible records, so ordinary views stay individual.
+ */
+export const GRID_MAX_ZOOM = 14;
 /** Visible-record count at or below which markers are individual even at low zoom. */
 export const MAX_INDIVIDUAL_MARKERS = 150;
 
@@ -88,10 +104,11 @@ export function shouldUseGrid(visibleCount: number, zoom: number): boolean {
 /**
  * Bucket records into screen-pixel cells at the given zoom. Cells are keyed
  * by (floor(worldPx.x / cellPx), floor(worldPx.y / cellPx)) — a record in
- * the same 48px screen box as another lands in the same cell regardless of
+ * the same 64px screen box as another lands in the same cell regardless of
  * its exact position, which is exactly the "native pixel grid" the CEO
  * asked for. Returns only NON-EMPTY cells, each with count + member ids and
- * the member-averaged centroid (projected average, then unprojected — more
+ * the member-averaged centroid, clamped GRID_BADGE_HALF_PX inside the cell
+ * (projected average, then unprojected — more
  * stable than averaging raw lat/lng across the antimeridian for our data).
  */
 export function aggregateToGrid<T extends { id: number; latitude: number; longitude: number }>(
@@ -121,8 +138,12 @@ export function aggregateToGrid<T extends { id: number; latitude: number; longit
     cell.sumY += y;
     cell.ids.push(record.id);
   }
+  const margin = Math.min(GRID_BADGE_HALF_PX, cellPx / 2);
+  const clamp = (value: number, start: number) => Math.min(Math.max(value, start + margin), start + cellPx - margin);
   return [...cells.values()].map((cell) => {
-    const { latitude, longitude } = webMercatorUnproject(cell.sumX / cell.count, cell.sumY / cell.count, zoom);
+    const px = clamp(cell.sumX / cell.count, cell.x * cellPx);
+    const py = clamp(cell.sumY / cell.count, cell.y * cellPx);
+    const { latitude, longitude } = webMercatorUnproject(px, py, zoom);
     return {
       x: cell.x,
       y: cell.y,

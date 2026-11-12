@@ -59,9 +59,9 @@ async function leaves() {
 
 /** Select a suggestion from the dropdown by typing `query` and clicking option `index`. */
 async function pickOption(screen, user, query, index) {
-  const input = screen.getByRole("combobox", { name: /Filter points or find a place/ });
+  const input = screen.getByRole("combobox", { name: /Find a place/ });
   await user.clear(input);
-  await user.type(input, query);
+  await user.type(input, `${query}{Enter}`);
   const listbox = await rtl.waitFor(() => screen.getByRole("listbox", { name: "Place suggestions" }), { timeout: 5000 });
   rtl.within(listbox).getAllByRole("option")[index].click();
 }
@@ -72,8 +72,8 @@ async function pickOption(screen, user, query, index) {
  * tests so the render/flush ordering matches the probe.
  */
 async function pickAppend(screen, user, query, index = 0) {
-  const input = screen.getByRole("combobox", { name: /Filter points or find a place/ });
-  await user.type(input, query);
+  const input = screen.getByRole("combobox", { name: /Find a place/ });
+  await user.type(input, `${query}{Enter}`);
   const listbox = await rtl.waitFor(() => screen.getByRole("listbox", { name: "Place suggestions" }), { timeout: 5000 });
   await user.click(rtl.within(listbox).getAllByRole("option")[index]);
 }
@@ -92,8 +92,8 @@ test("B01: selecting a city suggestion frames the administrative AREA with fitBo
   await renderWithLocale(React.createElement(MappaTool));
   await expandMapPoints();
 
-  const input = screen.getByRole("combobox", { name: /Filter points or find a place/ });
-  await user.type(input, "Ferrara");
+  const input = screen.getByRole("combobox", { name: /Find a place/ });
+  await user.type(input, "Ferrara{Enter}");
   const listbox = await waitFor(() => screen.getByRole("listbox", { name: "Place suggestions" }), { timeout: 5000 });
 
   rtl.within(listbox).getAllByRole("option")[0].click();
@@ -118,8 +118,8 @@ test("B01: a point/address suggestion (small box) keeps the point + zoom fallbac
   await renderWithLocale(React.createElement(MappaTool));
   await expandMapPoints();
 
-  const input = screen.getByRole("combobox", { name: /Filter points or find a place/ });
-  await user.type(input, "Via");
+  const input = screen.getByRole("combobox", { name: /Find a place/ });
+  await user.type(input, "Via{Enter}");
   const listbox = await waitFor(() => screen.getByRole("listbox", { name: "Place suggestions" }), { timeout: 5000 });
 
   // The road entry is option 1 (the small box).

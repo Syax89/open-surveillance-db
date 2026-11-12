@@ -1,54 +1,17 @@
 /**
- * t_b1e192e1 / t_3c4b188e regression suite: the /api/geocode autocomplete
- * fetch MUST fire when the user types in the /mappa search — and the geocode
- * dropdown must stay VISIBLE and STABLE while the points list re-filters.
+ * Map place search — privacy contract (2026-11, replaces the t_b1e192e1 /
+ * t_3c4b188e debounce/remount suite: there is no as-you-type traffic left
+ * to protect from remounts).
  *
- * Deployed diagnosis (CEO, browser live): typing "ferrara" and stopping
- * started the search immediately; the place-suggestion dropdown never had
- * time to appear. 0 requests to /api/geocode in
- * performance.getEntriesByType('resource'), while the console logged the
- * RSC navigation error at every keystroke. Root cause chain:
- *
- *   1. typing commits ?q= via router.replace (applyFilters, ~250ms debounce);
- *   2. the replace THROWS on the deployed environment — ASYNCHRONOUSLY, from
- *      vinext's navigation controller, AFTER router.replace has returned —
- *      so #212's try/catch (which only sees synchronous throws) never caught
- *      it; vinext then forces `window.location.href = currentHref` (a full
- *      reload) which invalidates/remounts the tool tree;
- *   3. the remount closed the geocode dropdown right after it opened, and the
- *      old unmount cleanup cancelled the 300ms debounce timer BEFORE
- *      runGeocode could fetch → 0 network requests, forever.
- *
- * t_3c4b188e fixes the ROOT CAUSE instead of mitigating the symptom: the
- * keyboard ?q= commit in useCameraFilters#applyFilters NEVER calls
- * router.replace — it writes the URL with a PURE window.history.replaceState
- * (no RSC navigation → no digest error → no reload → no remount → the
- * dropdown stays open), and the geocode debounce (250ms) fires BEFORE the
- * ?q= commit debounce (400ms), so the suggestions appear first. The suite
- * keeps two defence layers that remain valuable:
- *
- *   LAYER 1 (use-camera-filters.ts applyFilters): the router path (explicit
- *   selects/reset) is hardened — a no-op guard skips router.replace when the
- *   target URL equals the current one (no churn), and a try/catch falls back
- *   to a SILENT window.history.replaceState when router.replace throws
- *   synchronously, so the tree is never invalidated by a failed navigation.
- *
- *   LAYER 2 (GeocodeSearch.tsx): the debounce timer + AbortController live
- *   at MODULE level (pendingGeocodeByInput), keyed by input id, with NO
- *   unmount cleanup — a remount from ANY other source during the 250ms
- *   window cannot cancel the pending query; the fetch fires regardless of
- *   the component lifecycle.
- *
- * Suite contracts:
- *   1. typing never calls router.replace (pure history.replaceState commit):
- *      the ?q= write cannot trigger the vinext RSC navigation error at all;
- *      the tree survives (same combobox node, draft kept) and the /api/
- *      geocode fetch fires.
- *   2. explicit remount before the 250ms debounce elapses: the fetch still
- *      fires (module-level timer survives unmount).
- *   3. applyFilters no-op guard: a filter write that would produce the
- *      CURRENT URL performs NO router.replace (zero churn); a genuinely
- *      different write still replaces once.
+ * The project sends as little as possible to third parties:
+ *   1. typing sends NOTHING (no /api/geocode request) and writes no URL;
+ *   2. Enter sends exactly ONE /api/geocode request (q, limit=5, lang);
+ *   3. pasted coordinates move the map with ZERO requests;
+ *   4. "#123" opens the record with ZERO requests;
+ *   5. a 429 starts the Retry-After cooldown: a new Enter sends nothing;
+ *   6. the visible caption states the promise and is wired to the input.
+ * The applyFilters no-op guard (URL churn) is kept: it still protects the
+ * filter selects.
  *
  * Fixtures are fictitious (illustrative records, example.test).
  */
@@ -115,233 +78,6 @@ afterEach(async () => {
   await resetLeafletMarkers();
 });
 
-// ---------------------------------------------------------------------------
-// LAYER 1 + end-to-end: the keyboard ?q= write is a pure history.replaceState
-// ---------------------------------------------------------------------------
-
-test("t_3c4b188e: typing never calls router.replace (pure history.replaceState commit) — the vinext RSC error cannot fire and the dropdown stays open", async () => {
-  // The deployed failure (CEO, browser live): every keystroke's ?q= commit
-  // called router.replace; vinext's navigation controller threw the RSC
-  // 'digest' error ASYNCHRONOUSLY (out of reach of #212's try/catch) and
-  // forced a full reload, remounting the tool and closing the geocode
-  // dropdown right after it opened. t_3c4b188e fixes the root cause: the
-  // keyboard ?q= commit NEVER calls router.replace — it writes the URL with
-  // a pure history.replaceState. Contract: zero router.replace attempts
-  // while typing (even under a hostile router), one history.replaceState
-  // commit carrying the typed q, the /api/geocode fetch fires, and the tree
-  // is alive (same combobox node, draft kept, dropdown open).
-  setNavState({ pathname: "/mappa", failReplace: true });
-  const { screen, waitFor } = rtl;
-  const user = rtl.userEvent.setup();
-  await renderWithLocale(React.createElement(MappaTool));
-  await expandMapPoints();
-
-  const historyReplaceCalls = [];
-  const originalReplaceState = window.history.replaceState.bind(window.history);
-  window.history.replaceState = (data, unused, url) => {
-    historyReplaceCalls.push(String(url));
-    originalReplaceState(data, unused, url);
-  };
-  try {
-    const input = screen.getByRole("combobox", { name: /Filter points or find a place/ });
-    await user.type(input, "Ferrara");
-
-    // The 250ms geocode debounce fires the fetch; the 400ms ?q= debounce
-    // then commits the URL through the pure-history path — both well inside
-    // the waitFor budget, so waiting for the commit proves the q write ran
-    // its course without tearing the tree down.
-    await waitFor(() => assert.ok(geocodeFetches >= 1, "the /api/geocode fetch must fire"), { timeout: 5000 });
-    await waitFor(() => assert.ok(historyReplaceCalls.length >= 1, "the ?q= commits via history.replaceState"), { timeout: 5000 });
-
-    const nav = await getNavState();
-    assert.equal(nav.replaced.length, 0, "router.replace was NEVER attempted for the keyboard ?q= write (failReplace is irrelevant)");
-    assert.ok(historyReplaceCalls.some((href) => href.includes("q=Ferrara")), "the committed URL carries the typed q");
-
-    // The tree is alive: the same combobox is still mounted, still holds
-    // the typed draft, and the dropdown is open with suggestions.
-    const inputAfter = screen.getByRole("combobox", { name: /Filter points or find a place/ });
-    assert.equal(inputAfter, input, "the combobox DOM node is the SAME node — the tree was not invalidated");
-    assert.equal(inputAfter.value, "Ferrara", "the typed draft survives");
-    assert.equal(inputAfter.getAttribute("aria-expanded"), "true", "the dropdown opened with suggestions");
-  } finally {
-    window.history.replaceState = originalReplaceState;
-  }
-});
-
-test("t_3c4b188e: failReplace + clear commits the URL via the pure-history path and fetches nothing for an empty query", async () => {
-  // After the ?q= write went through history.replaceState (never touching
-  // the router), clearing the search must behave the same: no exception, no
-  // remount, no geocode fetch for an empty string (the empty branch aborts
-  // instead of fetching).
-  setNavState({ pathname: "/mappa", failReplace: true });
-  const { screen, waitFor } = rtl;
-  const user = rtl.userEvent.setup();
-  await renderWithLocale(React.createElement(MappaTool));
-  await expandMapPoints();
-
-  const input = screen.getByRole("combobox", { name: /Filter points or find a place/ });
-  await user.type(input, "Ferrara");
-  await waitFor(() => assert.ok(geocodeFetches >= 1), { timeout: 5000 });
-
-  await user.clear(input);
-  // Give any stray timer a chance to misbehave (a buggy empty branch would
-  // fetch with q= or crash the tree).
-  await new Promise((resolve) => setTimeout(resolve, 400));
-  const nav = await getNavState();
-  assert.equal(geocodeFetches, 1, "clearing the search must NOT fire another geocode fetch (empty branch aborts)");
-  assert.ok(screen.getByRole("combobox", { name: /Filter points or find a place/ }), "the tree is still alive after clearing");
-  assert.equal(nav.replaced.length, 0, "router.replace never succeeded (failReplace) — the fallback path wrote the URL");
-});
-
-test("a geocode 429 announces Retry-After and suppresses new autocomplete traffic during the cooldown", async () => {
-  let calls = 0;
-  installFetchMock((input) => {
-    if (String(input).startsWith("/api/geocode")) {
-      calls += 1;
-      return new Response(JSON.stringify({ error: "Too many place searches" }), {
-        status: 429,
-        headers: { "Content-Type": "application/json", "Retry-After": "60" },
-      });
-    }
-    return jsonResponse(fakeCamerasPayload(POPUP_RECORDS));
-  });
-  const { screen, waitFor } = rtl;
-  const user = rtl.userEvent.setup();
-  await renderWithLocale(React.createElement(GeocodeSearch, {
-    search: "", onSearchChange: () => {}, onPlaceSelect: () => {},
-  }));
-
-  const input = screen.getByRole("combobox", { name: /Filter points or find a place/ });
-  await user.type(input, "Ferrara");
-  await waitFor(
-    () => assert.ok(screen.getByText(/Place search has reached its short request limit/)),
-    { timeout: 5_000 },
-  );
-  assert.equal(calls, 1, "the first completed autocomplete is the one that receives 429");
-
-  await user.type(input, "x");
-  await new Promise((resolve) => setTimeout(resolve, 350));
-  assert.equal(calls, 1, "typing during Retry-After still filters locally but must not make another upstream request");
-  assert.equal(input.value, "Ferrarax", "the local input remains editable during the cooldown");
-});
-
-// ---------------------------------------------------------------------------
-// LAYER 2: the debounce is immune to an explicit remount
-// ---------------------------------------------------------------------------
-
-test("t_3c4b188e: the geocode dropdown appears BEFORE the ?q= commit re-filters the list, and stays open after it (debounce ordering)", async () => {
-  // CEO's live feedback: "quando inizio a scrivere (es. ferrara) e mi fermo,
-  // parte subito la ricerca, non aspetto l'invio; non faccio in tempo a
-  // vedere il menu a discesa con gli indirizzi". Contract: the 250ms geocode
-  // debounce opens the dropdown with suggestions WHILE the points list is
-  // still unfiltered; the 400ms ?q= commit then re-filters the list
-  // UNDERNEATH the dropdown — no router.replace, so no remount, so the
-  // dropdown stays open and interactive. The records ("Illustrative record
-  // A/B") never match "Ferrara", so the ?q= commit empties the list — the
-  // strongest version of the reported symptom.
-  setNavState({ pathname: "/mappa" });
-  const { screen, waitFor } = rtl;
-  const user = rtl.userEvent.setup();
-  await renderWithLocale(React.createElement(MappaTool));
-  await expandMapPoints();
-
-  const input = screen.getByRole("combobox", { name: /Filter points or find a place/ });
-  await user.type(input, "Ferrara");
-
-  // Phase 1: the dropdown opens (250ms) while the list is STILL unfiltered
-  // — this compound wait only passes if both hold at the same time, i.e.
-  // the suggestions appear before the ?q= commit narrows the list.
-  await waitFor(() => {
-    assert.ok(screen.getByRole("listbox", { name: "Place suggestions" }), "the suggestion dropdown appears while typing");
-    assert.ok(screen.getByRole("button", { name: /Illustrative record A/ }), "the list is still unfiltered when the dropdown opens (no ?q= commit yet)");
-  }, { timeout: 5000 });
-
-  // Phase 2: the 400ms ?q= commit re-filters the list underneath — and the
-  // dropdown SURVIVES it (same instance, no remount).
-  await waitFor(() => assert.ok(screen.queryByRole("button", { name: /Illustrative record A/ }) === null), { timeout: 5000 });
-  assert.equal(input.getAttribute("aria-expanded"), "true", "the dropdown stays open after the ?q= commit (no remount)");
-  const listbox = screen.getByRole("listbox", { name: "Place suggestions" });
-  assert.ok(rtl.within(listbox).getAllByRole("option").length >= 1, "the suggestions remain selectable");
-});
-
-test("t_b1e192e1: an unmount before the 250ms debounce elapses does NOT cancel the /api/geocode fetch (module-level timer)", async () => {
-  // Direct component-level proof of LAYER 2: mount GeocodeSearch, type,
-  // unmount the WHOLE tree BEFORE the debounce window, remount. The pending
-  // query lives at module level (pendingGeocodeByInput) with no unmount
-  // cleanup, so the timer still fires and the fetch still goes out.
-  const { screen, waitFor } = rtl;
-  const user = rtl.userEvent.setup();
-
-  const first = await renderWithLocale(React.createElement(GeocodeSearch, {
-    search: "", onSearchChange: () => {}, onPlaceSelect: () => {},
-  }));
-  const input = screen.getByRole("combobox", { name: /Filter points or find a place/ });
-  await user.type(input, "Ferrara");
-  // Unmount BEFORE the 250ms debounce fires (user.type finishes in ms).
-  first.unmount();
-
-  // Remount a fresh instance: it shares the module-level pending entry.
-  await renderWithLocale(React.createElement(GeocodeSearch, {
-    search: "", onSearchChange: () => {}, onPlaceSelect: () => {},
-  }));
-
-  await waitFor(() => assert.ok(geocodeFetches >= 1, "the pending geocode fetch must fire even though the scheduling instance unmounted"), { timeout: 5000 });
-});
-
-// ---------------------------------------------------------------------------
-// Usability: the dual-purpose caveat is ALWAYS VISIBLE, not only sr-only
-// ---------------------------------------------------------------------------
-
-test("the dual-purpose search field shows an always-visible caption next to the input, while the sr-only help stays untouched", async () => {
-  // Reported usability bug: the same field filters the visible points AND
-  // suggests places; picking a suggestion pans the map and CLEARS the typed
-  // filter. That caveat only existed in the sr-only listSearchHelp, so
-  // sighted users could silently lose a filter they were typing. Contract:
-  // the new caption is REAL visible DOM text adjacent to the input (no
-  // sr-only class, not display:none, no aria-hidden, no JS toggle), its
-  // wording differs from the sr-only help, and that help paragraph is
-  // unchanged and still the input's aria-describedby target.
-  const mapBundle = await loadDomModule("app/lib/i18n/map.mjs");
-  const caption = mapBundle.en.listSearchCaption;
-  const helpText = mapBundle.en.listSearchHelp;
-
-  const { container } = await renderWithLocale(React.createElement(GeocodeSearch, {
-    search: "", onSearchChange: () => {}, onPlaceSelect: () => {},
-  }));
-
-  const input = rtl.screen.getByRole("combobox", { name: /Filter points or find a place/ });
-
-  // 1. The caption is real, visible DOM text rendered from the new i18n key.
-  const captionNode = rtl.screen.getByText(caption);
-  assert.equal(captionNode.tagName, "P", "the caption is a real paragraph element");
-  assert.ok(!captionNode.classList.contains("sr-only"), "the caption must NOT be sr-only");
-  assert.equal(captionNode.getAttribute("aria-hidden"), null, "the caption is not hidden from assistive tech");
-  assert.notEqual(window.getComputedStyle(captionNode).display, "none", "the caption must not be display:none");
-  assert.ok(caption.trim().length > 0, "the caption carries visible text");
-  // It states BOTH consequences explicitly: the map moves, the filter clears.
-  assert.match(caption.toLowerCase(), /mov/, "the caption says the map moves");
-  assert.match(caption.toLowerCase(), /clear|filter/, "the caption says the typed filter is cleared");
-
-  // 2. It sits NEXT TO the search input, inside the same wrapper.
-  const wrapper = container.querySelector(".map-list-search");
-  assert.ok(wrapper?.contains(input), "the input lives in the search wrapper");
-  assert.ok(wrapper?.contains(captionNode), "the caption lives in the same search wrapper, adjacent to the input");
-  assert.equal(input.parentElement, captionNode.parentElement, "caption and input share the immediate container");
-
-  // 3. The existing sr-only help is untouched and still wired.
-  const help = container.querySelector("#map-list-help");
-  assert.ok(help, "the sr-only help paragraph is still rendered");
-  assert.notEqual(help, captionNode, "the visible caption is a distinct node, not the help paragraph");
-  assert.ok(help.classList.contains("sr-only"), "the existing help stays sr-only");
-  assert.equal(input.getAttribute("aria-describedby"), "map-list-help", "the input still points at the sr-only help");
-  assert.equal(help.textContent, helpText, "the sr-only help text is unchanged");
-  assert.notEqual(caption, helpText, "the caption wording differs from the sr-only help (no duplication)");
-});
-
-// ---------------------------------------------------------------------------
-// LAYER 1: applyFilters no-op guard (URL churn)
-// ---------------------------------------------------------------------------
-
 test("t_b1e192e1: applyFilters no-op guard — a write producing the CURRENT URL performs ZERO router.replace", async () => {
   // R2 URL churn check (CEO): committing ?q= (or any filter) that is
   // already the current URL must not re-replace. A tiny harness exposes the
@@ -377,3 +113,88 @@ test("t_b1e192e1: applyFilters no-op guard — a write producing the CURRENT URL
   nav = await getNavState();
   assert.equal(nav.replaced.length, 1, "re-writing the committed filter must not churn the URL");
 });
+
+// ---------------------------------------------------------------------------
+// Privacy contract of the map place search
+// ---------------------------------------------------------------------------
+
+async function mountMap() {
+  setNavState({ pathname: "/mappa" });
+  const user = rtl.userEvent.setup();
+  await renderWithLocale(React.createElement(MappaTool));
+  await expandMapPoints();
+  const input = rtl.screen.getByRole("combobox", { name: /Find a place/ });
+  return { user, input };
+}
+
+test("typing sends nothing and writes no URL; Enter sends exactly one /api/geocode request", async () => {
+  const historyReplaceCalls = [];
+  const originalReplaceState = window.history.replaceState.bind(window.history);
+  window.history.replaceState = (data, unused, url) => { historyReplaceCalls.push(String(url)); originalReplaceState(data, unused, url); };
+  try {
+    const { user, input } = await mountMap();
+    const requests = [];
+    installFetchMock((url) => {
+      if (String(url).startsWith("/api/geocode")) { requests.push(String(url)); geocodeFetches += 1; return jsonResponse(FERRARA_SUGGESTIONS); }
+      return jsonResponse(fakeCamerasPayload(POPUP_RECORDS));
+    });
+    await user.type(input, "Ferrara");
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    assert.equal(requests.length, 0, "no geocode request while typing");
+    assert.ok(!historyReplaceCalls.some((href) => href.includes("q=")), "typing does not filter the points or touch the URL");
+
+    await user.keyboard("{Enter}");
+    const listbox = await rtl.waitFor(() => rtl.screen.getByRole("listbox", { name: "Place suggestions" }), { timeout: 3000 });
+    assert.equal(requests.length, 1, "one request per explicit search");
+    const sent = new URL(requests[0], "https://osdb.test");
+    assert.equal(sent.searchParams.get("q"), "Ferrara");
+    assert.equal(sent.searchParams.get("limit"), "5");
+    assert.equal(sent.searchParams.get("lang"), "en");
+    assert.equal(rtl.within(listbox).getAllByRole("option").length, 2);
+  } finally {
+    window.history.replaceState = originalReplaceState;
+  }
+});
+
+test("pasted coordinates move the map without any request", async () => {
+  const leaflet = await loadDomModule("node_modules/leaflet/index.mjs");
+  const { user, input } = await mountMap();
+  await user.type(input, "44.8381, 11.6198{Enter}");
+  await rtl.waitFor(() => {
+    const map = leaflet.__maps.at(-1);
+    assert.ok(map.views.some((view) => Math.abs(view.center[0] - 44.8381) < 1e-6 && Math.abs(view.center[1] - 11.6198) < 1e-6), "the map centres on the typed coordinates");
+  }, { timeout: 3000 });
+  assert.equal(geocodeFetches, 0, "coordinates never reach the geocoder");
+  assert.equal(rtl.screen.queryByRole("listbox"), null);
+});
+
+test("\"#123\" opens the record without any request", async () => {
+  const opened = [];
+  const user = rtl.userEvent.setup();
+  await renderWithLocale(React.createElement(GeocodeSearch, { onPlaceSelect: () => assert.fail("not a place"), onRecordSelect: (id) => opened.push(id) }));
+  await user.type(rtl.screen.getByRole("combobox", { name: /Find a place/ }), "#6302{Enter}");
+  assert.deepEqual(opened, [6302]);
+  assert.equal(geocodeFetches, 0, "record numbers never reach the geocoder");
+});
+
+test("a 429 announces Retry-After and a new Enter during the cooldown sends nothing", async () => {
+  const { user, input } = await mountMap();
+  let calls = 0;
+  installFetchMock((url) => {
+    if (String(url).startsWith("/api/geocode")) { calls += 1; return jsonResponse({ error: "rate limited" }, { status: 429, headers: { "retry-after": "30" } }); }
+    return jsonResponse(fakeCamerasPayload(POPUP_RECORDS));
+  });
+  await user.type(input, "Ferrara{Enter}");
+  await rtl.waitFor(() => assert.match(document.querySelector(".geocode-status")?.textContent ?? "", /30 seconds/), { timeout: 3000 });
+  await user.keyboard("{Enter}");
+  assert.equal(calls, 1, "the cooldown suppresses the second request");
+});
+
+test("the visible caption states the privacy promise and describes the input", async () => {
+  const { input } = await mountMap();
+  const caption = document.getElementById("map-list-caption");
+  assert.ok(caption, "the caption renders");
+  assert.match(caption.textContent, /Nothing is sent while you type/);
+  assert.ok((input.getAttribute("aria-describedby") ?? "").split(" ").includes("map-list-caption"), "the caption is announced with the field");
+});
+

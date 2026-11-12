@@ -136,7 +136,9 @@
 .map-explorer-search { padding:12px 18px; border-bottom:1px solid var(--line); background:var(--map-surface); }
 .map-explorer-search .map-list-search { position:relative; max-width:none; }
 .map-explorer-search .map-list-search label { display:block; margin-bottom:6px; color:var(--label); font-size:var(--text-2xs); text-transform:uppercase; letter-spacing:.1em; font-weight:800; }
-.map-explorer-search .map-list-search input { width:100%; min-height:44px; box-sizing:border-box; padding:9px 11px; border:1px solid var(--map-input-border); border-radius:var(--radius-md); background:var(--white); color:var(--ink-5); font-size:var(--text-md); }
+.map-explorer-search .map-list-search input { width:100%; min-height:44px; box-sizing:border-box; padding:9px 11px 9px 38px; border:1px solid var(--map-input-border); border-radius:var(--radius-md); background:var(--white) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%235c6c75' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E") no-repeat 12px 50%; color:var(--ink-5); font-size:var(--text-md); }
+/* Search field (2026-11): a magnifier glyph marks it as THE search box. */
+.map-explorer-search .map-list-search input:focus-visible { border-color:var(--focus); outline:3px solid color-mix(in srgb, var(--focus) 35%, transparent); outline-offset:0; }
 .map-explorer-search .geocode-dropdown { left:0; right:0; }
 /* Always-visible caption under the /mappa sidebar search: reuses the same
    muted small-text tokens as the record-search help (.record-search p), which
@@ -403,3 +405,28 @@
 .osm-popup-community .community-actions { margin:0; padding:0; border-bottom:0; }
 .osm-popup-community .community-actions-compact .community-actions-cta { margin:8px 0 0; }
 .osm-popup-community .community-actions-compact .community-actions-cta a { font-size:var(--text-sm); }
+/* Mobile map chrome (owner 2026-11: "hide the filters by default on mobile,
+   keep the search field"). Search and the filters toggle share ONE row: the
+   toggle is a compact pill beside the field; opening it drops the controls
+   below the row. The field label is visually hidden (the placeholder and the
+   magnifier carry it; screen readers still get the label), and the "picking
+   a place clears the filter" caption appears while the field is in use —
+   the moment the warning is relevant — instead of costing a line at rest. */
+@media (max-width:768px) {
+  .map-card { display:grid; grid-template-columns:minmax(0,1fr) auto; }
+  .map-card > * { grid-column:1 / -1; min-width:0; }
+  .map-card > .map-explorer-search { grid-column:1; padding-right:6px; }
+  .map-card > .filters-panel { grid-column:2; align-self:start; padding:8px 14px 8px 0; }
+  .map-card > .filters-panel:has(.filters-disclosure[data-open="true"]) { grid-column:1 / -1; padding:0 14px 10px; }
+  .map-card > .filters-panel .filters-disclosure:not([data-open="true"]) { border:0; background:transparent; }
+  .map-card > .filters-panel .filters-disclosure:not([data-open="true"]) > .filters-disclosure-toggle {
+    width:auto; gap:8px; padding:0 14px; border:1px solid var(--map-input-border); border-radius:var(--radius-md); background:var(--white); color:var(--ink);
+  }
+  /* The phone keyboard shows a Search key (enterkeyhint): the button shrinks
+     to a 44px arrow so the field keeps its width; its text stays the
+     accessible name. */
+  .map-list-search > .place-search-button { width:44px; padding:0; font-size:0; justify-content:center; }
+  .map-list-search > .place-search-button::after { content:"\2192"; font-size:18px; line-height:1; }
+  .map-explorer-search .map-list-search label { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+  .map-explorer-search .map-list-search:not(:focus-within) .map-list-search-hint { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+}

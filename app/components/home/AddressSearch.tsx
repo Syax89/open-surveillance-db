@@ -38,6 +38,7 @@ export function AddressSearch({ inputId, onPlaceSelect }: Props) {
     rateLimited: t.addressSearchRateLimited,
     unavailable: t.addressSearchUnavailable,
     attribution: t.addressSearchAttribution,
+    searchButton: t.addressSearchButton,
   };
   // The visible label travels as a `label` ReactNode into the primitive's
   // wrapper (the outside-click boundary), so clicking the label never

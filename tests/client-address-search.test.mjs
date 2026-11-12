@@ -91,155 +91,79 @@ test("report form renders the address search next to the geolocation button", as
   assert.ok(geolocate, "geolocation button must sit on the same row, to the right");
 });
 
-test("address search debounces, suggests and selects a place into coordinates", async () => {
-  const selected = [];
+function installGeocode(results = []) {
+  const calls = [];
   const originalFetch = globalThis.fetch;
-  let geocodeCalls = 0;
-  const geocodeUrls = [];
   globalThis.fetch = async (input) => {
     const url = String(input);
     if (url.startsWith("/api/geocode?")) {
-      geocodeCalls += 1;
-      geocodeUrls.push(url);
-      return new Response(
-        JSON.stringify({
-          results: [
-            {
-              display_name: "Piazza del Duomo, Milan, Italy",
-              lat: 45.4642,
-              lng: 9.19,
-              type: "pedestrian",
-              boundingbox: ["45.4", "45.5", "9.1", "9.2"],
-            },
-          ],
-        }),
-        { status: 200, headers: { "Content-Type": "application/json" } },
-      );
+      calls.push(url);
+      return new Response(JSON.stringify({ results }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
     return new Response(JSON.stringify({ keys: [] }), { status: 200 });
   };
+  return { calls, restore: () => { globalThis.fetch = originalFetch; } };
+}
 
+const DUOMO = { display_name: "Piazza del Duomo, Milan, Italy", lat: 45.4642, lng: 9.19, type: "pedestrian", boundingbox: ["45.4", "45.5", "9.1", "9.2"] };
+
+test("address search sends nothing while typing; the Search button sends one request and a pick selects the coordinates", async () => {
+  const selected = [];
+  const geocode = installGeocode([DUOMO]);
   try {
-    const view = await renderWithLocale(
-      React.createElement(
-        ReportForm,
-        reportFormProps({
-          onSelectCoordinates: (lat, lng) => selected.push({ lat, lng }),
-        }),
-      ),
-    );
-    const { container } = view;
-    const search = container.querySelector("#report-address-search");
+    const view = await renderWithLocale(React.createElement(ReportForm, reportFormProps({ onSelectCoordinates: (lat, lng) => selected.push({ lat, lng }) })));
+    const search = view.container.querySelector("#report-address-search");
 
     typeInto(search, "piazza del");
-    assert.equal(geocodeCalls, 0, "no geocode fetch before the debounce");
-
     await advance(400);
-    assert.equal(geocodeCalls, 1, "geocode fetch fires after the debounce");
-    assert.equal(geocodeUrls.length, 1, "exactly one geocode request");
-    const url = new URL(geocodeUrls[0], "https://osdb.test/");
-    assert.equal(url.pathname, "/api/geocode", "same-origin geocode proxy only");
-    assert.equal(url.searchParams.get("limit"), "5", "suggestion cap must be 5");
-    assert.equal(url.searchParams.get("lang"), "en", "request must carry the current locale");
-    assert.equal(url.searchParams.get("q"), "piazza del", "the trimmed query is sent");
+    assert.equal(geocode.calls.length, 0, "privacy: no request while typing");
 
-    const option = await view.findByText("Piazza del Duomo, Milan, Italy");
-    assert.ok(option, "suggestion must render in the dropdown");
-    rtl.fireEvent.click(option);
+    rtl.fireEvent.click(view.getByRole("button", { name: en.addressSearchButton }));
     await advance(20);
+    assert.equal(geocode.calls.length, 1, "exactly one request per explicit search");
+    const url = new URL(geocode.calls[0], "https://osdb.test/");
+    assert.equal(url.pathname, "/api/geocode", "same-origin geocode proxy only");
+    assert.equal(url.searchParams.get("limit"), "5");
+    assert.equal(url.searchParams.get("lang"), "en");
+    assert.equal(url.searchParams.get("q"), "piazza del");
 
-    assert.equal(selected.length, 1, "selecting a place must set coordinates");
-    assert.equal(selected[0].lat, 45.4642);
-    assert.equal(selected[0].lng, 9.19);
+    rtl.fireEvent.click(await view.findByText("Piazza del Duomo, Milan, Italy"));
+    await advance(20);
+    assert.deepEqual(selected, [{ lat: 45.4642, lng: 9.19 }], "the place goes through the map-click coordinate path");
+    assert.equal(search.value, "Piazza del Duomo, Milan, Italy");
+    assert.equal(search.getAttribute("aria-expanded"), "false");
   } finally {
-    globalThis.fetch = originalFetch;
+    geocode.restore();
   }
 });
 
-test("selecting a suggestion cancels a pending debounce so a queued query cannot reopen the dropdown (regression)", async () => {
-  const originalFetch = globalThis.fetch;
-  let geocodeCalls = 0;
-  globalThis.fetch = async (input) => {
-    const url = String(input);
-    if (url.startsWith("/api/geocode?")) {
-      geocodeCalls += 1;
-      return new Response(
-        JSON.stringify({
-          results: [
-            {
-              display_name: "Piazza del Duomo, Milan, Italy",
-              lat: 45.4642,
-              lng: 9.19,
-              type: "pedestrian",
-              boundingbox: ["45.4", "45.5", "9.1", "9.2"],
-            },
-          ],
-        }),
-        { status: 200, headers: { "Content-Type": "application/json" } },
-      );
-    }
-    return new Response(JSON.stringify({ keys: [] }), { status: 200 });
-  };
-
+test("pasted coordinates select the point locally, with no request (Italian decimal comma too)", async () => {
+  const selected = [];
+  const geocode = installGeocode([]);
   try {
-    const view = await renderWithLocale(
-      React.createElement(ReportForm, reportFormProps()),
-    );
-    const { container } = view;
-    const search = container.querySelector("#report-address-search");
-
-    // First query resolves and renders its suggestion.
-    typeInto(search, "piazza");
-    await advance(400);
-    const option = await view.findByText("Piazza del Duomo, Milan, Italy");
-    assert.ok(option, "the first query renders its suggestion");
-
-    // A second keystroke queues a new debounce while the old results are
-    // still visible, then the user clicks the visible suggestion (pointer
-    // choice). The click must cancel the pending debounce: the queued query
-    // must never fire and reopen the dropdown over the choice.
-    rtl.act(() => typeInto(search, "piazza del duomo"));
-    rtl.fireEvent.click(option);
-    await advance(400);
-
-    assert.equal(search.value, "Piazza del Duomo, Milan, Italy", "the pointer choice fills the input");
-    assert.equal(geocodeCalls, 1, "the queued query was cancelled — no second geocode request");
-    assert.equal(
-      container.querySelector("#report-address-search-listbox"),
-      null,
-      "the dropdown must stay closed after selection (no reopen by the queued query)",
-    );
-    assert.equal(search.getAttribute("aria-expanded"), "false");
+    const view = await renderWithLocale(React.createElement(ReportForm, reportFormProps({ onSelectCoordinates: (lat, lng) => selected.push({ lat, lng }) })));
+    const search = view.container.querySelector("#report-address-search");
+    typeInto(search, "45,4642; 9,1900");
+    rtl.fireEvent.keyDown(search, { key: "Enter" });
+    await advance(20);
+    assert.deepEqual(selected, [{ lat: 45.4642, lng: 9.19 }]);
+    assert.equal(geocode.calls.length, 0, "coordinates never leave the browser");
   } finally {
-    globalThis.fetch = originalFetch;
+    geocode.restore();
   }
 });
 
 test("address search announces an honest empty state", async () => {
-  const originalFetch = globalThis.fetch;
-  globalThis.fetch = async (input) => {
-    const url = String(input);
-    if (url.startsWith("/api/geocode?")) {
-      return new Response(JSON.stringify({ results: [] }), { status: 200 });
-    }
-    return new Response(JSON.stringify({ keys: [] }), { status: 200 });
-  };
-
+  const geocode = installGeocode([]);
   try {
-    const view = await renderWithLocale(
-      React.createElement(ReportForm, reportFormProps()),
-    );
-    const { container } = view;
-    const search = container.querySelector("#report-address-search");
+    const view = await renderWithLocale(React.createElement(ReportForm, reportFormProps()));
+    const search = view.container.querySelector("#report-address-search");
     typeInto(search, "zzzz not a place");
-
-    await advance(400);
-    const status = await view.findByText(
-      en.addressSearchNoResults("zzzz not a place"),
-    );
-    assert.ok(status, "empty state must be announced via role=status");
+    rtl.fireEvent.keyDown(search, { key: "Enter" });
+    await advance(20);
+    const status = await view.findByText(en.addressSearchNoResults("zzzz not a place"));
     assert.equal(status.getAttribute("role"), "status");
   } finally {
-    globalThis.fetch = originalFetch;
+    geocode.restore();
   }
 });

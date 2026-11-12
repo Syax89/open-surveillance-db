@@ -15,7 +15,7 @@ map-tile strategy compliant with provider terms").
 | Correct tile URL (`https://tile.openstreetmap.org/{z}/{x}/{y}.png`, no subdomains) | ❌ used deprecated `{s}.tile.openstreetmap.org` | ✅ canonical URL (default upstream of the proxy) |
 | Visible licence attribution linked to the copyright notice | ✅ | ✅ (kept, now with "Fix the map" link) |
 | Stable, contactable User-Agent identifying the app | ❌ browser default UA, no app identity | ✅ `OpenSurveillanceDB/0.1 (+https://github.com/Syax89/open-surveillance-db; contact: privacy@opensurveillancedb.org)` on every upstream request |
-| Referer present and accurate end-to-end | ⚠️ browser-only, dependent on site Referrer-Policy | ✅ requests are same-origin; the proxy forwards the Referer verbatim (never stripped, policy §3.4) |
+| Referer present and accurate end-to-end | ⚠️ browser-only, dependent on site Referrer-Policy | ✅ requests are same-origin; the proxy forwards the Referer reduced to the site origin — never stripped or blank (policy §3.4), but without the page path/query (privacy, 2026-11) |
 | Server-side caching (≥ 7-day TTL or upstream cache headers) | ❌ browser cache only | ✅ Cloudflare Cache API + `Cache-Control: public, max-age=604800` fallback |
 | No bulk download / prefetch / offline features | ✅ none present | ✅ unchanged (validated, zoom-capped endpoint) |
 | No `Cache-Control: no-cache` / `Pragma: no-cache` on tiles | ✅ | ✅ (errors only carry `no-store`) |
@@ -63,7 +63,7 @@ Next.js route handler (Cloudflare Worker)
    │  cache lookup (Cache API: caches.default)
    │  miss → upstream GET https://<TILE_PROVIDER_URL>/{z}/{x}/{y}.png
    │         headers: User-Agent: OpenSurveillanceDB/0.1 (+repo; contact: …)
-   │                  Referer: <client Referer, forwarded verbatim>
+   │                  Referer: <client Referer reduced to its origin, e.g. https://example.org/>
    │                  Accept: image/avif,image/webp,image/png,…
    │  response: cache headers honoured, or Cache-Control: public, max-age=604800
    ▼
@@ -186,7 +186,7 @@ tiers below are ordered by operational commitment.
 - [x] Upstream requests carry the identifying User-Agent
   `OpenSurveillanceDB/0.1 (+https://github.com/Syax89/open-surveillance-db;
   contact: privacy@opensurveillancedb.org)`.
-- [x] Client Referer is forwarded upstream, never stripped or blanked.
+- [x] Client Referer is forwarded upstream as its origin only — never stripped or blanked, never the full page URL (app/lib/upstream-referer.ts).
 - [x] Server-side caching via Cloudflare Cache API; ≥ 7-day
   `Cache-Control` fallback; upstream cache headers honoured.
 - [x] No bulk download / prefetch / offline features; zoom- and
@@ -238,8 +238,15 @@ compliance posture as the tile proxy:
 - **Identification**: every upstream request carries the app User-Agent
   `OpenSurveillanceDB/0.1 (+https://github.com/Syax89/open-surveillance-db;
   contact: privacy@opensurveillancedb.org)` and forwards the end user's
-  Referer verbatim (Nominatim requires a valid UA or Referer; §3.4 of the
-  proxy policy — never strip the Referer).
+  Referer reduced to the site origin (Nominatim requires a valid UA or
+  Referer; §3.4 of the proxy policy — never strip the Referer — is honoured
+  without passing on the page path or query).
+- **No as-you-type lookups (2026-11)**: the site's search boxes only query
+  the geocoder on Enter or the Search button (Nominatim's policy forbids
+  client-side autocomplete on the public instance). Coordinates and
+  `#record` numbers are resolved in the browser and never reach the proxy;
+  results are ranked by the current map view in the browser, so the map
+  position is never sent either.
 - **Rate limiting**: a per-caller bucket (default 30/min,
   `GEOCODE_RATE_LIMIT_MAX` / `GEOCODE_RATE_LIMIT_WINDOW_SECONDS`) keeps the
   average well below the Nominatim ceiling (~1 request/second/client); the

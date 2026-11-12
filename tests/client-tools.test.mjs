@@ -216,7 +216,7 @@ test("MappaTool renders the map tool shell with the shared FiltersBar and the vi
   // DUAL-FUNCTION (t_b9666d09): it filters the viewport points AND suggests
   // places through the geocoder (combobox). The FiltersBar row keeps
   // kind/freshness/sort/reset — exactly ONE search control on the page.
-  assert.ok(screen.getByLabelText("Filter points or find a place"), "place/point search above the map");
+  assert.ok(screen.getByLabelText("Find a place"), "place/point search above the map");
   assert.ok(screen.queryByLabelText("Search the public directory") === null, "no duplicated FiltersBar search on /mappa");
   assert.ok(screen.getByLabelText("Camera type"), "shared FiltersBar kind filter");
 
@@ -290,7 +290,7 @@ test("MappaTool freshness filter keeps the map rendered and uses the global rese
   // The map region is still on the page (never replaced by an empty state).
   assert.ok(screen.getByRole("region", { name: "Interactive OpenStreetMap map" }), "the map stays rendered with zero matching records");
   // The explorer controls stay above the map; the sidebar is just the list.
-  assert.ok(screen.getByLabelText("Filter points or find a place"), "the top search stays rendered");
+  assert.ok(screen.getByLabelText("Find a place"), "the top search stays rendered");
   assert.ok(screen.getByText("No published record matches those filters."), "truthful in-list empty note");
   assert.ok(screen.getByText(/This does not mean that there are no cameras/), "the note never implies an area has no surveillance");
   assert.ok(screen.getByRole("button", { name: /Reset filters/ }), "the top controls offer the reset action");
@@ -606,14 +606,14 @@ test("MappaTool geocode autocomplete suggests places in a combobox; keyboard sel
   };
   t.after(() => { window.history.replaceState = originalReplaceState; });
 
-  const input = screen.getByRole("combobox", { name: /Filter points or find a place/ });
+  const input = screen.getByRole("combobox", { name: /Find a place/ });
   assert.equal(input.getAttribute("aria-expanded"), "false", "the combobox starts collapsed");
 
-  // Typing a query that does not match any local point opens the geocode
-  // dropdown after the ~250ms debounce (the map itself stays rendered).
-  await user.type(input, "Ferrara");
+  // Privacy pass (2026-11): typing sends nothing; Enter runs the search and
+  // opens the dropdown (the map itself stays rendered).
+  await user.type(input, "Ferrara{Enter}");
   const listbox = await waitFor(() => screen.getByRole("listbox", { name: "Place suggestions" }), { timeout: 5000 });
-  assert.equal(input.getAttribute("aria-expanded"), "true", "typing expands the combobox");
+  assert.equal(input.getAttribute("aria-expanded"), "true", "the search expands the combobox");
   assert.ok(input.getAttribute("aria-controls") !== null, "aria-controls points at the listbox while open");
   // Scoped to the listbox: the FiltersBar selects also carry native
   // <option> elements, so getAllByRole("option") must not count them.
@@ -622,29 +622,22 @@ test("MappaTool geocode autocomplete suggests places in a combobox; keyboard sel
   assert.match(options[0].textContent, /Ferrara, Emilia-Romagna, Italia/);
   assert.match(options[1].textContent, /Via del Duomo/);
 
-  // t_3c4b188e: the 400ms ?q= commit fires AFTER the dropdown opened — it
-  // must NOT close it (pure history.replaceState, no remount). Waiting for
-  // the commit here also gives the selection clear something real to clear.
-  await waitFor(() => assert.ok(historyReplaceCalls.some((href) => href.includes("q=Ferrara")), "the typed q committed via history.replaceState"), { timeout: 5000 });
-  assert.equal(input.getAttribute("aria-expanded"), "true", "the dropdown stays open after the ?q= commit");
+  // Typing no longer filters the points: nothing wrote ?q= to the URL.
+  assert.ok(!historyReplaceCalls.some((href) => href.includes("q=Ferrara")), "the typed text is not a point filter any more");
 
   // Keyboard: ArrowDown highlights the first option (aria-activedescendant
   // follows), Enter selects it — the combobox pattern.
   await user.keyboard("{ArrowDown}");
   assert.equal(options[0].getAttribute("aria-selected"), "true", "ArrowDown highlights the first option");
-  assert.equal(input.getAttribute("aria-activedescendant"), "geocode-option-0");
+  assert.equal(input.getAttribute("aria-activedescendant"), "map-list-search-option-0");
   await user.keyboard("{Enter}");
 
-  // Selection: the dropdown closes, the input keeps the chosen display
-  // name, and the LOCAL point filter (?q=) is cleared so the list can
-  // follow the new viewport unfiltered. t_3c4b188e: the clear is a pure
-  // history.replaceState — router.replace was never involved.
+  // Selection: the dropdown closes and the input keeps the chosen name.
   assert.equal(input.getAttribute("aria-expanded"), "false", "selection closes the dropdown");
   assert.equal(input.value, "Ferrara, Emilia-Romagna, Italia", "the input keeps the chosen place name");
   const nav = await getNavState();
-  assert.equal(nav.replaced.length, 0, "selecting a place never called router.replace (pure-history ?q= writes)");
-  assert.ok(historyReplaceCalls.length >= 2, "the ?q= commit + selection clear both went through history.replaceState");
-  assert.ok(!historyReplaceCalls.at(-1).includes("q="), "selecting a place clears the local point filter");
+  assert.equal(nav.replaced.length, 0, "selecting a place never called router.replace");
+  assert.ok(!historyReplaceCalls.some((href) => href.includes("q=")), "no point filter was ever written");
 
   // The map framed the selected administrative AREA (B01): the Ferrara city
   // suggestion carries a bounding box, so the map uses fitBounds (capped at
@@ -725,8 +718,8 @@ test("MappaTool geocode dropdown closes on Escape and on click outside", async (
   await renderWithLocale(React.createElement(MappaTool));
   await expandMapPoints();
 
-  const input = screen.getByRole("combobox", { name: /Filter points or find a place/ });
-  await user.type(input, "Ferrara");
+  const input = screen.getByRole("combobox", { name: /Find a place/ });
+  await user.type(input, "Ferrara{Enter}");
   await waitFor(() => assert.ok(screen.getByRole("listbox", { name: "Place suggestions" })), { timeout: 5000 });
   assert.equal(input.getAttribute("aria-expanded"), "true");
 
@@ -759,7 +752,7 @@ test("MappaTool geocode dropdown closes on Escape and on click outside", async (
   // next poll's mousedown closes the dropdown and the asserts pass; if the
   // close logic itself breaks, the retry still times out and the test fails
   // — the retry covers ONLY the attach race, never the close behavior.
-  await user.type(input, "a");
+  await user.type(input, "a{Enter}");
   await waitFor(() => assert.ok(screen.getByRole("listbox", { name: "Place suggestions" })), { timeout: 5000 });
   await waitFor(() => {
     rtl.fireEvent.mouseDown(document.body);
@@ -776,9 +769,9 @@ test("MappaTool geocode autocomplete shows honest no-results and unavailable sta
   const user = rtl.userEvent.setup();
   await renderWithLocale(React.createElement(MappaTool));
   await expandMapPoints();
-  const input = screen.getByRole("combobox", { name: /Filter points or find a place/ });
+  const input = screen.getByRole("combobox", { name: /Find a place/ });
 
-  await user.type(input, "Xyzzy");
+  await user.type(input, "Xyzzy{Enter}");
   await waitFor(() => assert.ok(screen.getByText("No results for “Xyzzy”")), { timeout: 5000 });
   assert.ok(screen.getByText("Places © OpenStreetMap contributors"), "the dropdown keeps the ODbL attribution");
 
@@ -789,32 +782,28 @@ test("MappaTool geocode autocomplete shows honest no-results and unavailable sta
     return jsonResponse(fakeCamerasPayload(POPUP_RECORDS));
   });
   rtl.fireEvent.change(input, { target: { value: "Roma" } });
+  rtl.fireEvent.keyDown(input, { key: "Enter" });
   await waitFor(() => assert.ok(screen.getByText("Place search is temporarily unavailable.")), { timeout: 5000 });
   assert.ok(screen.getByRole("region", { name: "Interactive OpenStreetMap map" }), "a geocoder failure never breaks the map");
   installEmptyMock();
 });
 
-test("MappaTool text search with no matching record keeps the map rendered (in-list note, map-always-visible)", async () => {
+test("MappaTool place search does not filter the points while typing (privacy pass 2026-11)", async () => {
   installRecordsMock();
-  const { screen, fireEvent } = rtl;
+  const { screen } = rtl;
   const user = rtl.userEvent.setup();
-  // Whole-world viewport, deterministic start (t_b9666d09): a leftover
-  // narrow viewport from a previous test would silently hide record A.
   await resetLeafletMarkers();
   await renderWithLocale(React.createElement(MappaTool));
   await expandMapPoints();
   await rtl.waitFor(() => assert.ok(screen.getByRole("button", { name: /Illustrative record A/ })));
 
-  // A query that matches no local point empties ONLY the list (the map and
-  // the sidebar stay); reset remains in the explorer controls above.
-  await user.type(screen.getByLabelText("Filter points or find a place"), "no-such-camera");
-  await rtl.waitFor(() => assert.ok(screen.getByText("No published record matches those filters.")), { timeout: 5000 });
-
-  assert.ok(screen.getByRole("region", { name: "Interactive OpenStreetMap map" }), "the map stays rendered after a no-match search");
-  assert.ok(screen.getByRole("button", { name: /Reset filters/ }), "the top controls offer the reset action");
-
-  fireEvent.change(screen.getByLabelText("Filter points or find a place"), { target: { value: "" } });
-  await rtl.waitFor(() => assert.ok(screen.getByRole("button", { name: /Illustrative record A/ }), "clearing restores the records"), { timeout: 5000 });
+  // The field finds PLACES on Enter; typing text that matches no camera no
+  // longer empties the list or the map (that confused people: "the map
+  // emptied"). Searching cameras by name is the directory's job.
+  await user.type(screen.getByLabelText("Find a place"), "no-such-camera");
+  await new Promise((resolve) => setTimeout(resolve, 600));
+  assert.ok(screen.getByRole("button", { name: /Illustrative record A/ }), "every point stays listed while typing");
+  assert.ok(screen.getByRole("region", { name: "Interactive OpenStreetMap map" }), "the map stays rendered");
 });
 
 // ---------------------------------------------------------------------------

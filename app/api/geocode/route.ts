@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import { originOnlyReferer } from "../../lib/upstream-referer";
 import { isLocale } from "../../lib/i18n/types";
 import { geocodeLimits } from "../../lib/rate-limit";
 import { rateLimitResponse } from "../../lib/rate-limit-response";
@@ -15,7 +16,8 @@ import { maxQueryLength } from "../../lib/search";
  *
  *   - a stable, contactable User-Agent naming the app (Nominatim usage
  *     policy — identification is mandatory);
- *   - the end user's Referer forwarded verbatim, never stripped or blanked
+ *   - the end user's Referer reduced to its origin (never stripped or
+ *     blanked, but no page path or query — app/lib/upstream-referer.ts)
  *     (proxy policy §3.4);
  *   - server-side caching (Cloudflare Cache API) with a 24 h TTL for
  *     non-empty replies and 1 h for empty ones, so repeat keystrokes never
@@ -255,7 +257,9 @@ export async function GET(request: Request) {
       "User-Agent": GEOCODE_UA,
       Accept: GEOCODE_ACCEPT,
     });
-    const referer = request.headers.get("Referer");
+    // Origin only (app/lib/upstream-referer.ts): a valid, never-blank
+    // Referer that does not reveal the page, the place or the person.
+    const referer = originOnlyReferer(request.headers.get("Referer"));
     if (referer) headers.set("Referer", referer);
     upstream = await fetch(
       upstreamUrl(parsed.query, parsed.limit, parsed.countrycodes, parsed.language),
