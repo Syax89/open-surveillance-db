@@ -6,7 +6,7 @@
  * browser API needs is small enough to own, and keeping it local means the
  * client bundle carries no extra library. The JSON shapes produced here are
  * the ones the backend routes expect (RegistrationResponseJSON /
- * AuthenticationResponseJSON in @simplewebauthn/server v13 terms):
+ * AuthenticationResponseJSON in @simplewebauthn/server v14 terms):
  *
  *   - registration (navigator.credentials.create -> register/complete):
  *     { id, rawId, type, response: { clientDataJSON, attestationObject,

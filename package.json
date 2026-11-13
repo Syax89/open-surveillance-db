@@ -34,7 +34,7 @@
     "import:rollback": "node scripts/import/cli.mjs rollback"
   },
   "dependencies": {
-    "@simplewebauthn/server": "^13.3.2",
+    "@simplewebauthn/server": "^14.1.0",
     "@types/leaflet.markercluster": "^1.5.6",
     "drizzle-orm": "0.45.4",
     "fflate": "^0.8.3",
@@ -62,14 +62,14 @@
     "axe-core": "^4.10.0",
     "c8": "^12.0.0",
     "drizzle-kit": "0.31.11",
-    "eslint": "^9.39.5",
+    "eslint": "^10.15.0",
     "eslint-config-next": "^16.4.6",
     "jsdom": "^30.0.1",
     "miniflare": "5.20260730.0-alpha",
     "react-server-dom-webpack": "^19.3.1",
     "tailwindcss": "4.3.5",
     "typescript": "5.9.3",
-    "vinext": "0.0.50",
+    "vinext": "1.4.4",
     "vite": "^8.3.7",
     "wrangler": "^4.118.0"
   },
