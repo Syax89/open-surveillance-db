@@ -107,6 +107,8 @@ const DB_MODULES = [
   // read side of import_batches. db/cameras.ts imports getImportBatchById
   // from it for the record-detail provenance, so it must be in the tree.
   { source: "db/import-sources.ts", output: "db/import-sources.mjs" },
+  // db/cameras.ts caches its full-scan COUNT(*) through ./count-cache.
+  { source: "db/count-cache.ts", output: "db/count-cache.mjs" },
   // db/camera-edits.ts (community editing, ADR 0018 §4) imports getD1 from
   // ./cameras and recordModerationEvent from ./moderation — both already in
   // this tree — so the real two-track logic runs against the same binding.

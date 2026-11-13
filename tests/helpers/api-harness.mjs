@@ -121,6 +121,8 @@ const REAL_DB_MODULES = [
   // from it for the record-detail provenance, so the real db tree must
   // resolve it (the /api/import-sources route also imports it directly).
   { source: "db/import-sources.ts", output: "db-real/import-sources.mjs" },
+  // db/cameras.ts caches its full-scan COUNT(*) through ./count-cache.
+  { source: "db/count-cache.ts", output: "db-real/count-cache.mjs" },
   // db/reverse-geocode.ts (CEO 2026-08-07): coordinate → address via
   // Nominatim with a persistent geocode_reverse_cache table; imports
   // getD1 from ./cameras (already in this tree).

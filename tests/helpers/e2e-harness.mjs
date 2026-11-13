@@ -150,6 +150,8 @@ const REAL_DB_MODULES = [
   // from it for the record-detail provenance, so the e2e tree must resolve
   // it (the /api/import-sources route imports it directly too).
   { source: "db/import-sources.ts", output: "db/import-sources.mjs" },
+  // db/cameras.ts caches its full-scan COUNT(*) through ./count-cache.
+  { source: "db/count-cache.ts", output: "db/count-cache.mjs" },
   // db/api-keys.ts (per-contributor write API keys, EPIC api-keys — T2/T3,
   // T5): the unified write gate (app/lib/write-gate.ts, T11) now resolves
   // bearer credentials through app/lib/api-key-auth.ts → findApiKeyByHash /

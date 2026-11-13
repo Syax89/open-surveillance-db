@@ -3,6 +3,7 @@ import { classifyDuplicateMatch, textSimilarity, type MatchStrength } from "../a
 import { PUBLIC_CAMERA_STATUSES } from "../app/lib/public-status";
 import { LIKE_ESCAPE_CLAUSE, likeContainsPattern, SUGGEST_ADDRESS_MAX_LENGTH, SUGGEST_MAX_LIMIT, type RecordSuggestion } from "../app/lib/search";
 import { titleSortKey } from "../app/lib/title-sort-key";
+import { cachedCount } from "./count-cache";
 import { confirmationCountsFor } from "./confirmations";
 import { communityActionCountsFor, type CommunityActionCounts } from "./community-actions";
 import { getImportBatchById, type ImportBatchPublic } from "./import-sources";
@@ -338,8 +339,8 @@ export async function listPublicCamerasPage(
   
   let total: number | null = null;
   if (withCount) {
-    const countResult = await d1.prepare(`SELECT COUNT(*) AS total ${query}`).bind(...parameters).first<{ total: number }>();
-    total = countResult?.total ?? 0;
+    const countSql = `SELECT COUNT(*) AS total ${query}`;
+    total = await cachedCount(countSql, parameters, async () => (await d1.prepare(countSql).bind(...parameters).first<{ total: number }>())?.total ?? 0);
 
     // Pagination guard (kanban t_e86c91c4): an offset at/beyond the dataset
     // total can never return records — answer an empty page WITHOUT running
@@ -853,8 +854,8 @@ export async function listPublicCamerasInBboxPage(
   // pays for the COUNT even when the caller opted out (one query, bounded
   // by the 15-minute edge cache — never a per-pan scan).
   if (withCount || forceDecimation) {
-    const countResult = await d1.prepare(`SELECT COUNT(*) AS total ${query}`).bind(...parameters).first<{ total: number }>();
-    total = countResult?.total ?? 0;
+    const countSql = `SELECT COUNT(*) AS total ${query}`;
+    total = await cachedCount(countSql, parameters, async () => (await d1.prepare(countSql).bind(...parameters).first<{ total: number }>())?.total ?? 0);
     // Same pagination guard as listPublicCamerasPage (kanban t_e86c91c4):
     // an offset at/beyond the bbox total is an empty page answered WITHOUT
     // the SELECT — no astronomical SQL OFFSET on the D1, no fixed cap.
