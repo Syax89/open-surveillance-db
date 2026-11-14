@@ -1,5 +1,3 @@
-import { env } from "cloudflare:workers";
-import { publicCameraPredicate } from "../../db/cameras";
 import { publicUrl } from "../lib/site-url";
 
 /**
@@ -17,22 +15,9 @@ import { publicUrl } from "../lib/site-url";
  */
 export const dynamic = "force-dynamic";
 
-const CHUNK_SIZE = 40000;
-
 export async function GET() {
-  const nowIso = new Date().toISOString();
-  const { sql, parameters } = publicCameraPredicate(nowIso);
-  const { results } = await env.DB.prepare(
-    `SELECT COUNT(*) AS n FROM cameras WHERE ${sql}`,
-  )
-    .bind(...parameters)
-    .all<{ n: number }>();
-  const chunks = Math.max(1, Math.ceil(results[0].n / CHUNK_SIZE));
-
-  const locs = [
-    publicUrl("/sitemap/static.xml"),
-    ...Array.from({ length: chunks }, (_, i) => publicUrl(`/sitemap/${i + 1}.xml`)),
-  ];
+  // Record chunks intentionally omitted (see robots.ts: /records/ is disallowed).
+  const locs = [publicUrl("/sitemap/static.xml")];
   const xml = [
     `<?xml version="1.0" encoding="UTF-8"?>`,
     `<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`,
