@@ -27,7 +27,9 @@ export default function robots(): MetadataRoute.Robots {
           "/api/",
           "/moderation",
           "/account",
-          "/records/*/edit",
+          // Crawl budget: 273k near-duplicate record pages kept bots busy for
+          // days; only the main pages (home, directory, map, info) are crawled.
+          "/records/",
           "/register",
           "/login",
         ],
