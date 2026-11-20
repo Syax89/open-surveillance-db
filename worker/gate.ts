@@ -72,7 +72,7 @@ export function normalizeGatePath(pathname: string): string {
  * reduces the cost of a probe to a single regex test.
  *
  * Deliberately narrow: only unmistakably non-site paths are matched
- * (nothing under /api, /assets, /mappa, /segnala, /correggi, /moderation
+ * (nothing under /api, /_next/static, /mappa, /segnala, /correggi, /moderation
  * or /records can ever hit it) so no legitimate route is affected — see
  * tests/worker-edge.test.mjs "anti-scanner" for both sides of the fence.
  *

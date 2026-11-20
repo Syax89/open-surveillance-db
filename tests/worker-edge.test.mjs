@@ -575,7 +575,7 @@ test("anti-scanner: legitimate site paths are never blocked", async () => {
     "/api/auth/me",
     "/api/geocode?q=padova",
     "/api/corrections",
-    "/assets/index-DzX5SSCE.css",
+    "/_next/static/css/BaF74ZOW.css",
     "/records/6745",
   ];
   for (const path of legit) {
@@ -1468,7 +1468,7 @@ test("private-cache: public caches, ungated lookalikes and contributor POST appe
       : new Response("public-ok", { status: 200, headers: { "cache-control": PUBLIC_APP_CACHE, "x-osdb-fixture": "kept" } });
   };
   try {
-    for (const route of ["/api/cameras?limit=1", "/api/cameras/1", "/assets/index-abc.css", "/records/6745", "/moderation-help", "/api/moderation-extra", "/api/appeals-extra"]) {
+    for (const route of ["/api/cameras?limit=1", "/api/cameras/1", "/_next/static/css/abc.css", "/records/6745", "/moderation-help", "/api/moderation-extra", "/api/appeals-extra"]) {
       const response = await worker.fetch(request(route), testEnv(), ctx());
       assert.equal(response.headers.get("cache-control"), PUBLIC_APP_CACHE, route);
       assert.equal(response.headers.get("x-osdb-fixture"), "kept", route);

@@ -78,7 +78,10 @@ const NOINDEX_ROUTES = ["/login", "/register", "/forgot-password", "/reset-passw
 
 /** Canonicals that already existed and must keep their exact absolute URL. */
 const EXISTING_CANONICALS = [
-  { route: "/", expected: `${ORIGIN}/` },
+  // vinext 1.x (like Next.js) serialises a same-origin root canonical as the
+  // bare origin. "https://<site>" and "https://<site>/" are the same URL (an
+  // empty path IS "/"), so search engines see no change (#562).
+  { route: "/", expected: ORIGIN },
   { route: "/directory", expected: `${ORIGIN}/directory` },
   { route: "/mappa", expected: `${ORIGIN}/mappa` },
   { route: "/records/12", expected: `${ORIGIN}/records/12` },

@@ -7,8 +7,8 @@
    Delivery: NOT imported by any module. vite.config.ts
    (routeStylesheets) compiles this file with Vite's own lightningcss
    (inlining the Leaflet @import, minified, same CSS targets as the main
-   bundle) into a content-hashed /assets/map-<hash>.css (immutable cache
-   via public/_headers' /assets/* rule) that app/components/MapStyles.tsx
+   bundle) into a content-hashed /_next/static/css/map-<hash>.css (immutable cache
+   via public/_headers' /_next/static/* rule) that app/components/MapStyles.tsx
    links ONLY from the routes that render a Leaflet map: /mappa, /segnala,
    /records/[id] and /records/[id]/edit.
 

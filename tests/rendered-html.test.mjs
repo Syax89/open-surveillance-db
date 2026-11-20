@@ -222,15 +222,15 @@ test("the Leaflet/map stylesheet is render-blocking only on map routes, after th
     const { response, html } = await renderRoute(route);
     assert.equal(response.status, 200, `${route} renders`);
     const hrefs = stylesheets(html);
-    const globalIndex = hrefs.findIndex((href) => /^\/assets\/index-[\w-]+\.css$/.test(href));
-    const mapIndex = hrefs.findIndex((href) => /^\/assets\/map-[0-9a-f]{10}\.css$/.test(href));
+    const globalIndex = hrefs.findIndex((href) => /^\/_next\/static\/css\/(?!map-)[\w-]+\.css$/.test(href));
+    const mapIndex = hrefs.findIndex((href) => /^\/_next\/static\/css\/map-[0-9a-f]{10}\.css$/.test(href));
     assert.ok(globalIndex >= 0, `${route} links the global stylesheet`);
     assert.ok(mapIndex > globalIndex, `${route} links the hashed map stylesheet AFTER the global one (cascade), got ${hrefs.join(", ")}`);
   }
   for (const route of ["/", "/faq", "/fonti", "/privacy", "/directory", "/correggi"]) {
     const { html } = await renderRoute(route);
     const hrefs = stylesheets(html);
-    assert.ok(!hrefs.some((href) => /\/assets\/map-/.test(href)), `${route} must not pay for the map stylesheet, got ${hrefs.join(", ")}`);
+    assert.ok(!hrefs.some((href) => /\/_next\/static\/css\/map-/.test(href)), `${route} must not pay for the map stylesheet, got ${hrefs.join(", ")}`);
   }
 });
 
