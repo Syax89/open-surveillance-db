@@ -37,7 +37,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Lint (ESLint 9)
+      - name: Lint (ESLint 10)
         run: npm run lint
 
       - name: Typecheck (tsc --noEmit)

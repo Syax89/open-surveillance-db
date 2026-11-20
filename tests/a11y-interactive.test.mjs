@@ -665,6 +665,17 @@ test("the footer legal disclosure has a visible keyboard focus and touch-sized t
   );
 });
 
+// Only the footer's own <nav class="footer-links">…</nav>: slicing to the end
+// of the document would also pick up Suspense content React streams in AFTER
+// the footer (e.g. the /mappa explore-view switch, which is aria-current too).
+function footerNav(html) {
+  const start = html.indexOf("footer-links");
+  assert.ok(start >= 0, "the footer navigation is rendered");
+  const end = html.indexOf("</nav>", start);
+  assert.ok(end > start, "the footer navigation is closed");
+  return html.slice(start, end);
+}
+
 test("aria-current marks the active page in the footer and the header brand (QA-2026-08-01-3 closed)", async () => {
   // The audit finding is CLOSED (F-QA t_7b716c97): the footer marks its own
   // link with aria-current="page" on every route in its link set (13 links,
@@ -675,7 +686,7 @@ test("aria-current marks the active page in the footer and the header brand (QA-
   const FOOTER_LINKS = ["/mappa", "/directory", "/segnala", "/correggi", "/manifesto", "/regole", "/guide", "/privacy", "/termini", "/licenze", "/accessibility", "/faq", "/contatti"];
   for (const route of FOOTER_LINKS) {
     const { html } = await renderRoute(route);
-    const footer = html.slice(html.indexOf("footer-links"));
+    const footer = footerNav(html);
     const linkTag = footer.match(new RegExp(`<a[^>]*href="${route}"[^>]*>`));
     assert.ok(linkTag, `${route}: the footer must link to itself`);
     assert.match(linkTag[0], /aria-current="page"/, `${route}: the footer's own link must be marked current`);
@@ -686,7 +697,7 @@ test("aria-current marks the active page in the footer and the header brand (QA-
   // NO footer link as current — none of them is in the footer navigation.
   for (const route of ["/login", "/register", "/account", "/records/1", "/moderation"]) {
     const { html } = await renderRoute(route);
-    const footer = html.slice(html.indexOf("footer-links"));
+    const footer = footerNav(html);
     assert.equal((footer.match(/aria-current="page"/g) ?? []).length, 0, `${route}: no footer link may be current`);
   }
   // The home marks the header brand (in-page anchor to #top) and the footer
