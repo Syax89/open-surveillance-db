@@ -124,7 +124,7 @@ const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
     // Static-first: hashed assets, icons, robots.txt live on disk under
     // dist/client — serve them directly, never through the worker (the
-    // built worker 404s /assets/* it does not recognise).
+    // built worker 404s /_next/static/* it does not recognise).
     const staticFile = assetPathFor(url.pathname);
     if (staticFile) {
       const file = await readFile(staticFile).catch(() => null);

@@ -4,7 +4,7 @@
  * Leaflet's CSS and the map-only rules used to sit in the single global,
  * render-blocking bundle on EVERY route. They now live in app/styles/map.css,
  * compiled by the `routeStylesheets` plugin (vite.config.ts) into a
- * content-hashed /assets/map-<hash>.css that app/components/MapStyles.tsx
+ * content-hashed /_next/static/css/map-<hash>.css that app/components/MapStyles.tsx
  * links only from the routes rendering a Leaflet map. These checks keep that
  * split from silently regressing (a stray Leaflet import back in globals, a
  * map route that forgets the link, a non-map route that adds it).
@@ -73,29 +73,33 @@ test("only the Leaflet routes link the map stylesheet", async () => {
   }
 });
 
-test("the build plugin emits a content-hashed asset under the immutable /assets/* rule", async () => {
+test("the build plugin emits a content-hashed asset under the immutable /_next/static/* rule", async () => {
   const config = await read("vite.config.ts");
   assert.match(config, /const MAP_CSS_SOURCE = "app\/styles\/map\.css";/);
-  assert.match(config, /href = `\/assets\/map-\$\{hash\}\.css`;/, "the URL carries a content hash");
+  assert.match(config, /href = `\/_next\/static\/css\/map-\$\{hash\}\.css`;/, "the URL carries a content hash");
   assert.match(config, /define: \{ __OSDB_MAP_CSS_HREF__: JSON\.stringify\(href\) \}/);
   assert.match(config, /routeStylesheets\(\),\s*\n\s*vinext\(\),/, "the plugin is registered");
   const headers = await read(path.join("public", "_headers"));
-  assert.match(headers, /^\/assets\/\*\n\s+Cache-Control: public, max-age=31536000, immutable$/m);
+  assert.match(headers, /^\/_next\/static\/\*\n\s+Cache-Control: public, max-age=31536000, immutable$/m);
 });
 
-test("built output: the hashed map stylesheet exists and the bundle points at it", { skip: !existsSync(path.join(root, "dist", "client", "assets")) && "run `npm run build` first" }, async () => {
-  const assets = await readdir(path.join(root, "dist", "client", "assets"));
+test("built output: the hashed map stylesheet exists and the bundle points at it", { skip: !existsSync(path.join(root, "dist", "client", "_next", "static", "css")) && "run `npm run build` first" }, async () => {
+  const assets = await readdir(path.join(root, "dist", "client", "_next", "static", "css"));
   const mapFiles = assets.filter((file) => /^map-[0-9a-f]{10}\.css$/.test(file));
   assert.equal(mapFiles.length, 1, `exactly one hashed map stylesheet, got ${mapFiles.join(", ")}`);
-  const mapCss = await read(path.join("dist", "client", "assets", mapFiles[0]));
+  const mapCss = await read(path.join("dist", "client", "_next", "static", "css", mapFiles[0]));
   assert.match(mapCss, /\.leaflet-container\{/, "Leaflet is bundled in");
   assert.match(mapCss, /\.osm-popup-footer a\{/, "the map overrides are bundled in");
 
-  const globalCss = assets.filter((file) => /^index-.*\.css$/.test(file));
+  // vinext 1.x names its global bundle by hash only (e.g. BaF74ZOW.css).
+  const globalCss = assets.filter((file) => file.endsWith(".css") && !file.startsWith("map-"));
   assert.equal(globalCss.length, 1);
-  assert.doesNotMatch(await read(path.join("dist", "client", "assets", globalCss[0])), /\.leaflet-container\{/, "the global bundle is Leaflet-free");
+  assert.doesNotMatch(await read(path.join("dist", "client", "_next", "static", "css", globalCss[0])), /\.leaflet-container\{/, "the global bundle is Leaflet-free");
 
-  const server = await read(path.join("dist", "server", "index.js"));
-  assert.ok(server.includes(`/assets/${mapFiles[0]}`), "the server bundle links the emitted file");
+  // vinext 1.x code-splits the server build, so check every server chunk.
+  const serverDir = path.join(root, "dist", "server");
+  const serverFiles = (await readdir(serverDir, { recursive: true })).filter((file) => file.endsWith(".js"));
+  const server = (await Promise.all(serverFiles.map((file) => readFile(path.join(serverDir, file), "utf8")))).join("\n");
+  assert.ok(server.includes(`/_next/static/css/${mapFiles[0]}`), "the server bundle links the emitted file");
   assert.doesNotMatch(server, /__OSDB_MAP_CSS_HREF__/, "the define was replaced at build time");
 });

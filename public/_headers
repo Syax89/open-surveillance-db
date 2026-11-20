@@ -4,7 +4,10 @@
 #
 # IMPORTANT: vinext writes its own dist/client/_headers ONLY when none exists,
 # so this file must keep the immutable rule for the content-hashed bundle.
-/assets/*
+# vinext 1.x emits every client chunk and stylesheet under /_next/static/
+# (hash-named files, plus a per-build-id directory for its manifests); the
+# route-scoped map stylesheet (vite.config.ts) is emitted there too.
+/_next/static/*
   Cache-Control: public, max-age=31536000, immutable
 
 # Unhashed brand/social assets: one day of browser + edge cache instead of

@@ -109,8 +109,9 @@ function denyServerSource(): Plugin {
  * with the lightningcss Vite itself uses to minify CSS and Vite's default
  * build targets, into a content-hashed asset. Its URL reaches the app as the
  * `__OSDB_MAP_CSS_HREF__` define (app/components/MapStyles.tsx); the client
- * build emits the file under assets/ (immutable, public/_headers) and the
- * dev server answers the same URL from the live source.
+ * build emits the file under _next/static/css/, next to vinext's own CSS
+ * (immutable, public/_headers), and the dev server answers the same URL from
+ * the live source.
  */
 const MAP_CSS_SOURCE = "app/styles/map.css";
 // Vite 8's "baseline-widely-available" CSS targets (chrome111 edge111
@@ -155,7 +156,7 @@ function routeStylesheets(): Plugin {
       root = path.resolve(userConfig.root ?? process.cwd());
       css = await compileRouteStylesheet(root);
       const hash = createHash("sha256").update(css).digest("hex").slice(0, 10);
-      href = `/assets/map-${hash}.css`;
+      href = `/_next/static/css/map-${hash}.css`;
       return { define: { __OSDB_MAP_CSS_HREF__: JSON.stringify(href) } };
     },
     configureServer(server) {

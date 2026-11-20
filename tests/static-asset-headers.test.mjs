@@ -1,7 +1,7 @@
 // Static-asset cache headers (perf 2026-11): public/_headers is copied by
 // Vite into dist/client/_headers, which the Cloudflare assets binding
 // applies to files it serves directly (wrangler.jsonc "assets"). vinext only
-// generates its own dist/client/_headers (the immutable /assets/* rule) when
+// generates its own dist/client/_headers (the immutable /_next/static/* rule) when
 // none exists, so this file must carry that rule itself — otherwise adding
 // it would silently drop the hashed-bundle immutable caching.
 import assert from "node:assert/strict";
@@ -35,7 +35,8 @@ function parseHeaders(text) {
 const rules = parseHeaders(source);
 
 test("hashed bundle assets keep vinext's immutable rule", () => {
-  assert.equal(rules.get("/assets/*")?.["cache-control"], "public, max-age=31536000, immutable");
+  assert.equal(rules.get("/_next/static/*")?.["cache-control"], "public, max-age=31536000, immutable");
+  assert.ok(!rules.has("/assets/*"), "vinext 1.x no longer emits /assets/: the stale rule is gone");
 });
 
 test("brand and social assets get a one-day cache instead of must-revalidate", () => {
@@ -54,6 +55,6 @@ test("no rule can reach HTML documents or API responses", () => {
   for (const pattern of rules.keys()) {
     assert.notEqual(pattern, "/*", "no catch-all rule");
     assert.ok(!pattern.startsWith("/api"), "API responses keep their own Cache-Control");
-    assert.ok(pattern === "/assets/*" || /^\/[\w.-]+\.(svg|png|css)$/.test(pattern), `${pattern} targets one static file`);
+    assert.ok(pattern === "/_next/static/*" || /^\/[\w.-]+\.(svg|png|css)$/.test(pattern), `${pattern} targets one static file`);
   }
 });

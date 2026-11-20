@@ -8,7 +8,7 @@
  * /segnala, /records/[id] and /records/[id]/edit.
  *
  * The href is injected at build time by the `routeStylesheets` plugin in
- * vite.config.ts (`__OSDB_MAP_CSS_HREF__` → "/assets/map-<hash>.css", served
+ * vite.config.ts (`__OSDB_MAP_CSS_HREF__` → "/_next/static/css/map-<hash>.css", served
  * immutable by public/_headers). Outside Vite (the node test harnesses that
  * transpile the pages) the define is absent and the stable fallback is used,
  * so no module ever imports a `.css` file.
@@ -20,7 +20,7 @@
 declare const __OSDB_MAP_CSS_HREF__: string | undefined;
 
 export const MAP_CSS_HREF: string =
-  typeof __OSDB_MAP_CSS_HREF__ === "string" ? __OSDB_MAP_CSS_HREF__ : "/assets/map.css";
+  typeof __OSDB_MAP_CSS_HREF__ === "string" ? __OSDB_MAP_CSS_HREF__ : "/_next/static/css/map.css";
 
 export function MapStyles() {
   return <link rel="stylesheet" href={MAP_CSS_HREF} precedence="default" />;
