@@ -672,6 +672,41 @@ test("page-post-guard: a Next-Action header does not exempt a multipart POST (40
   assert.equal(app.__calls.length, 0, "the app router must never see the malformed multipart body");
 });
 
+test("server-action guard: POSTs carrying an action header answer 400 and never reach the app router", async () => {
+  const { worker, app } = await loadWorker();
+  const cases = [
+    ["/", { "next-action": "7f3e2a1b9c0d" }],
+    ["/", { "x-rsc-action": "abc#default" }],
+    ["/mappa", { "Next-Action": "x", "content-type": "text/plain;charset=UTF-8" }],
+    ["/api/cameras", { "next-action": "x", "content-type": "application/json" }],
+  ];
+  for (const [requestPath, headers] of cases) {
+    const response = await worker.fetch(
+      request(requestPath, { method: "POST", headers, body: "[]" }),
+      testEnv(),
+      ctx(),
+    );
+    assert.equal(response.status, 400, `${requestPath} ${JSON.stringify(headers)} must be refused`);
+    assert.equal(response.headers.get("cache-control"), "no-store");
+    assert.equal(response.headers.get("x-content-type-options"), "nosniff", "security headers still apply");
+    assert.deepEqual(JSON.parse(await response.text()), { error: "Server actions are not supported." });
+  }
+  assert.equal(app.__calls.length, 0, "the vinext action loader must never be reached");
+});
+
+test("server-action guard: ordinary POSTs and non-POST requests with the header pass through", async () => {
+  const { worker, app } = await loadWorker();
+  const json = await worker.fetch(
+    request("/api/cameras", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }),
+    testEnv(),
+    ctx(),
+  );
+  assert.equal(json.status, 200, "the JSON write path stays open");
+  const get = await worker.fetch(request("/", { headers: { "next-action": "x" } }), testEnv(), ctx());
+  assert.equal(get.status, 200, "only POST triggers vinext's action path, so only POST is refused");
+  assert.equal(app.__calls.length, 2);
+});
+
 test("page-post-guard: the scanner gate still wins (multipart POST to /.env is 403, not 400)", async () => {
   const { worker, app } = await loadWorker();
   const response = await worker.fetch(
