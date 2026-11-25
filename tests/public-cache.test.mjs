@@ -28,6 +28,10 @@ async function loadModule() {
     compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ESNext },
   }).outputText;
   const tmp = await import("node:fs/promises").then(({ mkdtemp }) => mkdtemp("/tmp/public-cache-"));
+  // The module imports `vinext/shims/request-context` (ctx.waitUntil for the
+  // streamed-export cache write): link the repo's node_modules so the bare
+  // specifier resolves from the temp dir.
+  await (await import("node:fs/promises")).symlink(new URL("../node_modules", import.meta.url), `${tmp}/node_modules`, "dir");
   const file = `${tmp}/public-cache.mjs`;
   await (await import("node:fs/promises")).writeFile(file, js);
   return import(`${pathToFileURL(file).href}?t=${Date.now()}`);
@@ -179,4 +183,179 @@ test("cache keys are query-string sensitive (different bbox = different entry)",
 
   assert.equal(state.store.size, 2, "different viewports are cached separately");
   assert.equal(state.matchCalls, 2, "each distinct query is checked independently");
+});
+
+// ---------------------------------------------------------------------------
+// Streamed bodies (Workers OOM, 2026-11): the full CSV/GeoJSON exports are a
+// ReadableStream paged from D1. `await cache.put(response.clone())` would
+// drain the cache branch of the clone's tee before the client branch is
+// read, i.e. hold the WHOLE export in memory. A response flagged with
+// markStreamedResponse is instead split with a lockstep tee (bounded) and
+// the cache write runs in ctx.waitUntil, concurrently with the download.
+// ---------------------------------------------------------------------------
+
+const { runWithExecutionContext } = await import("vinext/shims/request-context");
+
+const encoder = new TextEncoder();
+const decoder = new TextDecoder();
+
+function countedSource(chunks) {
+  const state = { pulled: 0, cancelled: false };
+  const stream = new ReadableStream(
+    {
+      pull(controller) {
+        if (state.pulled === chunks.length) {
+          controller.close();
+          return;
+        }
+        controller.enqueue(encoder.encode(chunks[state.pulled]));
+        state.pulled += 1;
+      },
+      cancel() {
+        state.cancelled = true;
+      },
+    },
+    { highWaterMark: 0 },
+  );
+  return { stream, state };
+}
+
+async function readAll(stream, onChunk = () => {}) {
+  const reader = stream.getReader();
+  let text = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) return text;
+    text += decoder.decode(value);
+    await onChunk();
+  }
+}
+
+const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+// A cache whose put() consumes the body chunk by chunk, like the Workers
+// Cache API, optionally slowly.
+function installStreamingCache({ putDelayMs = 0, putError = null } = {}) {
+  const state = { store: new Map(), putCalls: 0, consumed: 0 };
+  globalThis.caches = {
+    default: {
+      async match(key) {
+        return state.store.get(key.url) ?? null;
+      },
+      async put(key, response) {
+        state.putCalls += 1;
+        if (putError) throw putError;
+        const text = await readAll(response.body, async () => {
+          state.consumed += 1;
+          if (putDelayMs) await new Promise((resolve) => setTimeout(resolve, putDelayMs));
+        });
+        state.store.set(key.url, new Response(text, { status: response.status, headers: response.headers }));
+      },
+    },
+  };
+  return state;
+}
+
+function streamedBuilder(markStreamedResponse, chunks) {
+  const source = countedSource(chunks);
+  const build = async () =>
+    markStreamedResponse(new Response(source.stream, { headers: { "Content-Type": "text/csv", "Cache-Control": "public, s-maxage=86400", "Cache-Tag": "cameras-export" } }));
+  return { source, build };
+}
+
+const CHUNKS = Array.from({ length: 20 }, (_, index) => `row-${index}\n`);
+
+test("streamed miss: the client and the cache both get the full body, the put runs in waitUntil", async () => {
+  const { withPublicCache, markStreamedResponse } = await loadModule();
+  const cache = installStreamingCache({ putDelayMs: 1 });
+  const { source, build } = streamedBuilder(markStreamedResponse, CHUNKS);
+  const background = [];
+  const ctx = { waitUntil: (promise) => background.push(promise) };
+
+  const response = await runWithExecutionContext(ctx, () =>
+    withPublicCache(new Request("https://osdb.test/api/cameras?format=csv"), 300, build),
+  );
+  assert.equal(background.length, 1, "the cache write is handed to waitUntil, not awaited before the response");
+  assert.equal(response.headers.get("X-OSDB-Cache"), "miss");
+  assert.equal(response.headers.get("Cache-Tag"), "cameras-export");
+
+  let maxLead = 0;
+  let clientChunks = 0;
+  const body = await readAll(response.body, () => {
+    clientChunks += 1;
+    // Lockstep: the source never runs ahead of the slower reader by more
+    // than the chunk in flight.
+    maxLead = Math.max(maxLead, source.state.pulled - Math.min(clientChunks, cache.consumed));
+  });
+  await Promise.all(background);
+
+  assert.equal(body, CHUNKS.join(""));
+  assert.ok(maxLead <= 2, `the source ran ${maxLead} chunks ahead of the slower branch`);
+  const stored = cache.store.get("https://osdb.test/api/cameras?format=csv");
+  assert.ok(stored, "the export is cached for the next request");
+  assert.equal(await stored.text(), CHUNKS.join(""));
+  assert.equal(stored.headers.get("Cache-Control"), "public, s-maxage=86400", "the export TTL is preserved");
+  assert.equal(stored.headers.get("X-OSDB-Cache"), "miss");
+});
+
+test("streamed miss without an ExecutionContext deliberately bypasses the cache", async () => {
+  const { withPublicCache, markStreamedResponse } = await loadModule();
+  const cache = installStreamingCache();
+  const { build } = streamedBuilder(markStreamedResponse, CHUNKS);
+  const response = await withPublicCache(new Request("https://osdb.test/api/cameras?format=csv"), 300, build);
+  assert.equal(await response.text(), CHUNKS.join(""));
+  assert.equal(cache.putCalls, 0, "no waitUntil -> no cache write (awaiting it would buffer the whole body)");
+});
+
+test("streamed miss: a failing cache write is detached and the download carries on", async () => {
+  const { withPublicCache, markStreamedResponse } = await loadModule();
+  installStreamingCache({ putError: new Error("cache write failed") });
+  const { build } = streamedBuilder(markStreamedResponse, CHUNKS);
+  const background = [];
+  const response = await runWithExecutionContext({ waitUntil: (promise) => background.push(promise) }, () =>
+    withPublicCache(new Request("https://osdb.test/api/cameras?format=geojson"), 300, build),
+  );
+  assert.equal(await response.text(), CHUNKS.join(""));
+  await Promise.all(background);
+});
+
+test("streamed miss: a client that disconnects cancels the source and stores nothing", async () => {
+  const { withPublicCache, markStreamedResponse } = await loadModule();
+  const cache = installStreamingCache();
+  const { source, build } = streamedBuilder(markStreamedResponse, CHUNKS);
+  const background = [];
+  const response = await runWithExecutionContext({ waitUntil: (promise) => background.push(promise) }, () =>
+    withPublicCache(new Request("https://osdb.test/api/cameras?format=csv"), 300, build),
+  );
+  const reader = response.body.getReader();
+  await reader.read();
+  await reader.cancel("client went away");
+  await Promise.all(background);
+  assert.equal(source.state.cancelled, true, "the D1 walk stops with the client");
+  assert.ok(source.state.pulled < CHUNKS.length);
+  assert.equal(cache.store.size, 0, "a partial export is never cached");
+});
+
+test("lockstepTee reads the source only when both branches want a chunk", async () => {
+  const { lockstepTee } = await loadModule();
+  const source = countedSource(["a", "b", "c"]);
+  const tee = lockstepTee(source.stream);
+  const primary = tee.primary.getReader();
+  const secondary = tee.secondary.getReader();
+
+  const firstPrimary = primary.read();
+  await tick();
+  assert.equal(source.state.pulled, 0, "the primary alone cannot pull the source");
+  const firstSecondary = secondary.read();
+  assert.equal(decoder.decode((await firstPrimary).value), "a");
+  assert.equal(decoder.decode((await firstSecondary).value), "a");
+
+  const secondPrimary = primary.read();
+  await tick();
+  assert.equal(source.state.pulled, 1, "the primary cannot run ahead of a stalled secondary");
+  tee.detachSecondary(new Error("cache gave up"));
+  assert.equal(decoder.decode((await secondPrimary).value), "b", "once detached, the primary continues alone");
+  assert.equal(decoder.decode((await primary.read()).value), "c");
+  assert.equal((await primary.read()).done, true);
+  await assert.rejects(secondary.read(), /cache gave up/);
 });

@@ -750,6 +750,17 @@ changes accumulate under `[Unreleased]`.
 
 ### Fixed
 
+- **Esportazioni CSV/GeoJSON in streaming (2026-11):** `GET /api/cameras?format=csv`
+  e `?format=geojson` leggevano tutti i record pubblici (~273k) con una sola
+  SELECT e costruivano l'intero file in memoria, superando il limite di
+  128 MB dell'isolate Workers (`exceededMemory`). Ora il corpo è un
+  `ReadableStream` che legge D1 a pagine keyset da 1000 righe
+  (`id < ? ORDER BY id DESC`, stesso ordine di prima) e le scrive una alla
+  volta: la memoria non cresce più con il dataset. Byte, intestazioni, filtri
+  e licenza ODbL invariati (test di regressione byte per byte). La cache del
+  worker salva l'export senza bufferizzarlo (tee a passo con il client, scrittura in
+  `waitUntil`); senza ExecutionContext l'export non viene messo in cache.
+
 - **Phone layout overflows (2026-11):** on `/segnala` the "Date observed"
   input overflowed its fieldset on a 390px screen — the ≤480px one-column
   rule for the report metadata and coordinate fields sat before the base
