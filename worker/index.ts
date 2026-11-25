@@ -263,6 +263,30 @@ async function dispatch(request: Request, env: Env, ctx: ExecutionContext, url: 
       );
     }
 
+    // 1l. Server-action invocations are refused at the edge — on EVERY path.
+    //    vinext treats a POST carrying `next-action` (or its own
+    //    `x-rsc-action`, vinext app-rsc-handler) as a server-action call and
+    //    tries to load that action. The app defines none (see 1k), so the
+    //    loader throws and the router answers HTTP 500 "[vinext] Server
+    //    action error" (Workers Observability 2026-11: bot POSTs to /). Such
+    //    a request can only be a probe; it gets a clean 400 instead. Runs
+    //    after the multipart gate so a multipart action POST keeps that
+    //    gate's exact 400 body. MUST be revisited if a real server action is
+    //    ever added.
+    if (
+      request.method === "POST" &&
+      (request.headers.has("next-action") || request.headers.has("x-rsc-action"))
+    ) {
+      return withSecurityHeaders(
+        Response.json(
+          { error: "Server actions are not supported." },
+          { status: 400, headers: { "Cache-Control": "no-store" } },
+        ),
+        url.pathname,
+        url.hostname,
+      );
+    }
+
     if (url.pathname === "/_vinext/image") {
       const allowedWidths = [...DEFAULT_DEVICE_SIZES, ...DEFAULT_IMAGE_SIZES];
       const optimized = await handleImageOptimization(gated, {
