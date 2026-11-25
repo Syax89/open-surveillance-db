@@ -174,12 +174,16 @@ export function demoRecordsPublic(): boolean {
 }
 
 /**
- * Page size for the streamed CSV/GeoJSON exports (Workers OOM, 2026-11):
- * the exports used to read the WHOLE public set (~273k rows) in one
- * SELECT and build the body in memory, which exceeded the 128 MB isolate
- * limit. The route now walks listPublicCameras in keyset pages of this
- * size and streams each page out, so peak memory is bounded by a page,
- * not by the dataset.
+ * Page size for the full public list (Workers OOM, 2026-11). Paging is
+ * MANDATORY, not an optimisation: the exports used to read the whole
+ * public set (~273k rows) in ONE SELECT, which both exceeded the 128 MB
+ * Worker isolate limit and — since 2026-11-04 — exceeds D1's 50 MB maximum
+ * query result size, so the single query fails on D1 itself whatever the
+ * Worker does with it. listPublicCameras therefore always sends a LIMIT of
+ * at most this size (~0.5 MB per page), and the CSV/GeoJSON exports walk it
+ * in keyset pages and stream each page out. 1000 rows/page keeps a 273k
+ * export at ~274 D1 queries, far below the Workers Paid per-invocation
+ * subrequest budget (10,000).
  */
 export const PUBLIC_CAMERAS_EXPORT_PAGE_SIZE = 1000;
 
@@ -192,9 +196,9 @@ export type PublicCameraListOptions = {
    */
   beforeId?: number;
   /**
-   * Page size, clamped to [1, PUBLIC_CAMERAS_EXPORT_PAGE_SIZE]. Omitted =
-   * the historical unbounded list (db/test callers only — the public
-   * exports always page).
+   * Page size, clamped to [1, PUBLIC_CAMERAS_EXPORT_PAGE_SIZE]; omitted =
+   * PUBLIC_CAMERAS_EXPORT_PAGE_SIZE. There is deliberately no unbounded
+   * mode: a caller that needs every row walks the pages with `beforeId`.
    */
   limit?: number;
   /**
@@ -247,13 +251,10 @@ export async function listPublicCameras(
     query += " AND id < ?";
     parameters.push(Math.trunc(options.beforeId));
   }
-  query += " ORDER BY id DESC";
-  if (options.limit !== undefined) {
-    // Defensive clamp: the db boundary never hands out an unbounded page
-    // to a caller that asked for a bounded one.
-    query += " LIMIT ?";
-    parameters.push(Math.min(Math.max(Math.trunc(options.limit) || PUBLIC_CAMERAS_EXPORT_PAGE_SIZE, 1), PUBLIC_CAMERAS_EXPORT_PAGE_SIZE));
-  }
+  // Always bounded (see PUBLIC_CAMERAS_EXPORT_PAGE_SIZE): an unbounded
+  // SELECT over the public set exceeds D1's 50 MB result cap.
+  query += " ORDER BY id DESC LIMIT ?";
+  parameters.push(Math.min(Math.max(Math.trunc(options.limit ?? PUBLIC_CAMERAS_EXPORT_PAGE_SIZE) || PUBLIC_CAMERAS_EXPORT_PAGE_SIZE, 1), PUBLIC_CAMERAS_EXPORT_PAGE_SIZE));
   const result = await d1.prepare(query).bind(...parameters).all<PublicCameraRecord>();
   return result.results.map((record) => ({ ...record, latitude: roundPublicCoordinate(record.latitude), longitude: roundPublicCoordinate(record.longitude) }));
 }

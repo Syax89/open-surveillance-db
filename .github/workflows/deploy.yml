@@ -246,3 +246,15 @@ jobs:
             previous-version-id.txt
           if-no-files-found: warn
           retention-days: 30
+
+      # Workers OOM (2026-11): GET /api/cameras?format=csv|geojson must answer
+      # 200 with the COMPLETE public dataset after every deploy. The exports
+      # are streamed from keyset-paged D1 reads (one SELECT of the full set
+      # exceeds the 128 MB isolate and D1's 50 MB result cap), so a 200 alone
+      # is not enough: the script reads both bodies to the end and checks the
+      # ODbL footer/licence, unique ids and row count == the public `total`.
+      # Runs LAST so a failure never skips the snapshot/version-id upload
+      # above; the rollback command is already in the job summary.
+      - name: Verify full exports (post-deploy, CSV + GeoJSON complete)
+        if: ${{ github.event.inputs.mode == 'deploy' }}
+        run: node scripts/verify-exports.mjs https://opensurveillancedb.org

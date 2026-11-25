@@ -760,6 +760,14 @@ changes accumulate under `[Unreleased]`.
   e licenza ODbL invariati (test di regressione byte per byte). La cache del
   worker salva l'export senza bufferizzarlo (tee a passo con il client, scrittura in
   `waitUntil`); senza ExecutionContext l'export non viene messo in cache.
+  La lettura a pagine è obbligatoria, non un'ottimizzazione: dal 2026-11-04
+  D1 rifiuta i risultati oltre 50 MB, quindi `listPublicCameras` manda
+  sempre un `LIMIT` (nessuna SELECT illimitata possibile). Nuovo controllo
+  post-deploy `scripts/verify-exports.mjs` (ultimo step di `deploy.yml`):
+  entrambi gli export devono rispondere 200 con il dataset completo (corpo
+  letto fino in fondo, footer/licenza ODbL, id univoci, numero di righe =
+  `total` della lista pubblica). Verificato in workerd (Miniflare) con
+  273.000 righe: CSV 58 MB e GeoJSON 103 MB, 200 e completi.
 
 - **Phone layout overflows (2026-11):** on `/segnala` the "Date observed"
   input overflowed its fieldset on a 390px screen — the ≤480px one-column

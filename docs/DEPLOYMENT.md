@@ -237,7 +237,19 @@ Manual smoke commands after a deploy (read-only):
 npx wrangler tail                        # live logs
 npx wrangler versions list               # version ids for rollback correlation
 npx wrangler rollback [version-id]       # instant rollback, does not touch D1
+node scripts/verify-exports.mjs          # CSV + GeoJSON exports: 200 + complete dataset
 ```
+
+`deploy.yml` runs `scripts/verify-exports.mjs` as its last step (mode
+`deploy`): both full exports (`/api/cameras?format=csv|geojson`) must answer
+200 with the COMPLETE public dataset. They are streamed from keyset-paged D1
+reads — paging is mandatory, since one SELECT of the full public set exceeds
+both the 128 MB Worker isolate and D1's 50 MB query-result cap — so the script
+reads each body to the end and checks the ODbL footer/licence, unique ids and
+that the row count equals `total` from the public JSON list (a broken stream
+cuts the body after the 200 headers). Its URLs carry a `verify=<timestamp>`
+parameter so the worker cache misses and the streamed path really runs. A
+failure leaves the run red with the rollback command in the job summary.
 
 The OpenAI-hosting metadata scaffold (`.openai/hosting.json` and the `sites()`
 Vite plugin that copied it plus `drizzle/` into `dist/.openai`) was template

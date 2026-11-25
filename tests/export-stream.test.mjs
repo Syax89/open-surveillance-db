@@ -289,8 +289,60 @@ test("real SQL: walking listPublicCameras by keyset pages equals the unbounded l
     assert.deepEqual(walked, full, `keyset walk == unbounded list for ${JSON.stringify(filters)}`);
   }
 
-  // The db boundary clamps an oversized page to the export page size.
-  const clamped = await cameras.listPublicCameras({}, { now, limit: 1_000_000 });
-  assert.ok(clamped.length <= cameras.PUBLIC_CAMERAS_EXPORT_PAGE_SIZE);
   assert.equal(cameras.PUBLIC_CAMERAS_EXPORT_PAGE_SIZE, PAGE_SIZE, "the route mock mirrors the real page size");
+});
+
+test("real SQL: the full list is never one unbounded SELECT, and the keyset walk covers every row", async () => {
+  // Paging is mandatory (D1 caps a query result at 50 MB since 2026-11-04;
+  // the ~273k-row public set is well above it): no call may issue an
+  // unbounded SELECT, and walking the pages must still yield the complete
+  // dataset. 2345 rows = two full pages and a short third one.
+  const runtime = await loadDbRuntime();
+  const db = new D1SqliteDatabase();
+  await applyDrizzleMigrations(db);
+  runtime.env.DB = db;
+  delete runtime.env.ENVIRONMENT;
+  const { cameras } = runtime;
+
+  const { id: seedId } = await cameras.createPendingCamera({
+    title: "Bulk camera",
+    kind: "PTZ",
+    manufacturer: null,
+    observedOn: null,
+    address: "Via Bulk",
+    notes: "",
+    latitude: 41.9,
+    longitude: 12.49,
+  });
+  await db.prepare("UPDATE cameras SET status = 'active' WHERE id = ?").bind(seedId).run();
+  const columns = (await db.prepare("PRAGMA table_info(cameras)").all()).results
+    .map((column) => column.name)
+    .filter((name) => name !== "id")
+    .map((name) => `"${name}"`)
+    .join(", ");
+  await db
+    .prepare(`WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 2344) INSERT INTO cameras (${columns}) SELECT ${columns} FROM cameras, n WHERE cameras.id = ?`)
+    .bind(seedId)
+    .run();
+  const expectedIds = (await db.prepare("SELECT id FROM cameras WHERE status = 'active' ORDER BY id DESC").all()).results.map((row) => row.id);
+  assert.equal(expectedIds.length, 2345);
+
+  const bare = await cameras.listPublicCameras();
+  assert.equal(bare.length, PAGE_SIZE, "a call without a page request still returns one bounded page");
+  const oversized = await cameras.listPublicCameras({}, { limit: 1_000_000 });
+  assert.equal(oversized.length, PAGE_SIZE, "an oversized limit is clamped to the page size");
+
+  const now = new Date().toISOString();
+  const walkedIds = [];
+  let beforeId;
+  let pages = 0;
+  for (;;) {
+    const page = await cameras.listPublicCameras({}, { now, limit: PAGE_SIZE, ...(beforeId === undefined ? {} : { beforeId }) });
+    pages += 1;
+    walkedIds.push(...page.map((record) => record.id));
+    if (page.length < PAGE_SIZE) break;
+    beforeId = page[page.length - 1].id;
+  }
+  assert.equal(pages, 3);
+  assert.deepEqual(walkedIds, expectedIds, "every public row exactly once, newest id first");
 });
