@@ -750,6 +750,21 @@ changes accumulate under `[Unreleased]`.
 
 ### Fixed
 
+- **Controllo post-deploy degli export e indirizzo workers.dev (2026-11-26):**
+  dopo il deploy del 26/11 lo step "Verify full exports" era fallito con un
+  403 sul GeoJSON, ma il worker non aveva mai ricevuto la richiesta: era la
+  pagina di challenge di Bot Fight Mode, che Cloudflare mostra a parte del
+  traffico che arriva dai datacenter (il runner GitHub è su Azure, ASN 8075).
+  Ora `scripts/verify-exports.mjs` riconosce queste risposte (header
+  `cf-mitigated: challenge`) e le ritenta come un 5xx. Se la challenge
+  persiste, il controllo risulta **non verificato** (avviso nel riepilogo
+  del job) invece che fallito. Ogni altra risposta diversa da 200 fa ancora
+  fallire il deploy, compreso un 403 senza `cf-mitigated`.
+  `wrangler.jsonc` imposta anche `workers_dev: false`. L'indirizzo
+  `*.workers.dev` serviva l'intero sito fuori dalla zona: senza Bot Fight
+  Mode, senza redirect all'host canonico e senza `noindex`. Era quindi un
+  duplicato indicizzabile del sito, già visitato dai bot.
+
 - **Esportazioni CSV/GeoJSON in streaming (2026-11):** `GET /api/cameras?format=csv`
   e `?format=geojson` leggevano tutti i record pubblici (~273k) con una sola
   SELECT e costruivano l'intero file in memoria, superando il limite di

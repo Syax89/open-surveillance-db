@@ -251,6 +251,17 @@ cuts the body after the 200 headers). Its URLs carry a `verify=<timestamp>`
 parameter so the worker cache misses and the streamed path really runs. A
 failure leaves the run red with the rollback command in the job summary.
 
+Cloudflare challenges are not failures. The zone runs Bot Fight Mode, which
+answers some requests from datacenter networks (the GitHub runner included)
+with its own challenge page: HTTP 403 with `cf-mitigated: challenge`. The
+Worker never receives those requests, and on the Free plan Bot Fight Mode
+cannot be skipped for a single path. The script retries a challenged request
+like a 5xx. If every attempt is challenged, that check is reported as
+**unverified**: a `::warning::` annotation in the job summary, and the run stays
+green. Re-run `node scripts/verify-exports.mjs` from a non-datacenter network to
+complete it. Any other non-200 answer, a 403 without `cf-mitigated` included,
+still fails the run.
+
 The OpenAI-hosting metadata scaffold (`.openai/hosting.json` and the `sites()`
 Vite plugin that copied it plus `drizzle/` into `dist/.openai`) was template
 leftover and has been removed: this project deploys only to Cloudflare
