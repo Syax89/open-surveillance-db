@@ -86,6 +86,66 @@ test("verifyExports fails on a non-200 export and on a stream that breaks mid-bo
   await assert.rejects(verifyExports("https://osdb.test", { ...quiet, fetch: broken }), /D1 went away/);
 });
 
+// Cloudflare Bot Fight Mode (deploy 2026-11-26): the zone answers some
+// datacenter requests with its own challenge page (403, cf-mitigated:
+// challenge) and the Worker never sees them.
+const challengePage = () =>
+  new Response("<!DOCTYPE html><title>Just a moment...</title>", {
+    status: 403,
+    headers: { "content-type": "text/html; charset=UTF-8", "cf-mitigated": "challenge" },
+  });
+
+test("a Cloudflare challenge that persists makes that check unverified, not failed; the rest is still verified", async () => {
+  const inner = await routeFetch(rows(3));
+  const result = await verifyExports("https://osdb.test", {
+    ...quiet,
+    attempts: 2,
+    fetch: (url) => (url.includes("format=geojson") ? challengePage() : inner(url)),
+  });
+  assert.deepEqual(result.problems, []);
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped.length, 1);
+  assert.match(result.skipped[0], /^GEOJSON: Cloudflare challenged the request \(HTTP 403, cf-mitigated: challenge\)/);
+  assert.deepEqual(result.counts, { csv: 3, geojson: null }, "the CSV export is still fully checked");
+});
+
+test("a Cloudflare challenge is retried, and a later 200 is verified normally", async () => {
+  const inner = await routeFetch(rows(3));
+  let geojsonCalls = 0;
+  const result = await verifyExports("https://osdb.test", {
+    ...quiet,
+    attempts: 3,
+    fetch: (url) => (url.includes("format=geojson") && ++geojsonCalls === 1 ? challengePage() : inner(url)),
+  });
+  assert.equal(geojsonCalls, 2);
+  assert.deepEqual(result.skipped, []);
+  assert.deepEqual(result.problems, []);
+  assert.deepEqual(result.counts, { csv: 3, geojson: 3 });
+});
+
+test("a 403 without cf-mitigated still fails: only Cloudflare's own challenge is excused", async () => {
+  const inner = await routeFetch(rows(3));
+  const result = await verifyExports("https://osdb.test", {
+    ...quiet,
+    fetch: (url) => (url.includes("format=csv") ? Response.json({ error: "Forbidden" }, { status: 403 }) : inner(url)),
+  });
+  assert.equal(result.ok, false);
+  assert.ok(result.problems.includes("CSV: HTTP 403, expected 200"));
+  assert.deepEqual(result.skipped, []);
+});
+
+test("a challenged JSON list skips the total comparison without reporting a missing total", async () => {
+  const inner = await routeFetch(rows(3));
+  const result = await verifyExports("https://osdb.test", {
+    ...quiet,
+    fetch: (url) => (url.includes("limit=1") ? challengePage() : inner(url)),
+  });
+  assert.deepEqual(result.problems, []);
+  assert.equal(result.total, null);
+  assert.match(result.skipped.join(), /JSON list: Cloudflare challenged/);
+  assert.deepEqual(result.counts, { csv: 3, geojson: 3 }, "both exports are still checked and compared");
+});
+
 test("every request bypasses the worker cache with a verify stamp", async () => {
   const seen = [];
   const inner = await routeFetch(rows(2));

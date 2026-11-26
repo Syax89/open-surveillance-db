@@ -153,9 +153,25 @@ export function checkGeoJsonExport(text) {
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * Fetches `url` and reads the WHOLE body, retrying network errors, 5xx and
- * 429 (a deploy may still be propagating). A body that fails mid-stream
- * counts as a network error.
+ * A response Cloudflare answered itself with a challenge instead of passing
+ * the request to the Worker. Cloudflare marks every challenge page with
+ * `cf-mitigated: challenge`.
+ *
+ * Why it matters (deploy 2026-11-26): the zone runs Bot Fight Mode, which
+ * challenges automated traffic from datacenter networks request by request.
+ * The GitHub runner (ASN 8075) got a 403 `managed_challenge` on the GeoJSON
+ * export and the JSON list while its CSV export went through. The Worker
+ * never saw those requests (firewall events: source botFight), so they say
+ * nothing about the exports. On the Free plan Bot Fight Mode cannot be
+ * skipped per path, so the check reports the challenge instead of failing.
+ */
+export const isCloudflareChallenge = (response) => (response.headers.get("cf-mitigated") ?? "").toLowerCase() === "challenge";
+
+/**
+ * Fetches `url` and reads the WHOLE body, retrying network errors, 5xx, 429
+ * (a deploy may still be propagating) and Cloudflare challenges (Bot Fight
+ * Mode decides per request, so a retry often passes). A body that fails
+ * mid-stream counts as a network error.
  */
 async function fetchWhole(fetchImpl, url, { attempts, retryMs, timeoutMs, log }) {
   let lastError;
@@ -164,9 +180,10 @@ async function fetchWhole(fetchImpl, url, { attempts, retryMs, timeoutMs, log })
     try {
       const response = await fetchImpl(url, { signal: AbortSignal.timeout(timeoutMs), headers: { "user-agent": "osdb-verify-exports" } });
       const text = await response.text();
-      const result = { status: response.status, headers: response.headers, text, ms: Date.now() - started };
-      if ((response.status >= 500 || response.status === 429) && attempt < attempts) {
-        log(`  ${url}: HTTP ${response.status}, retrying in ${retryMs} ms (${attempt}/${attempts})`);
+      const challenged = isCloudflareChallenge(response);
+      const result = { status: response.status, headers: response.headers, text, ms: Date.now() - started, challenged };
+      if ((response.status >= 500 || response.status === 429 || challenged) && attempt < attempts) {
+        log(`  ${url}: HTTP ${response.status}${challenged ? " (Cloudflare challenge)" : ""}, retrying in ${retryMs} ms (${attempt}/${attempts})`);
         await sleep(retryMs);
         continue;
       }
@@ -194,10 +211,15 @@ export async function verifyExports(baseUrl, options = {}) {
   const base = baseUrl.replace(/\/+$/, "");
   const request = (path) => fetchWhole(fetchImpl, `${base}${path}${path.includes("?") ? "&" : "?"}verify=${stamp}`, { attempts, retryMs, timeoutMs, log });
   const problems = [];
+  // Checks a Cloudflare challenge kept from reaching the Worker even after
+  // every retry: unverified, not failed (see isCloudflareChallenge).
+  const skipped = [];
+  const challengeNote = (label, response) => `${label}: Cloudflare challenged the request (HTTP ${response.status}, cf-mitigated: challenge) on every attempt; the Worker never saw it, so this check is unverified, verify it by hand`;
 
   const list = await request("/api/cameras?limit=1");
   let total = null;
-  if (list.status !== 200) problems.push(`JSON list: HTTP ${list.status}, expected 200`);
+  if (list.challenged) skipped.push(challengeNote("JSON list", list));
+  else if (list.status !== 200) problems.push(`JSON list: HTTP ${list.status}, expected 200`);
   else {
     try {
       total = JSON.parse(list.text).total;
@@ -217,6 +239,10 @@ export async function verifyExports(baseUrl, options = {}) {
     const label = format.toUpperCase();
     const bytes = Buffer.byteLength(response.text);
     log(`${label}: HTTP ${response.status}, ${bytes} bytes in ${response.ms} ms, X-OSDB-Cache=${response.headers.get("x-osdb-cache") ?? "-"}`);
+    if (response.challenged) {
+      skipped.push(challengeNote(label, response));
+      continue;
+    }
     if (response.status !== 200) {
       problems.push(`${label}: HTTP ${response.status}, expected 200`);
       continue;
@@ -239,7 +265,7 @@ export async function verifyExports(baseUrl, options = {}) {
     }
   }
 
-  return { ok: problems.length === 0, total, counts: { csv: exports.csv?.length ?? null, geojson: exports.geojson?.length ?? null }, problems };
+  return { ok: problems.length === 0, total, counts: { csv: exports.csv?.length ?? null, geojson: exports.geojson?.length ?? null }, problems, skipped };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
@@ -252,9 +278,15 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       retryMs: number("VERIFY_EXPORTS_RETRY_MS", 20_000),
       timeoutMs: number("VERIFY_EXPORTS_TIMEOUT_MS", 300_000),
     });
-    if (result.ok) {
+    if (result.ok && result.skipped.length > 0) {
+      // A GitHub Actions warning annotation: the run stays green but the
+      // unverified checks show up in the job summary.
+      for (const note of result.skipped) console.log(`::warning title=Export check unverified::${note}`);
+      console.log("WARN: no failure found, but the checks above could not run because Cloudflare challenged them.");
+    } else if (result.ok) {
       console.log(`OK: both exports answered 200 with the complete dataset (${result.total} records).`);
     } else {
+      for (const note of result.skipped) console.log(`::warning title=Export check unverified::${note}`);
       for (const problem of result.problems) console.error(`FAIL: ${problem}`);
       process.exitCode = 1;
     }

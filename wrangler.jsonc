@@ -4,6 +4,13 @@
   "compatibility_date": "2026-07-31",
   "compatibility_flags": ["nodejs_compat"],
   "main": "./worker/index.ts",
+  // The *.workers.dev URL stays ON (explicit, 2026-11-26): ops monitoring
+  // (vars.PROD_URL, .github/workflows/ops-monitoring.yml) probes it from
+  // GitHub runners, which the zone's Bot Fight Mode challenges at random on
+  // opensurveillancedb.org. It is kept out of search instead: every response
+  // on it carries X-Robots-Tag noindex and its robots.txt is Disallow: /
+  // (worker/host.ts, worker/security-headers.ts).
+  "workers_dev": true,
   "assets": {
     "directory": "dist/client",
     "not_found_handling": "none",

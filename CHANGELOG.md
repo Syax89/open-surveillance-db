@@ -750,6 +750,23 @@ changes accumulate under `[Unreleased]`.
 
 ### Fixed
 
+- **Controllo post-deploy degli export e indirizzo workers.dev (2026-11-26):**
+  dopo il deploy del 26/11 lo step "Verify full exports" era fallito con un
+  403 sul GeoJSON, ma il worker non aveva mai ricevuto la richiesta: era la
+  pagina di challenge di Bot Fight Mode, che Cloudflare mostra a parte del
+  traffico che arriva dai datacenter (il runner GitHub è su Azure, ASN 8075).
+  Ora `scripts/verify-exports.mjs` riconosce queste risposte (header
+  `cf-mitigated: challenge`) e le ritenta come un 5xx. Se la challenge
+  persiste, il controllo risulta **non verificato** (avviso nel riepilogo
+  del job) invece che fallito. Ogni altra risposta diversa da 200 fa ancora
+  fallire il deploy, compreso un 403 senza `cf-mitigated`.
+  L'indirizzo `*.workers.dev` serviva l'intero sito senza `noindex`: era
+  un duplicato indicizzabile, già visitato dai bot. Resta attivo, ora in
+  modo esplicito (`workers_dev: true`), perché il monitoraggio GitHub
+  (`vars.PROD_URL`) lo usa per evitare le challenge di Bot Fight Mode sul
+  dominio. Su quell'host però ogni risposta porta `X-Robots-Tag: noindex`
+  e il suo `robots.txt` è `Disallow: /`.
+
 - **Esportazioni CSV/GeoJSON in streaming (2026-11):** `GET /api/cameras?format=csv`
   e `?format=geojson` leggevano tutti i record pubblici (~273k) con una sola
   SELECT e costruivano l'intero file in memoria, superando il limite di
