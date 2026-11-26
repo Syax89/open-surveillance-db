@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { BBOX_MAX_AREA_SQ_DEG, createCamera, DOME_KIND, findNearbyPublicCameras, freshnessWindows, getPublicCameraFacets, getPublicCameraKinds, listPublicCameras, listPublicCamerasInBbox, listPublicCamerasInBboxPage, listPublicCamerasPage, PUBLIC_CAMERAS_BBOX_DEFAULT_LIMIT, PUBLIC_CAMERAS_BBOX_GEOJSON_MAX_FEATURES, PUBLIC_CAMERAS_BBOX_MAX_LIMIT, PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT, PUBLIC_CAMERAS_PAGE_MAX_LIMIT, PUBLIC_CAMERA_SORT_OPTIONS, type FreshnessWindow, type PublicCameraFacets, type PublicCameraFilters } from "../../../db/cameras";
+import { BBOX_MAX_AREA_SQ_DEG, createCamera, DOME_KIND, findNearbyPublicCameras, freshnessWindows, getPublicCameraFacets, getPublicCameraKinds, listPublicCameras, listPublicCamerasInBbox, listPublicCamerasInBboxPage, listPublicCamerasPage, PUBLIC_CAMERAS_BBOX_DEFAULT_LIMIT, PUBLIC_CAMERAS_EXPORT_PAGE_SIZE, PUBLIC_CAMERAS_BBOX_GEOJSON_MAX_FEATURES, PUBLIC_CAMERAS_BBOX_MAX_LIMIT, PUBLIC_CAMERAS_PAGE_DEFAULT_LIMIT, PUBLIC_CAMERAS_PAGE_MAX_LIMIT, PUBLIC_CAMERA_SORT_OPTIONS, type FreshnessWindow, type PublicCameraFacets, type PublicCameraFilters, type PublicCameraRecord } from "../../../db/cameras";
 import { requiresDuplicateConfirmation } from "../../lib/duplicate-detection";
 import { requireWriteAuth } from "../../lib/write-gate";
 import { CSRF_REJECTED_ERROR, csrfVerified, sameOrigin } from "../../lib/csrf";
@@ -14,7 +14,7 @@ import {
 import { rateLimitResponse } from "../../lib/rate-limit-response";
 import { CACHE_TAGS } from "../../lib/cache-purge";
 import { errorSummary } from "../../lib/error-summary";
-import { withPublicCache } from "../../lib/public-cache";
+import { markStreamedResponse, withPublicCache } from "../../lib/public-cache";
 import {
   BodyReadError,
   readJsonBody,
@@ -87,15 +87,97 @@ function csvCell(value: string | number | null | undefined) {
   return `"${safeText.replaceAll('"', '""')}"`;
 }
 
-function toCsv(records: Awaited<ReturnType<typeof listPublicCameras>>) {
-  // `direction` is appended LAST so the historical column positions stay
-  // stable for existing consumers (t_1b08fe12); blank cell = non-directional.
-  const header = ["id", "title", "kind", "manufacturer", "observed_on", "status", "source", "updated", "description", "address", "latitude", "longitude", "direction"];
-  const rows = records.map((record) => [record.id, record.title, record.kind, record.manufacturer, record.observedOn, record.status, record.source, record.updated, record.description, record.address, record.latitude, record.longitude, record.direction].map(csvCell).join(","));
+/**
+ * A full-dataset export body, described as the pieces the streamed writer
+ * concatenates: `head`, then every row rendered by `row` and joined with
+ * `separator`, then `tail`. The concatenation is byte-identical to the former
+ * in-memory bodies (`toCsv(records)` / `Response.json(collection)`), only it
+ * is produced one keyset page at a time.
+ */
+type ExportBody = {
+  head: string;
+  row: (record: PublicCameraRecord) => string;
+  separator: string;
+  tail: string;
+};
+
+// `direction` is appended LAST so the historical column positions stay
+// stable for existing consumers (t_1b08fe12); blank cell = non-directional.
+const CSV_HEADER = ["id", "title", "kind", "manufacturer", "observed_on", "status", "source", "updated", "description", "address", "latitude", "longitude", "direction"];
+
+const CSV_EXPORT: ExportBody = {
+  head: `${CSV_HEADER.join(",")}\n`,
+  row: (record) => [record.id, record.title, record.kind, record.manufacturer, record.observedOn, record.status, record.source, record.updated, record.description, record.address, record.latitude, record.longitude, record.direction].map(csvCell).join(","),
+  separator: "\n",
   // ODbL 1.0 attribution (TERMS_OF_USE § 7.1): the licence requires the
   // notice when the database is shared, so every export carries it. The
   // footer comment keeps the header line parseable by spreadsheet tools.
-  return `${header.join(",")}\n${rows.join("\n")}\n# ${DATA_LICENSE_NOTICE}\n`;
+  // The leading "\n" ends the last row (or, with no rows, leaves the same
+  // empty line the old `rows.join("\n")` produced).
+  tail: `\n# ${DATA_LICENSE_NOTICE}\n`,
+};
+
+// Top-level licence metadata (RFC 7946 foreign members): ODbL 1.0
+// attribution required when the database is shared (TERMS § 7.1). The head
+// and tail spell out exactly what JSON.stringify emitted for
+// { type, license, attribution, features: [...] }, in that key order.
+const GEOJSON_EXPORT: ExportBody = {
+  head: `{"type":"FeatureCollection","license":${JSON.stringify(DATA_LICENSE_ID)},"attribution":${JSON.stringify(DATA_LICENSE_NOTICE)},"features":[`,
+  row: (record) => JSON.stringify({ type: "Feature", geometry: { type: "Point", coordinates: [record.longitude, record.latitude] }, properties: { id: record.id, title: record.title, kind: record.kind, manufacturer: record.manufacturer, observedOn: record.observedOn, status: record.status, source: record.source, updated: record.updated, description: record.description, direction: record.direction } }),
+  separator: ",",
+  tail: "]}",
+};
+
+/**
+ * Streamed full-dataset export (Workers OOM, 2026-11): the CSV/GeoJSON
+ * exports used to load every public row (~273k) with ONE unbounded SELECT
+ * and build the whole body in memory, which blew the 128 MB isolate limit.
+ * The body is now pulled from D1 in keyset pages of
+ * PUBLIC_CAMERAS_EXPORT_PAGE_SIZE (`id < lastId ORDER BY id DESC`, the same
+ * order the single SELECT returned) and each page is encoded and enqueued
+ * before the next one is read, so peak memory is about one page.
+ *
+ * `fetchPage(beforeId)` returns the next page of at most
+ * PUBLIC_CAMERAS_EXPORT_PAGE_SIZE records with `id < beforeId` (undefined =
+ * the first page). The first page is read BEFORE the Response exists, so a
+ * database outage still answers the route's 503 instead of a 200 with a
+ * broken body. A failure on a later page errors the stream (the client sees
+ * a truncated download, and the worker cache never stores it).
+ */
+async function streamPublicExport(fetchPage: (beforeId?: number) => Promise<PublicCameraRecord[]>, body: ExportBody): Promise<ReadableStream<Uint8Array>> {
+  let page: PublicCameraRecord[] | null = await fetchPage();
+  let lastId: number | undefined;
+  let wroteHead = false;
+  let wroteRow = false;
+  const encoder = new TextEncoder();
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      try {
+        const records: PublicCameraRecord[] = page ?? (await fetchPage(lastId));
+        page = null;
+        const parts: string[] = [];
+        if (!wroteHead) {
+          parts.push(body.head);
+          wroteHead = true;
+        }
+        for (const record of records) {
+          if (wroteRow) parts.push(body.separator);
+          parts.push(body.row(record));
+          wroteRow = true;
+        }
+        // A short page is the last one; a full page may be followed by an
+        // empty one, which then only closes the body.
+        const last = records.length < PUBLIC_CAMERAS_EXPORT_PAGE_SIZE;
+        if (records.length > 0) lastId = records[records.length - 1].id;
+        if (last) parts.push(body.tail);
+        controller.enqueue(encoder.encode(parts.join("")));
+        if (last) controller.close();
+      } catch (error) {
+        console.error("GET /api/cameras export stream failed", error);
+        controller.error(error);
+      }
+    },
+  });
 }
 
 export async function GET(request: Request) {
@@ -264,21 +346,33 @@ export async function GET(request: Request) {
       );
     }
 
-    if (format === "geojson") {
+    if (format === "geojson" || format === "csv") {
       // Exports are complete snapshots (rate-limited in the "export" bucket):
-      // they fetch the FULL public list, never a page.
-      const records = await listPublicCameras(filters);
-      // Top-level licence metadata (RFC 7946 foreign members): ODbL 1.0
-      // attribution required when the database is shared (TERMS § 7.1).
+      // they walk the FULL public list (listPublicCameras, keyset-paged) and
+      // stream it, never a single page. Same filters as before: only kind and
+      // freshness apply, newest id first.
       // Exports are complete snapshots for download: a bounded 1 h edge/browser
       // cache is acceptable (the dataset changes through moderation, not live
       // feeds), and revalidation happens after the window. Deliberately NOT
       // `immutable` — the export URL's content does change when moderators act.
-      return Response.json({ type: "FeatureCollection", license: DATA_LICENSE_ID, attribution: DATA_LICENSE_NOTICE, features: records.map((record) => ({ type: "Feature", geometry: { type: "Point", coordinates: [record.longitude, record.latitude] }, properties: { id: record.id, title: record.title, kind: record.kind, manufacturer: record.manufacturer, observedOn: record.observedOn, status: record.status, source: record.source, updated: record.updated, description: record.description, direction: record.direction } })) }, { headers: { "Content-Disposition": "attachment; filename=opensurveillancedb-cameras.geojson", "Cache-Control": "public, s-maxage=86400", "Cache-Tag": CACHE_TAGS.export } });
-    }
-    if (format === "csv") {
-      const records = await listPublicCameras(filters);
-      return new Response(toCsv(records), { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": "attachment; filename=opensurveillancedb-cameras.csv", "Cache-Control": "public, s-maxage=86400", "Cache-Tag": CACHE_TAGS.export } });
+      // `now` pins the review-window/freshness boundary once for every page,
+      // exactly like the former single query.
+      const csv = format === "csv";
+      const now = new Date().toISOString();
+      const stream = await streamPublicExport(
+        (beforeId) => listPublicCameras(filters, { limit: PUBLIC_CAMERAS_EXPORT_PAGE_SIZE, now, ...(beforeId === undefined ? {} : { beforeId }) }),
+        csv ? CSV_EXPORT : GEOJSON_EXPORT,
+      );
+      return markStreamedResponse(
+        new Response(stream, {
+          headers: {
+            "Content-Type": csv ? "text/csv; charset=utf-8" : "application/json",
+            "Content-Disposition": `attachment; filename=opensurveillancedb-cameras.${csv ? "csv" : "geojson"}`,
+            "Cache-Control": "public, s-maxage=86400",
+            "Cache-Tag": CACHE_TAGS.export,
+          },
+        }),
+      );
     }
     // Pagination applies to the default JSON list only — CSV/GeoJSON exports
     // stay complete snapshots (rate-limited in the "export" bucket). limit is

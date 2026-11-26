@@ -157,11 +157,17 @@ test("JSON, GeoJSON, and CSV are all derived from the public camera list", async
   const getHandler = route.slice(getStart, postStart);
 
   assert.match(route, /import\s*\{[^}]*\blistPublicCameras\b[^}]*\}\s*from\s*["'][^"']*db\/cameras["']/);
-  assert.match(getHandler, /const\s+records\s*=\s+await\s+listPublicCameras\(filters\)/);
+  // Streamed exports (Workers OOM, 2026-11): both exports walk the SAME
+  // filtered public list in bounded keyset pages and stream the body.
   assert.match(
     getHandler,
-    /features\s*:\s*records\.map\(/,
-    "GeoJSON must map the same filtered records returned by listPublicCameras",
+    /streamPublicExport\(\s*\(beforeId\)\s*=>\s*listPublicCameras\(filters,\s*\{\s*limit:\s*PUBLIC_CAMERAS_EXPORT_PAGE_SIZE,/,
+    "CSV/GeoJSON must stream pages of the same filtered records returned by listPublicCameras",
+  );
+  assert.match(
+    route,
+    /const\s+GEOJSON_EXPORT[\s\S]*?row:\s*\(record\)\s*=>\s*JSON\.stringify\(\{\s*type:\s*"Feature"/,
+    "GeoJSON must map each listed record to a Feature",
   );
   assert.match(
     getHandler,
@@ -178,10 +184,10 @@ test("JSON, GeoJSON, and CSV are all derived from the public camera list", async
     /return\s+Response\.json\(\s*facets\s*\?\s*\{/,
     "the default JSON list must return the paginated shape (records, total, nextOffset) — facets included ONLY when explicitly requested",
   );
-  assert.match(route, /function\s+toCsv\s*\(records/, "CSV must have an explicit serializer");
+  assert.match(route, /const\s+CSV_EXPORT\s*:\s*ExportBody\s*=/, "CSV must have an explicit serializer");
   assert.match(getHandler, /format\s*===\s*["']csv["']/, "the public route must recognise the CSV format");
-  assert.match(getHandler, /new\s+Response\(toCsv\(records\)/, "CSV must serialize the same filtered record list");
-  assert.match(getHandler, /Content-Type["']?\s*:\s*["']text\/csv; charset=utf-8["']/, "CSV must identify its content type");
+  assert.match(getHandler, /csv\s*\?\s*CSV_EXPORT\s*:\s*GEOJSON_EXPORT/, "CSV must serialize the same filtered record list");
+  assert.match(getHandler, /Content-Type["']?\s*:\s*csv\s*\?\s*["']text\/csv; charset=utf-8["']/, "CSV must identify its content type");
   assert.doesNotMatch(getHandler, /\bgetD1\b|\bcreatePendingCamera\b/, "GET must not bypass the public-list boundary");
 });
 

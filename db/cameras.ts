@@ -120,9 +120,9 @@ export const DOME_KIND = "Fixed dome";
 // moderation edits such as a title fix). The moderation write path already
 // sets last_verified_at on approve/reverify, and migration 0019 backfills it
 // for legacy verified rows from their recovered verification timestamp.
-function freshnessCutoff(freshness: Exclude<FreshnessWindow, "all">): string {
+function freshnessCutoff(freshness: Exclude<FreshnessWindow, "all">, nowMs: number = Date.now()): string {
   const days = Number.parseInt(freshness, 10);
-  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  return new Date(nowMs - days * 24 * 60 * 60 * 1000).toISOString();
 }
 export function publicCameraPredicate(nowIso: string): { sql: string; parameters: string[] } {
   // The shared public-read predicate, derived from PUBLIC_CAMERA_STATUSES
@@ -173,21 +173,59 @@ export function demoRecordsPublic(): boolean {
   return env.ENVIRONMENT === "development";
 }
 
+/**
+ * Page size for the full public list (Workers OOM, 2026-11). Paging is
+ * MANDATORY, not an optimisation: the exports used to read the whole
+ * public set (~273k rows) in ONE SELECT, which both exceeded the 128 MB
+ * Worker isolate limit and — since 2026-11-04 — exceeds D1's 50 MB maximum
+ * query result size, so the single query fails on D1 itself whatever the
+ * Worker does with it. listPublicCameras therefore always sends a LIMIT of
+ * at most this size (~0.5 MB per page), and the CSV/GeoJSON exports walk it
+ * in keyset pages and stream each page out. 1000 rows/page keeps a 273k
+ * export at ~274 D1 queries, far below the Workers Paid per-invocation
+ * subrequest budget (10,000).
+ */
+export const PUBLIC_CAMERAS_EXPORT_PAGE_SIZE = 1000;
+
+export type PublicCameraListOptions = {
+  /**
+   * Keyset cursor for the export walk: only rows with `id < beforeId`.
+   * The list is ORDER BY id DESC, so passing the last id of the previous
+   * page yields the next page without OFFSET (index seek on the implicit
+   * rowid of cameras_status_idx).
+   */
+  beforeId?: number;
+  /**
+   * Page size, clamped to [1, PUBLIC_CAMERAS_EXPORT_PAGE_SIZE]; omitted =
+   * PUBLIC_CAMERAS_EXPORT_PAGE_SIZE. There is deliberately no unbounded
+   * mode: a caller that needs every row walks the pages with `beforeId`.
+   */
+  limit?: number;
+  /**
+   * ISO instant used for BOTH the review-window predicate and the freshness
+   * cutoff. A paged export pins it once so every page shares the same
+   * visibility boundary, exactly like the former single SELECT.
+   */
+  now?: string;
+};
+
 export async function listPublicCameras(
   nowIsoOrFilters?: string | PublicCameraFilters,
+  options: PublicCameraListOptions = {},
 ): Promise<PublicCameraRecord[]> {
   const d1 = await getD1();
   // The first argument is either a review-window boundary (ISO string, as used
   // by the freshness-reverification suite) or a filter object (directory UI /
   // public API route). A string selects the boundary at a specific instant;
-  // filter objects always evaluate the boundary "now".
+  // filter objects evaluate the boundary at `options.now`, or "now".
   const filters =
     typeof nowIsoOrFilters === "string" ? undefined : nowIsoOrFilters;
   const nowIso =
-    typeof nowIsoOrFilters === "string"
+    options.now ??
+    (typeof nowIsoOrFilters === "string"
       ? nowIsoOrFilters
-      : new Date().toISOString();
-  const parameters: string[] = [];
+      : new Date().toISOString());
+  const parameters: (string | number)[] = [];
   // Public visibility boundary: derived from PUBLIC_CAMERA_STATUSES — only
   // `demo` records and `verified` records still inside their review window
   // (or without a schedule, i.e. not provably stale) are presented as
@@ -201,7 +239,7 @@ export async function listPublicCameras(
   }
   if (filters?.freshness && filters.freshness !== "all") {
     query += " AND last_verified_at >= ?";
-    parameters.push(freshnessCutoff(filters.freshness));
+    parameters.push(freshnessCutoff(filters.freshness, Date.parse(nowIso)));
     // No GLOB anti-label filter here: migration 0019 normalised every
     // non-ISO `updated` value to a real timestamp, and the freshness window
     // itself is anchored on `last_verified_at` (domain decision, § 3.2.6), so
@@ -209,7 +247,14 @@ export async function listPublicCameras(
     // (status, last_verified_at) index is usable — a GLOB would defeat the
     // index seek.
   }
-  query += " ORDER BY id DESC";
+  if (options.beforeId !== undefined) {
+    query += " AND id < ?";
+    parameters.push(Math.trunc(options.beforeId));
+  }
+  // Always bounded (see PUBLIC_CAMERAS_EXPORT_PAGE_SIZE): an unbounded
+  // SELECT over the public set exceeds D1's 50 MB result cap.
+  query += " ORDER BY id DESC LIMIT ?";
+  parameters.push(Math.min(Math.max(Math.trunc(options.limit ?? PUBLIC_CAMERAS_EXPORT_PAGE_SIZE) || PUBLIC_CAMERAS_EXPORT_PAGE_SIZE, 1), PUBLIC_CAMERAS_EXPORT_PAGE_SIZE));
   const result = await d1.prepare(query).bind(...parameters).all<PublicCameraRecord>();
   return result.results.map((record) => ({ ...record, latitude: roundPublicCoordinate(record.latitude), longitude: roundPublicCoordinate(record.longitude) }));
 }
@@ -255,8 +300,8 @@ export type PublicCameraListPage = {
  * Paginated variant of listPublicCameras for the default JSON directory.
  *
  * The default JSON payload must stay bounded as the dataset grows, while the
- * CSV/GeoJSON exports remain complete snapshots (they keep calling
- * listPublicCameras). The page shares the same public predicate, the same
+ * CSV/GeoJSON exports remain complete snapshots (they walk
+ * listPublicCameras in keyset pages and stream the body). The page shares the same public predicate, the same
  * publish-flag CASEs and the same ~10 m coordinate rounding as the full
  * list, and ORDER BY id DESC keeps offsets stable between requests. `limit`
  * is clamped to [1, PUBLIC_CAMERAS_PAGE_MAX_LIMIT] and `offset` to >= 0 at

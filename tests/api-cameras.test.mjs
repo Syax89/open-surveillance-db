@@ -424,7 +424,13 @@ test("GET /api/cameras export formats honour the same safe filters", async () =>
 
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-disposition"), /filename=opensurveillancedb-cameras\.csv/);
-  assert.deepEqual(callArgs("listPublicCameras")[0], [{ kind: "Fixed dome", freshness: "90d" }]);
+  // Streamed export (Workers OOM, 2026-11): the filters are unchanged; the
+  // second argument is the keyset page request (bounded limit + pinned now).
+  const [filters, page] = callArgs("listPublicCameras")[0];
+  assert.deepEqual(filters, { kind: "Fixed dome", freshness: "90d" });
+  assert.equal(page.limit, 1000);
+  assert.equal(page.beforeId, undefined, "the first page starts at the newest id");
+  assert.match(page.now, /^\d{4}-\d{2}-\d{2}T/);
 });
 
 test("GET /api/cameras forwards limit and offset to the paginated query and reports total/nextOffset", async () => {
