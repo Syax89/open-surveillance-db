@@ -81,8 +81,34 @@ export function normalizeGatePath(pathname: string): string {
  * service-desc). The spec answers from the static ASSETS, not the router
  * pipeline, so a probe costs a CDN-cached asset fetch instead of D1 work.
  */
-export const SCANNER_PATH_PATTERN =
-  /(^|\/)(\.env|\.git|\.svn|\.hermes|node_modules|service_account\.json|appsettings\.json|firebase\.json|aws-config|configuration\.php|frontend_latest|telescope|server-info|phpmyadmin|adminer|wp-admin|sa\.json|application\.properties|classwithtostring)|\.(php|bak|sql|log)$/i;
+const SCANNER_PATH_PARTS = [
+  // Original list (2026-08-12).
+  /(^|\/)(\.env|\.git|\.svn|\.hermes|node_modules|service_account\.json|appsettings\.json|firebase\.json|aws-config|configuration\.php|frontend_latest|telescope|server-info|phpmyadmin|adminer|wp-admin|sa\.json|application\.properties|classwithtostring)|\.(php|bak|sql|log)$/,
+  // 2026-11-26 (Workers Observability, 7 days: ~2,160 404s across 159
+  // probe paths, each rendered as a full app 404 page). Same rule as
+  // above: only paths that can never belong to the site.
+  // Any dot-segment (dotfiles and dot-directories: .ssh, .aws, .azure,
+  // .kube, .docker, .config, .claude, .cursor, .codex, .npmrc, .DS_Store…)
+  // EXCEPT /.well-known/, which the site serves (API catalog, OAuth
+  // metadata, agent index), and /.rsc, vinext's RSC payload for the home
+  // page (client-side navigation to /).
+  /(^|\/)\.(?!well-known(\/|$)|rsc$)[^/]/,
+  // Secret, config, infrastructure and backup file types the site never
+  // serves (it only serves html/json/js/css/svg/png/xml/txt/md).
+  /\.(ya?ml|toml|ini|conf|cfg|env|pem|key|p12|pfx|ovpn|tfstate|tfvars|hcl|rb|py|lock|db|sqlite3?|properties|gradle|zip|tar|tgz|gz|rar|7z)$/,
+  // Build / CI / deploy files without an extension.
+  /(^|\/)(dockerfile|makefile|jenkinsfile|procfile|capfile|rakefile|gulpfile|pipfile|gemfile|homestead)(\.[\w.-]+)?$/,
+  // Exact names of credential / project files. Generic words such as
+  // `credentials` or `config` alone are NOT matched: /api/auth/passkey/
+  // credentials is a real route.
+  /(^|\/)(package(-lock)?|composer|tsconfig|railway|auth|config|keys|credentials|google-key|google-credentials|firebase-key|service-account-key|vertex-ai-credentials|gcp|claude_desktop_config|mcp_config|mcp|azureprofile|accesstokens|settings(\.local)?|appsettings(\.[\w-]+)?)\.json$/,
+  /(^|\/)(env|env-config|config|next\.config)\.js$/,
+  /^\/env$/,
+  /(^|\/)(crossdomain\.xml|clientaccesspolicy\.xml|wp-content|phpinfo|actuator|_ignition|desktop\.ini)(\/|$|\.)/,
+  /(^|\/)v2\/_catalog$|(^|\/)app\/etc\/local\.xml$|(^|\/)(nuget\.config|settings\.xml)$/,
+];
+
+export const SCANNER_PATH_PATTERN = new RegExp(SCANNER_PATH_PARTS.map((part) => part.source).join("|"), "i");
 
 function safeEqual(expected: string, actual: string) {
   if (expected.length !== actual.length) return false;
