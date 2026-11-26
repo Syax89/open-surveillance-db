@@ -22,3 +22,18 @@ updates:
       npm-minor-patch:
         update-types: [minor, patch]
     open-pull-requests-limit: 5
+    ignore:
+      # Node 22 is the runtime everywhere (package.json engines, every
+      # workflow's setup-node, the deploy job): the Node type definitions must
+      # not describe a newer Node, or tsc accepts APIs that do not exist at
+      # runtime. 22.x patch/minor updates still arrive. Lift this together
+      # with the Node major bump (#572 was declined for this reason).
+      - dependency-name: "@types/node"
+        versions: [">=23"]
+      # TypeScript 7 (the native port) breaks eslint-config-next, which
+      # requires the `typescript` package and fails to load it (CI on #573:
+      # lint exits 2 before any check runs), and the test harnesses call
+      # ts.transpileModule. 5.x updates still arrive. Revisit once
+      # eslint-config-next supports TypeScript 7.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
