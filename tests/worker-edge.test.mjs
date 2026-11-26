@@ -579,6 +579,46 @@ test("anti-scanner: blocks sensitive-config probes with 403 before the app handl
     "/sa.json",
     "/.git/config",
     "/.svn/entries",
+    // 2026-11-26: real probes from a week of Workers logs.
+    "/.ssh/id_rsa",
+    "/.aws/credentials",
+    "/@fs/root/.aws/credentials",
+    "/.azure/accessTokens.json",
+    "/.kube/config",
+    "/.docker/config.json",
+    "/.claude/settings.json",
+    "/.cursor/mcp.json",
+    "/.config/gcloud/credentials.db",
+    "/.DS_Store",
+    "/.npmrc",
+    "/redis.conf",
+    "/docker-compose.yml",
+    "/config/secrets.yaml",
+    "/terraform.tfvars",
+    "/.terraform/terraform.tfstate",
+    "/supabase/config.toml",
+    "/credentials.ini",
+    "/private.key",
+    "/client.ovpn",
+    "/www.zip",
+    "/backup.tar.gz",
+    "/Gemfile.lock",
+    "/manage.py",
+    "/config/initializers/secret_token.rb",
+    "/Dockerfile",
+    "/Makefile",
+    "/Jenkinsfile",
+    "/package.json",
+    "/google-key.json",
+    "/appsettings.Development.json",
+    "/sendgrid.env",
+    "/env",
+    "/env.js",
+    "/next.config.js",
+    "/crossdomain.xml",
+    "/actuator/beans",
+    "/_ignition/health-check",
+    "/v2/_catalog",
   ];
   for (const path of probes) {
     const response = await worker.fetch(request(path), testEnv(), ctxObj);
@@ -606,12 +646,29 @@ test("anti-scanner: legitimate site paths are never blocked", async () => {
     "/api/corrections",
     "/_next/static/css/BaF74ZOW.css",
     "/records/6745",
+    // 2026-11-26 widening: the dot-segment rule must spare /.well-known/
+    // and vinext's home RSC payload (/.rsc); generic words stay allowed
+    // (/api/auth/passkey/credentials is a real route); .md/.txt are served.
+    "/.rsc",
+    "/mappa.rsc",
+    "/api/auth/passkey/credentials",
+    "/api/auth/keys",
+    "/robots.txt",
+    "/sitemap.xml",
+    "/favicon.ico",
+    "/apple-touch-icon.png",
   ];
   for (const path of legit) {
     const response = await worker.fetch(request(path), testEnv(), ctxObj);
     assert.notEqual(response.status, 403, `${path} must not be blocked`);
   }
   assert.equal(app.__calls.length, legit.length, "every legit path must reach the app handler");
+  // Discovery documents the worker answers itself: the dot-segment rule
+  // must spare /.well-known/, and .md is a served type.
+  for (const path of ["/.well-known/api-catalog", "/.well-known/oauth-protected-resource", "/.well-known/agent-index.json", "/auth.md"]) {
+    const response = await worker.fetch(request(path), testEnv(), ctxObj);
+    assert.equal(response.status, 200, `${path} must be served, not blocked`);
+  }
   // Moderation paths are gated (503 fail-closed without credentials), never
   // anti-scanner blocked — covered by the moderation gate tests below.
   for (const path of ["/moderation", "/api/moderation/corrections/1"]) {

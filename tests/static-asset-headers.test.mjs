@@ -40,7 +40,7 @@ test("hashed bundle assets keep vinext's immutable rule", () => {
 });
 
 test("brand and social assets get a one-day cache instead of must-revalidate", () => {
-  for (const file of ["/favicon.svg", "/logo-dark.svg", "/og.png"]) {
+  for (const file of ["/favicon.svg", "/favicon.ico", "/apple-touch-icon.png", "/apple-touch-icon-precomposed.png", "/logo-dark.svg", "/og.png"]) {
     assert.ok(existsSync(path.join(root, "public", file.slice(1))), `${file} exists in public/`);
     assert.equal(rules.get(file)?.["cache-control"], "public, max-age=86400", `${file} is cached for a day`);
   }
@@ -55,6 +55,6 @@ test("no rule can reach HTML documents or API responses", () => {
   for (const pattern of rules.keys()) {
     assert.notEqual(pattern, "/*", "no catch-all rule");
     assert.ok(!pattern.startsWith("/api"), "API responses keep their own Cache-Control");
-    assert.ok(pattern === "/_next/static/*" || /^\/[\w.-]+\.(svg|png|css)$/.test(pattern), `${pattern} targets one static file`);
+    assert.ok(pattern === "/_next/static/*" || /^\/[\w.-]+\.(svg|png|ico|css)$/.test(pattern), `${pattern} targets one static file`);
   }
 });
