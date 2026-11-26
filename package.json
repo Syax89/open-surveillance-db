@@ -65,7 +65,7 @@
     "eslint": "^10.15.0",
     "eslint-config-next": "^16.4.6",
     "jsdom": "^31.0.1",
-    "miniflare": "5.20260730.0-alpha",
+    "miniflare": "5.20261119.0-beta",
     "react-server-dom-webpack": "^19.3.1",
     "tailwindcss": "4.3.5",
     "typescript": "5.9.3",
@@ -76,6 +76,16 @@
   "type": "module",
   "overrides": {
     "sharp": "^0.35.3",
-    "postcss": "^8.5.18"
+    "postcss": "^8.5.18",
+    "satori": {
+      "fflate": "^0.7.5"
+    },
+    "test-exclude": {
+      "glob": "^14.0.2",
+      "minimatch": "^11.0.1"
+    },
+    "@esbuild-kit/core-utils": {
+      "esbuild": "^0.25.12"
+    }
   }
 }
