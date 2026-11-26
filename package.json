@@ -76,6 +76,19 @@
   "type": "module",
   "overrides": {
     "sharp": "^0.35.3",
-    "postcss": "^8.5.18"
+    "postcss": "^8.5.18",
+    "satori": {
+      "fflate": "^0.7.5"
+    },
+    "test-exclude": {
+      "glob": "^14.0.2",
+      "minimatch": "^11.0.1"
+    },
+    "@esbuild-kit/core-utils": {
+      "esbuild": "^0.25.12"
+    },
+    "miniflare": {
+      "undici": "^7.30.2"
+    }
   }
 }
