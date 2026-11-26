@@ -6,6 +6,7 @@ import { resolveLocale } from "../../../lib/i18n/types";
 import { searchLimits } from "../../../lib/rate-limit";
 import { rateLimitResponse } from "../../../lib/rate-limit-response";
 import { MAX_PAGE_OFFSET } from "../../../lib/input-limits";
+import { errorSummary } from "../../../lib/error-summary";
 import {
   coordinateRadiusMeters,
   formatDistance,
@@ -85,7 +86,8 @@ async function searchArea(query: string, area: SearchArea, limit: number, offset
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {
-    console.error("GET /api/cameras/search failed", error);
+    // D1-only try block: the error never carries the query text.
+    console.error("GET /api/cameras/search failed:", errorSummary(error), error);
     return Response.json({ error: "Database unavailable" }, { status: 503 });
   }
 }

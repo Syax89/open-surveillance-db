@@ -30,6 +30,14 @@ export default function robots(): MetadataRoute.Robots {
           // Crawl budget: 273k near-duplicate record pages kept bots busy for
           // days; only the main pages (home, directory, map, info) are crawled.
           "/records/",
+          // Same crawl-budget problem one hop later (Workers Observability,
+          // 2026-11-18..25): bots that had already harvested the record pages
+          // kept following their "view on map" links, /mappa?focus=<id> — one
+          // full map render (~45 ms CPU) per record. SemrushBot alone made
+          // ~55% of the worker's total CPU time this way. /mappa itself stays
+          // crawlable; only its query-string views (?focus=, ?q=, ?type=,
+          // ?freshness=, ?sort=) are near-duplicates of it and are excluded.
+          "/mappa?",
           "/register",
           "/login",
         ],

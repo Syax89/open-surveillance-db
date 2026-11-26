@@ -13,6 +13,7 @@ import {
 } from "../../lib/rate-limit";
 import { rateLimitResponse } from "../../lib/rate-limit-response";
 import { CACHE_TAGS } from "../../lib/cache-purge";
+import { errorSummary } from "../../lib/error-summary";
 import { markStreamedResponse, withPublicCache } from "../../lib/public-cache";
 import {
   BodyReadError,
@@ -420,7 +421,7 @@ export async function GET(request: Request) {
       { headers: { "Cache-Control": "public, s-maxage=900, stale-while-revalidate=1800", "Cache-Tag": CACHE_TAGS.list } },
     );
   } catch (error) {
-    console.error("GET /api/cameras failed", error);
+    console.error("GET /api/cameras failed:", errorSummary(error), error);
     return Response.json({ error: "Database unavailable" }, { status: 503 });
   }
   });
@@ -515,7 +516,7 @@ export async function POST(request: Request) {
     try {
       possibleDuplicates = await findNearbyPublicCameras(latitude, longitude, 75, { title, address, kind });
     } catch (error) {
-      console.error("POST /api/cameras duplicate check failed", error);
+      console.error("POST /api/cameras duplicate check failed:", errorSummary(error), error);
     }
     // A high-strength candidate (essentially the same spot, or <= 75 m with
     // matching text) forces an explicit acknowledgement. Without it the
@@ -544,7 +545,7 @@ export async function POST(request: Request) {
       console.warn("POST /api/cameras payload rejected: body too large or not valid JSON");
       return Response.json({ error: error.message }, { status: error.status });
     }
-    console.error("POST /api/cameras failed", error);
+    console.error("POST /api/cameras failed:", errorSummary(error), error);
     return Response.json({ error: "Unable to save report" }, { status: 500 });
   }
 }
