@@ -760,10 +760,12 @@ changes accumulate under `[Unreleased]`.
   persiste, il controllo risulta **non verificato** (avviso nel riepilogo
   del job) invece che fallito. Ogni altra risposta diversa da 200 fa ancora
   fallire il deploy, compreso un 403 senza `cf-mitigated`.
-  `wrangler.jsonc` imposta anche `workers_dev: false`. L'indirizzo
-  `*.workers.dev` serviva l'intero sito fuori dalla zona: senza Bot Fight
-  Mode, senza redirect all'host canonico e senza `noindex`. Era quindi un
-  duplicato indicizzabile del sito, già visitato dai bot.
+  L'indirizzo `*.workers.dev` serviva l'intero sito senza `noindex`: era
+  un duplicato indicizzabile, già visitato dai bot. Resta attivo, ora in
+  modo esplicito (`workers_dev: true`), perché il monitoraggio GitHub
+  (`vars.PROD_URL`) lo usa per evitare le challenge di Bot Fight Mode sul
+  dominio. Su quell'host però ogni risposta porta `X-Robots-Tag: noindex`
+  e il suo `robots.txt` è `Disallow: /`.
 
 - **Esportazioni CSV/GeoJSON in streaming (2026-11):** `GET /api/cameras?format=csv`
   e `?format=geojson` leggevano tutti i record pubblici (~273k) con una sola

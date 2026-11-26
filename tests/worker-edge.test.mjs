@@ -514,6 +514,35 @@ test("canonical HTTPS reaches the app while pre-production responses stay noinde
   assert.equal(app.__calls.length, 2);
 });
 
+// workers.dev host (2026-11-26): kept enabled for ops monitoring
+// (vars.PROD_URL), but it must never be indexed as a duplicate of the site.
+const WORKERS_DEV = "https://open-surveillance-db.simone-rondina.workers.dev";
+
+test("workers.dev: pages and the API still answer 200 for monitoring, always noindex", async () => {
+  const { worker, app } = await loadWorker();
+  for (const requestPath of ["/", "/api/cameras?limit=1", "/faq"]) {
+    const response = await worker.fetch(new Request(`${WORKERS_DEV}${requestPath}`), testEnv(), ctx());
+    assert.equal(response.status, 200, `${requestPath} must stay reachable for the health check`);
+    assert.equal(response.headers.get("x-robots-tag"), "noindex, nofollow", `${requestPath} must be noindex on workers.dev`);
+  }
+  assert.equal(app.__calls.length, 3, "workers.dev is served by the app, not redirected");
+});
+
+test("workers.dev: robots.txt disallows everything at the edge; the canonical robots.txt is the app's", async () => {
+  const { worker, app } = await loadWorker();
+  const devRobots = await worker.fetch(new Request(`${WORKERS_DEV}/robots.txt`), testEnv(), ctx());
+  assert.equal(devRobots.status, 200);
+  assert.equal(await devRobots.text(), "User-agent: *\nDisallow: /\n");
+  assert.match(devRobots.headers.get("content-type") ?? "", /^text\/plain/);
+  assert.equal(devRobots.headers.get("x-robots-tag"), "noindex, nofollow");
+  assert.equal(app.__calls.length, 0, "the workers.dev robots.txt never reaches the app router");
+
+  const canonical = await worker.fetch(new Request("https://opensurveillancedb.org/robots.txt"), testEnv(), ctx());
+  assert.equal(canonical.status, 200);
+  assert.equal(canonical.headers.get("x-robots-tag"), null);
+  assert.equal(app.__calls.length, 1, "the canonical robots.txt is served by app/robots.ts");
+});
+
 // ---------------------------------------------------------------------------
 // Anti-scanner path catch-all (2026-08-12, CEO decision)
 // ---------------------------------------------------------------------------

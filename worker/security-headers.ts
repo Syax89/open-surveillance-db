@@ -1,6 +1,6 @@
 /** Global security headers, CSP nonce and discovery Link header (split from worker/index.ts). */
 import { SESSION_COOKIE } from "../app/lib/csrf";
-import { PREPRODUCTION_HOST } from "./host";
+import { isWorkersDevHost, PREPRODUCTION_HOST } from "./host";
 
 /**
  * Global security headers (audit t_a07443bd, P2 gap).
@@ -153,7 +153,9 @@ export function withSecurityHeaders(response: Response, pathname?: string, hostn
   if (pathname && GEOLOCATION_ROUTES.has(pathname) && !appSetPermissionsPolicy) {
     headers.set("Permissions-Policy", GEOLOCATION_PERMISSIONS_POLICY);
   }
-  if (hostname?.toLowerCase() === PREPRODUCTION_HOST) {
+  // Non-canonical hosts never get indexed: the pre-production alias and the
+  // Worker's own *.workers.dev address (kept for ops monitoring, host.ts).
+  if (hostname && (hostname.toLowerCase() === PREPRODUCTION_HOST || isWorkersDevHost(hostname))) {
     headers.set("X-Robots-Tag", "noindex, nofollow");
   }
   // Private (gated) surfaces must never be publicly cacheable.

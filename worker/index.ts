@@ -7,7 +7,7 @@ import type { Env, ExecutionContext, ScheduledController } from "./env";
 import { gatedPath, normalizeGatePath, requireModerationAuth, SCANNER_PATH_PATTERN } from "./gate";
 import { localeFromRequest, renderGateUnavailablePage, wantsHtml } from "./gate-page";
 import { injectIdentityAfterGate, stripIdentityHeaders } from "./identity";
-import { hostRedirect } from "./host";
+import { hostRedirect, workersDevRobots } from "./host";
 import { applyApiCachePolicy, applyHtmlDocumentCachePolicy, buildCspWithNonce, generateCspNonce, withSecurityHeaders } from "./security-headers";
 import { AGENT_INDEX, AUTH_MD, MARKDOWN_PAGES, OAUTH_AUTHORIZATION_SERVER, OAUTH_PROTECTED_RESOURCE } from "./discovery";
 import { recordRequestAnalytics } from "./analytics";
@@ -36,6 +36,11 @@ const WARMUP_CRON = "*/1 * * * *";
 async function dispatch(request: Request, env: Env, ctx: ExecutionContext, url: URL): Promise<Response> {
   const redirect = hostRedirect(request, url);
   if (redirect) return redirect;
+
+  // workers.dev host (kept for ops monitoring): its robots.txt disallows
+  // everything, so it never competes with the canonical site (host.ts).
+  const robots = workersDevRobots(url);
+  if (robots) return withSecurityHeaders(robots, url.pathname, url.hostname);
 
     // Preserve the discovery routes' trailing-slash key. The auth gate uses
     // full router normalization below, without changing the admitted Request.
